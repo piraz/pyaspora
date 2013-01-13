@@ -1,4 +1,8 @@
 *.py[cod]
+__pycache__
+
+database.sqlite
+tmp/sessions/*
 
 # C extensions
 *.so
