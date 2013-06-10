@@ -33,9 +33,10 @@ When you are at the interpreter you can do:
     configure_session_for_app(your_cherrypy_app)
 '''
 
-
-from sqlalchemy import MetaData, create_engine, __version__ as sa_version
+from __future__ import absolute_import
+from sqlalchemy import create_engine, __version__ as sa_version
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.schema import MetaData
 
 if sa_version.split(".") < ["0", "5", "0"]:
     raise ImportError("Version 0.5 or later of SQLAlchemy required.")

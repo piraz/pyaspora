@@ -1,14 +1,13 @@
-import urllib.parse
+try:
+    from urllib.parse import quote_plus # py3
+except:
+    from urllib import quote_plus # py2
 
 import cherrypy.lib.sessions
-from jinja2 import Environment, FileSystemLoader
-
 import pyaspora.model as model
-import pyaspora.transport.diaspora.controller
+import pyaspora.view as view
+#import pyaspora.transport.diaspora.controller
 from pyaspora.tools.sqlalchemy import session
-
-# Quick access to the templating engine
-templ = Environment(loader=FileSystemLoader('src/pyaspora/templates'))
 
 class User:
     """
@@ -19,16 +18,16 @@ class User:
         """
         Create a new User (sign-up).
         """
-        if username is None or password is None or email is None or name is None:
-            return templ.get_template("user/create_form.tpl").render()
-        else:
-            my_user = model.User()
-            my_user.email = email
-            my_user.contact.username = username+'@localhost'
-            my_user.contact.realname = name
-            my_user.set_password(password)
-            my_user.generate_keypair(password)
-            return templ.get_template("user/created.tpl").render()
+        if not(username and password and email and name):
+            return view.User.create_form()
+        
+        my_user = model.User()
+        my_user.email = email
+        my_user.contact.username = username+'@localhost'
+        my_user.contact.realname = name
+        my_user.set_password(password)
+        my_user.generate_keypair(password)
+        return view.User.created()
         
     @cherrypy.expose
     def activate(self, guid):
@@ -37,26 +36,26 @@ class User:
         that confirms the email address is valid.
         """
         matched_user = model.User.get_unactivated(guid) 
-        if (matched_user is None):
-            return templ.get_template("user/activation_failed.tpl").render()
-        else:
-            matched_user.activate()
-            return templ.get_template("user/activation_success.tpl").render()
+        if not matched_user:
+            return view.User.activation_failed()
+        
+        matched_user.activate()
+        return view.User.activation_success()
         
     @cherrypy.expose
     def login(self, username=None, password=None):
         """
         Allow a user to log in.
         """
-        if username is None or password is None:
-            return templ.get_template("user/login.tpl").render({ 'logged_in': User.logged_in() })
+        if not(username and password):
+            return view.User.login(logged_in=User.logged_in())
         user = model.User.get_by_email(username)
-        if user is None: # FIXME: if user is None or user.activated is None: (activated users only)
-            return templ.get_template("user/login.tpl").render({ 'error': 'Incorrect login details' })
+        if not user: # FIXME: if user is None or user.activated is None: (activated users only)
+            return view.User.login(error='Incorrect login details')
         if not user.password_is(password):
-            return templ.get_template("user/login.tpl").render({ 'error': 'Incorrect login details' })
+            return view.User.login(error='Incorrect login details')
         cherrypy.session['logged_in_user'] = user.id
-        raise cherrypy.HTTPRedirect("/contact/profile?username=" + urllib.parse.quote_plus(user.contact.username), 303)
+        raise cherrypy.HTTPRedirect("/contact/profile?username={}".format(quote_plus(user.contact.username)), 303)
           
     @cherrypy.expose
     def logout(self):
@@ -65,7 +64,7 @@ class User:
         """
         cherrypy.session.clear()
         cherrypy.lib.sessions.expire()
-        return templ.get_template("user/logged_out.tpl").render({ 'logged_out': None })
+        return view.User.logged_out(logged_out=None)
     
     @classmethod
     def logged_in(cls):
@@ -75,7 +74,7 @@ class User:
         """
         try:
             user_id = cherrypy.session.get("logged_in_user")
-            if user_id is None:
+            if not user_id:
                 return None
             return model.User.get(user_id)
         except:
@@ -107,20 +106,16 @@ class Contact:
         """
         Display the "feed" for a Contact.
         """
-        contact = model.Contact.get_by_username(username)
-        
         # Don't want a visitor to cause us to do lots of network access
-        if contact is None and User.logged_in():
-            try:
-                contact = model.Contact()
-                pyaspora.transport.Diaspora.import_contact(username, contact)
-                session.add(contact)
-            except:
-                contact = None
+        should_import = User.logged_in()
         
-        if contact is None:
-            cherrypy.response.status = 404
-            return templ.get_template("denied.tpl").render()
+        try:
+            contact = model.Contact.get_by_username(username, try_import=should_import)
+        except:
+            contact = None
+        
+        if not contact:
+            return view.denied(status=404)
             
         posts = contact.feed
         posts = [ p.post for p in posts if p.post.parent is None ]
@@ -131,22 +126,22 @@ class Contact:
         can_add = False
         can_post = False
         
-        if full is None:
+        if not full:
             full = (logged_in_user and logged_in_user.contact.id == contact.id)
         
-        if logged_in_user is not None:
+        if logged_in_user:
             can_remove = logged_in_user.subscribed_to(contact)        
             can_add = (not(can_remove) and logged_in_user.contact.id != contact.id)
             can_post = (can_remove or logged_in_user.contact.id == contact.id)
 
-        return templ.get_template("contact/profile.tpl").render({
-            'contact': contact,
-            'posts': formatted_posts,
-            'can_add': can_add,
-            'can_remove': can_remove,
-            'can_post': can_post,
-            'logged_in': logged_in_user
-        })
+        return view.Contact.profile(
+                contact=contact,
+                posts=formatted_posts,
+                can_add=can_add,
+                can_remove=can_remove,
+                can_post=can_post,
+                logged_in=logged_in_user
+        )
     
     @cherrypy.expose
     def find(self, search_term=None):
@@ -161,32 +156,28 @@ class Contact:
         Subscribe (form a friendship of some sort) with a Contact. This is a one-way relationship.
         """
         user = User.logged_in()
-        if user is None:
-            cherrypy.response.status = 403
-            return templ.get_template("denied.tpl").render({ 'reason': 'You must be logged in to subscribe' })
+        if not user:
+            return view.denied(status=403, reason='You must be logged in to subscribe')
         contact = model.Contact.get(contactid)
-        if contact is None:
-            cherrypy.response.status = 404
-            return templ.get_template("denied.tpl").render({ 'reason': 'Contact cannot be found' })
+        if not contact:
+            return view.denied(status=404, reason='Contact cannot be found')
         contact.subscribe(user, subtype=subtype)
         session.commit()
-        return templ.get_template("contact/subscribed.tpl").render()
+        return view.Contact.subscribed()
 
     def unsubscribe(self, contactid):
         """
         "Unfriend" a contact.
         """
         user = User.logged_in()
-        if user is None:
-            cherrypy.response.status = 403
-            return templ.get_template("denied.tpl").render({ 'reason': 'You must be logged in to subscribe' })
+        if not user:
+            return view.denied(status=403, reason='You must be logged in to unsubscribe')
         contact = model.Contact.get(contactid)
-        if not user.subscribed_to(contact):
-            cherrypy.response.status = 404
-            return templ.get_template("denied.tpl").render({ 'reason': 'Contact cannot be found' })
+        if not contact or not user.subscribed_to(contact):
+            return view.denied(status=404, reason='Subscription cannot be found')
         contact.transport().unsubscribe(user)
         session.commit()
-        return templ.get_template("contact/unsubscribed.tpl").render()
+        return view.Contact.unsubscribed()
     
     def groups(self, contactid, groups=[]):
         pass
@@ -198,17 +189,16 @@ class Contact:
         """
         user = User.logged_in()
         contact = model.Contact.get(contactid)
-        if contact is None:        
-            cherrypy.response.status = 404
-            return templ.get_template("denied.tpl").render({ 'reason': 'Cannot find contact' })
-        is_friends_with = (user is not None and user.subscribed_to(contact))
-        public_view = not(user is not None and user.contact.id == contact.id)
-        return templ.get_template("contact/friend_list.tpl").render({
-            'contact': contact, 
-            'public_view': public_view,
-            'is_friends_with': is_friends_with,
-            'logged_in': user
-        })
+        if not contact:        
+            return view.denied(status=404, reason='Contact cannot be found')
+        is_friends_with = (user and user.subscribed_to(contact))
+        public_view = not(user and user.contact.id == contact.id)
+        return view.Contact.friend_list(
+                contact=contact, 
+                public_view=public_view,
+                is_friends_with=is_friends_with,
+                logged_in=user
+        )
         
     @cherrypy.expose
     def avatar(self, contactid):
@@ -216,17 +206,14 @@ class Contact:
         Display the photo (or other media) that represents a Contact.
         """
         contact = model.Contact.get(contactid)
-        if contact is None:
-            cherrypy.response.status = 404
-            templ.get_template("denied.tpl").render({ 'reason': 'No such user' })
+        if not contact:
+            return view.denied(status=404, reason='No such user')
         
         part = contact.avatar
-        if part is None:
-            cherrypy.response.status = 404
-            templ.get_template("denied.tpl").render({ 'reason': 'No such part' })
-            
-        cherrypy.response.headers['Content-Type'] = part.type
-        return part.body        
+        if not part:
+            return view.denied(status=404, reason='No such avatar')
+
+        return view.raw(mime_type=part.type, body=part.body)
         
 class System:
     @cherrypy.expose
@@ -237,20 +224,11 @@ class System:
         FIXME - this should be a stand-alone script run by the server administrator.
         """
         model.Base.metadata.create_all()
-        levels = { 
-            'hidden': 'Not shown at all',
-            'self': 'Only shown to me',
-            'contacts': 'Only shown to my contacts',
-            'public': 'Shown to everyone'
-        }
-        for k, v in levels.items():
-            session.add(model.PrivacyLevel(level=k, description=v))
-        session.commit()
         return "Tables created"
 
 class Post:
     @cherrypy.expose
-    def create(self, body=None, privacy=None, parent=None, canreshare=False):
+    def create(self, body=None, parent=None, wall_too=False):
         """
         Create a new Post and put it on my wall. May also put it on friends walls', depending
         on the Post's privacy level.
@@ -258,25 +236,22 @@ class Post:
         author = User.logged_in()
         
         # Need to be logged in to create a post
-        if author is None:
-            cherrypy.response.status = 403
-            return templ.get_template("denied.tpl").render({ 'reason': 'You must be logged in to post' })
+        if not author:
+            return view.denied(status=403, reason='You must be logged in to post')
         
         # If the mandatory fields aren't supplied, we are probably creating a new post
-        if body is None or privacy is None:
-            levels = model.PrivacyLevel.all()
-            return templ.get_template("post/create_form.tpl").render({ 'privacy': levels, 'parent': parent })
+        if not body:
+            return view.Post.create_form(parent=parent)
 
         # figure out if this is a comment on another post
         parent_post = None
-        if parent is not None:
+        if parent:
             parent_post = model.Post.get(parent)
             # are we permitted to comment on it?
             if not(parent_post) or not(self.permission_to_view(parent_post)):
-                cherrypy.response.status = 403
-                return templ.get_template("denied.tpl").render()
+                return view.denied(status=403)
         
-        post = model.Post(author=author.contact, permits_reshare=canreshare)
+        post = model.Post(author=author.contact)
         if parent_post:
             post.parent = parent_post        
         
@@ -285,18 +260,16 @@ class Post:
         post.add_part(part, inline=True, order=1)
         
         # post to author's wall
-        post.share_with([author.contact], privacy)
+        post.share_with([author.contact], show_on_wall=wall_too)
         
-        if (privacy in ('public', 'contacts')):
-            post.share_with(author.friends(), privacy)
+        #if (privacy in ('public', 'contacts')):
+        #    post.share_with(author.friends(), privacy)
         
         # commit everything to get the Post ID
         session.commit()
         
         # done
-        return templ.get_template("post/created.tpl").render({ 'post': post })
-    
-
+        return view.Post.created(post=post)
     
     @classmethod
     def format(cls, posts, all_parts=False, show_all=False):
@@ -336,11 +309,9 @@ class Post:
         """
         post = session.query(model.Post).get(post_id)
         if not self.permission_to_view(post):
-            cherrypy.response.status = 403
-            return templ.get_template("denied.tpl").render()
+            return view.denied(status=403)
         to_display = self.format([post], show_all=True)
-        return templ.get_template("post/render.tpl").render({ 'post': post, 'parts': to_display })
-            
+        return view.Post.render(post=post, parts=to_display)
 
     @cherrypy.expose
     def raw_part(self, part_id):
@@ -348,19 +319,16 @@ class Post:
         Show a raw MIME part (such as an attachment) with no reformatting.
         """
         part = session.query(model.MimePart).get(part_id)
-        if part is None:
-            cherrypy.response.status = 404
-            templ.get_template("denied.tpl").render({ 'reason': 'No such part' })
+        if not part:
+            return view.denied(status=404, reason="No such part")
             
         # If anyone has shared this part with us (or the public), we get to view it
         for link in part.posts:
             if self.permission_to_view(link.post):
-                cherrypy.response.headers['Content-Type'] = part.type
-                return part.body
+                return view.raw(part.type, part.body)
 
         # Nobody shared it with us
-        cherrypy.response.status = 403
-        return templ.get_template("denied.tpl").render({ 'reason': 'Permission denied' })
+        return view.denied(status=403)
     
     @classmethod
     def permission_to_view(cls, post, contact=None):
@@ -369,7 +337,7 @@ class Post:
         Returns a boolean.
         """
         # Defaults to current logged in user
-        if contact is None:
+        if not contact:
             user = User.logged_in()
             if user is not None:
                 contact = user.contact            
@@ -386,23 +354,19 @@ class SubscriptionGroup:
         """
 
         user = User.logged_in()
-        if user is None:
-            cherrypy.response.status = 403
-            return templ.get_template("denied.tpl").render({ 'reason': 'You must be logged in to subscribe' })
+        if not user:
+            return view.denied(status=403, reason='You must be logged in')
         group = model.SubscriptionGroup.get(groupid)        
-        if group is None:
-            cherrypy.response.status = 404
-            return templ.get_template("denied.tpl").render({ 'reason': 'No such group' })        
+        if not group:
+            return view.denied(status=404, reason='No such group')        
         if group.user_id != user.id:
-            cherrypy.response.status = 403
-            return templ.get_template("denied.tpl").render({ 'reason': "You don't own this group" })
-        if newname is not None:
+            return view.denied(status=403, reason="You don't own this group")
+        if newname:
             group.name = newname
             session.commit()
-            return templ.get_template("subscriptiongroup/renamed.tpl").render({ 'logged_in': user })
+            return view.SubscriptionGroup.renamed(logged_in=user)
         else:
-            return templ.get_template("subscriptiongroup/rename.tpl").render({ 'group': group, 'logged_in': user })
-
+            return view.SubscriptionGroup.rename_form(group=group, logged_in=user)
  
 class Root:
     """
@@ -413,7 +377,7 @@ class Root:
     system = System()
     post = Post()
     subscriptiongroup = SubscriptionGroup()
-    diaspora = pyaspora.transport.diaspora.controller.DiasporaController()
+    #diaspora = pyaspora.transport.diaspora.controller.DiasporaController()
     
     @cherrypy.expose   
     def index(self):

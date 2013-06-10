@@ -1,6 +1,6 @@
 import hashlib # for password hashing
-import random  # salt generation for hashing
-import uuid    # to construct the user GUIDs
+import random # salt generation for hashing
+import uuid # to construct the user GUIDs
 
 from Crypto.PublicKey import RSA
 from sqlalchemy.ext.declarative import declarative_base
@@ -10,8 +10,8 @@ from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import func
 from sqlalchemy.types import Boolean, DateTime, Integer, LargeBinary, String
 
-import pyaspora.renderer
-import pyaspora.transport
+#import pyaspora.renderer
+#import pyaspora.transport
 
 from pyaspora.tools.sqlalchemy import metadata, session
 
@@ -19,8 +19,8 @@ Base = declarative_base(metadata=metadata)
 
 class Subscription(Base):
     """
-    A 'friendship' between a user and a contact (that could be local or external). This class
-    doesn't store the user explicitly, but via a SubscriptionGroup.
+    A one-way 'friendship' between a user and a contact (that could be local or external).
+    This class doesn't store the user explicitly, but via a SubscriptionGroup.
     
     Fields:
         group - the SubscriptionGroup this Subscription is part of
@@ -28,24 +28,22 @@ class Subscription(Base):
         contact - the Contact the user is subscribed to
         contact_id - the database primary key of the above
         type - the nature of this subscription (eg. "friend", "feed")
-        privacy - a PrivacyLevel that defines who can view this subscription 
     """
     
     __tablename__ = "subscriptions"
-    group_id   = Column(Integer, ForeignKey('subscription_groups.id'), primary_key=True)
+    group_id = Column(Integer, ForeignKey('subscription_groups.id'), primary_key=True)
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
-    type       = Column(String, nullable=False)
-    privacy    = Column(String, ForeignKey('privacy_levels.level'), nullable=False)
+    type = Column(String, nullable=False)
     
     @classmethod
-    def create(cls, user, contact, subtype='friend', group='All', privacy='self'):
+    def create(cls, user, contact, group, subtype='friend'):
         """
         Create a new subscription, where <user> subscribes to <contact> with type <subtype>.
         The group name <group> will be used, and the group will be created if it doesn't already
-        exist. A privacy level of <privacy> will be assigned to the subscription.
+        exist. A privacy level of <private> will be assigned to the Subscription.
         """
         dbgroup = SubscriptionGroup.get_by_name(user=user, group=group, create=True)
-        sub = cls(group = dbgroup, contact_id = contact.id, type = subtype, privacy=privacy)
+        sub = cls(group=dbgroup, contact_id=contact.id, type=subtype)
         session.add(sub)
         return sub
 
@@ -87,8 +85,8 @@ class SubscriptionGroup(Base):
         """
         dbgroup = session.query(cls).filter(and_(cls.name == group, cls.user_id == user.id)). \
             first()
-        if create and dbgroup is None:
-            dbgroup = cls(user = user, name = group)
+        if create and not dbgroup:
+            dbgroup = cls(user=user, name=group)
             session.add(dbgroup)
         return dbgroup
 
@@ -116,13 +114,13 @@ class User(Base):
     """
     
     __tablename__ = 'users'
-    id           = Column(Integer, primary_key=True)
-    password     = Column(String, nullable=False)
-    email        = Column(String, unique=True, nullable=False)
-    guid         = Column(String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
-    private_key  = Column(String, nullable=False)
-    contact_id   = Column(Integer, ForeignKey('contacts.id'), nullable=False)
-    activated    = Column(DateTime, nullable=True, default=None)
+    id = Column(Integer, primary_key=True)
+    password = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False)
+    guid = Column(String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
+    private_key = Column(String, nullable=False)
+    contact_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
+    activated = Column(DateTime, nullable=True, default=None)
     groups = relationship('SubscriptionGroup', backref='user')
     
     password_version = 1
@@ -148,7 +146,7 @@ class User(Base):
         Fetches an unactivated user with GUID <guid>.
         """
         contact = cls.get_by_guid(guid)
-        if contact is None or contact.activated is not None:
+        if contact and not contact.activated:
             return None
         return contact
 
@@ -165,18 +163,16 @@ class User(Base):
         is then associated with the newly created User.
         """
         Base.__init__(self)
-        if contact is None:
-            self.contact = Contact()
-        else:
-            self.contact = contact
-        self.contact.engine = 'local'
+        if not contact:
+            contact = Contact()
+        self.contact = contact
         session.add(self)
     
     def activate(self):
         """
         Mark the user as having activated successfully.
         """
-        if self.activated is None:
+        if not self.activated:
             self.activated = func.now()
             
     def set_password(self, password):
@@ -219,10 +215,10 @@ class User(Base):
         sub = session.query(Subscription).join(SubscriptionGroup). \
                 filter(and_(SubscriptionGroup.user_id == self.id,
                     Subscription.contact_id == contact.id))
-        if subtype is not None:
+        if subtype:
             sub = sub.filter(Subscription.type == subtype)
         sub = sub.first()
-        return sub is not None
+        return sub
     
     def friends(self, subtype=None):
         """
@@ -233,7 +229,7 @@ class User(Base):
         friends = []
         for group in self.groups:
             for sub in group.subscriptions:
-                if subtype is None or sub.type == subtype:
+                if not(subtype) or sub.type == subtype:
                     if sub.contact not in friends:
                         friends.append(sub.contact)
         return friends
@@ -256,16 +252,13 @@ class Share(Base):
         contact_id - the database primary key of the above
         post - the Post that is being shared with <contact>
         post_id - the database primary key of the above
-        hidden - whether the Contact has "deleted" the post from their wall/feed. This is a boolean
-                 so we don't re-add it again later (as would happen if we really deleted it)
-        privacy - the PrivacyLevel of the Share (which defines whether the Contact's friends can view it)
+        public - whether the post is shown on the user's public wall
         shared_at - the DateTime the Post was shared with the Contact (that is, the Share creation date)
     """
     __tablename__ = 'shares'
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
-    post_id    = Column(Integer, ForeignKey('posts.id'), primary_key=True)
-    hidden     = Column(Boolean, nullable=False, default=False)
-    privacy    = Column(String, ForeignKey('privacy_levels.level'), nullable=False)
+    post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
+    public = Column(Boolean, nullable=False)
     shared_at  = Column(DateTime, nullable=False, default=func.now())
 
 class Contact(Base):
@@ -277,8 +270,6 @@ class Contact(Base):
         id - an integer identifier uniquely identifying this group in the node        
         username - the "user@node" address of the user
         realname - the user's "real" name (how they wish to be known)
-        engine - the type of transport engine that knows how to handle actions for the contact
-        engine_info - opaque transport engine specific data
         avatar - a displayable MIME part that represents the user, typically a photo
         user - the User that this Contact is part of. For all non-local Contacts this is None
         posts - a list of Posts that the user has authored. May be incomplete for non-local users.
@@ -287,16 +278,14 @@ class Contact(Base):
         transport_engine - None, or a transport engine object. Use self.transport() to be guaranteed one. 
     """
     __tablename__ = 'contacts'
-    id          = Column(Integer, primary_key=True)
-    username    = Column(String, unique=True, nullable=False)
-    realname    = Column(String, nullable=False)    
-    engine      = Column(String, nullable=False)
-    engine_info = Column(String, nullable=True)
-    avatar      = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
-    public_key  = Column(String, nullable=False)
-    user  = relationship("User", single_parent=True, backref='contact', uselist=False)
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    realname = Column(String, nullable=False)    
+    avatar = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
+    public_key = Column(String, nullable=False)
+    user = relationship("User", single_parent=True, backref='contact', uselist=False)
     posts = relationship("Post", backref='author')
-    feed  = relationship("Share", backref="contact", order_by='Share.shared_at')
+    feed = relationship("Share", backref="contact", order_by='Share.shared_at')
     subscriptions = relationship("Subscription", backref="contact")
     transport_engine = None
     
@@ -308,21 +297,13 @@ class Contact(Base):
         return session.query(cls).get(contactid)
     
     @classmethod
-    def get_by_username(cls, username):
+    def get_by_username(cls, username, try_import=False):
         """
         Get a Contact by "user@node" address. Returns None if the <username> is not known on
         this node.
         """
+        # FIXME support import
         return session.query(cls).filter(cls.username == username).first()
-    
-    def transport(self):
-        """
-        Return a transport engine instance suitable for interacting with this Contact.
-        """
-        if not self.transport_engine:
-            te_name = self.engine.capitalize()
-            self.transport_engine = getattr(pyaspora.transport, te_name)(self)
-        return self.transport_engine
     
     def subscribe(self, user, group='All', subtype='friend', privacy='self'):
         """
@@ -332,7 +313,7 @@ class Contact(Base):
         sub = Subscription.create(user, self, group=group, subtype=subtype, privacy=privacy)
         session.add(sub)
         self.transport().subscribe(user, subtype)
-    
+
 class PostPart(Base):
     """
     A link between a Post and a MIMEPart, specifying the order of parts in a Post. This class exists
@@ -348,11 +329,12 @@ class PostPart(Base):
         inline - a boolean hint as to whether the part should be displayed inline or as an attachment
     """
     __tablename__ = 'post_parts'
-    post_id      = Column(Integer, ForeignKey('posts.id'), primary_key=True)
+    post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
     mime_part_id = Column(Integer, ForeignKey('mime_parts.id'), primary_key=True)
-    order        = Column(Integer, nullable=False, default=0)
-    inline       = Column(Boolean, nullable=False, default=True)    
-
+    order = Column(Integer, nullable=False, default=0)
+    inline = Column(Boolean, nullable=False, default=True)
+    
+    
 class Post(Base):
     """
     A post (a collection of parts (text, images, etc) that together form an entry on a wall/feed etc.
@@ -363,16 +345,14 @@ class Post(Base):
         author_id - the database primary key for the above
         parent - if this Post is a comment on another Post, this links to the parent Post. May be None.
         parent_id - the database primary key for the above
-        permits_reshare - boolean indicating whether the author permits the Post to be re-shared
         shares - Shares of this Post (occurrences in feeds/on walls)
         parts - PostParts that this Post consists of (the Post contents)
         children - Posts that have this post as the parent
     """
     __tablename__ = 'posts'
-    id            = Column(Integer, primary_key=True)
-    author_id     = Column(Integer, ForeignKey('contacts.id'), nullable=False)
-    parent_id     = Column(Integer, ForeignKey('posts.id'), nullable=True, default=None)
-    permits_reshare = Column(Boolean, nullable=False, default=True)
+    id = Column(Integer, primary_key=True)
+    author_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
+    parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True, default=None)
     shares   = relationship('Share', backref='post')
     parts    = relationship('PostPart', backref='post', order_by=PostPart.order)
     children = relationship('Post', backref=backref('parent', remote_side=[id]))
@@ -417,17 +397,6 @@ class Post(Base):
         session.add(link)
         return link
     
-    def can_share(self, user):
-        """
-        Whether User <user> is permitted to re-share this Post with their friends.
-        """
-        if not self.has_permission_to_view(user.contact):
-            return False
-        # Don't re-share stuff we wrote
-        if self.author is user.contact:
-            return False
-        return True
-    
     def share_with(self, contacts, privacy):
         """
         Share this Post with all the contacts in list <contacts>. This method doesn't share the
@@ -435,7 +404,7 @@ class Post(Base):
         """
         for contact in contacts:
             existing_share = session.query(Share).filter(and_(Share.post == self, Share.contact == contact)).first()
-            if existing_share is None:
+            if not existing_share:
                 session.add(Share(contact=contact, post=self, privacy=privacy))
                 contact.transport().share(self, privacy)
             
@@ -445,7 +414,7 @@ class Post(Base):
         (who may have hidden it.
         """
         share = session.query(Share).filter(and_(Share.contact == contact, Share.post == self)).first()
-        return share is not None
+        return share
     
 class MimePart(Base):
     """
@@ -459,11 +428,11 @@ class MimePart(Base):
         posts - a list of PostParts that this MimePart is used in
     """
     __tablename__ = 'mime_parts'
-    id           = Column(Integer, primary_key=True)
-    type         = Column(String, nullable=False)
-    body         = Column(LargeBinary, nullable=False)
+    id = Column(Integer, primary_key=True)
+    type = Column(String, nullable=False)
+    body = Column(LargeBinary, nullable=False)
     text_preview = Column(String, nullable=False)
-    posts = relationship('PostPart', backref='part')
+    posts = relationship('PostPart', backref='mime_part')
     
     def render_as(self, mime_type, inline=False):
         """
@@ -480,11 +449,13 @@ class MessageQueue(Base):
     Fields:
         id - an integer identifier uniquely identifying the message in the queue
         user - the User recipient of the message
-        sender - the Contact originator of the message
+        sender - the Contact originator of the message, if known
+        format - the protocol format of the payload
         body - the message payload, in a protocol-specific format
     """
-    __tablename__ = 'messagequeue'
+    __tablename__ = 'message_queue'
     id = Column(Integer, primary_key=True)
     recipient = Column(Integer, ForeignKey('users.id'), nullable=False)
-    sender = Column(Integer, ForeignKey('contacts.id'), nullable=False)
+    sender = Column(Integer, ForeignKey('contacts.id'), nullable=True)
+    format = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)

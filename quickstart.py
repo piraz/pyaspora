@@ -3,7 +3,7 @@
 import cherrypy
 
 import pyaspora.controller
-from pyaspora.transport.diaspora.controller import DiasporaDispatcher
+#from pyaspora.transport.diaspora.controller import DiasporaDispatcher
 
 from pyaspora.tools.sqlalchemy import configure_session_for_app
 
@@ -18,7 +18,7 @@ app_config = {
     
     'tools.sessions.storage_type': "file",
     'tools.sessions.storage_path': "/home/lukeross/Workspace/Pyaspora/tmp/sessions",
-    'tools.staticdir.root': "/home/lukeross/Workspace/Pyaspora/src/pyaspora"
+    'tools.staticdir.root': "/home/lukeross/Workspace/Pyaspora/src/pyaspora/view"
     
 }
 app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={ 
@@ -27,19 +27,19 @@ app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={
         'tools.staticdir.on': True,
         'tools.staticdir.dir': 'static'
     },
-    '/.well-known': {
-        'request.dispatch': DiasporaDispatcher()
-    },
-    '/receive': {
-        'request.dispatch': DiasporaDispatcher()
-    },
-    '/people': {
-        'request.dispatch': DiasporaDispatcher()
-    }                                                                   
+    #'/.well-known': {
+    #    'request.dispatch': DiasporaDispatcher()
+    #},
+    #'/receive': {
+    #    'request.dispatch': DiasporaDispatcher()
+    #},
+    #'/people': {
+    #    'request.dispatch': DiasporaDispatcher()
+    #}                                                                   
 }) 
 configure_session_for_app(app)
 
-cherrypy.engine.subscribe('start', pyaspora.initialise_key)
+cherrypy.engine.subscribe('start', pyaspora.initialise_session_key)
 
 if hasattr(cherrypy.engine, 'block'):
     # 3.1 syntax
