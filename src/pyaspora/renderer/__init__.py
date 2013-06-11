@@ -1,15 +1,5 @@
 import re
 
-def _uppercase_next_block(self, match):
-    """
-    A utility function for the Renderer framework upper-cases the matched character
-    after a symbol.
-    """
-    try:
-        return match.group1(1).upper()
-    except(IndexError):
-        return ''
-    
 class Renderer:
     """
     A base class for a series of classes that can render a MIME part into a variety of
@@ -34,10 +24,7 @@ class Renderer:
         
         # ...and the second. Camel-case around any we find
         # (eg. "x-foo-bar" becomes "xFooBar")
-        second_mime_part = re.sub(r'[^A-Za-z0-9]+([A-Za-z0-9])?', _uppercase_next_block, second_mime_part)
-        
-        # Upper-case the first character, so "xFooBar" becomes "XFooBar" 
-        second_mime_part = second_mime_part[0].upper() + second_mime_part[1:]
+        second_mime_part = re.sub(r'[^A-Za-z0-9]', '', second_mime_part.title())
         
         # Attempt to find a handling class (eg. "pyspora.renderer.text.Plain")
         __import__("pyaspora.renderer." + first_mime_part)

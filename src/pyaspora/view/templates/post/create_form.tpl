@@ -1,23 +1,35 @@
 {#
 Allow a User to enter the contents of a new Post.
 #}
+{% extends "layout.tpl" %}
+
+{% block content %}
+<h2>Create a post</h2>
 <form method="post" action="create">
     <p>
-        <textarea name="body"></textarea>
+        <textarea name="body" style="width: 95%"></textarea>
     </p>
+    <h3>Show to:</h3>
     <p>
-        Show to:
+        
         <table>
         {% for level, suboptions in share_with_options.items() %}
             <tr>
             <th><label><input name="share_level" value="{{level.lower() |e}}" type="radio" /> {{level |e}}</label></th>
-            <td><ul>
+            <td>{% if suboptions %}<ul>
             {% for sublevel, subdesc in suboptions.items() %}
-                <li><label><input type="checkbox" name="{{sublevel |e}}" /> {{subdesc}}</label></li>
+                <li class="nobullet"><label><input type="checkbox" name="{{sublevel |e}}" /> {{subdesc}}</label></li>
             {% endfor %}
-            </ul><td>
+            </ul>
+            {% endif %}
+            <td>
             </tr>
         {% endfor %}
+        	<tr>
+        		<td colspan="2">
+        			<label><input type="checkbox" name="walls_too" /> Also display this post publicly on wall(s)</label>
+        		</td>
+        	</tr>
         </table>
     </p>
     <p>
@@ -27,3 +39,4 @@ Allow a User to enter the contents of a new Post.
         <input type="submit" value="Create" />
     </p>
 </form>
+{% endblock %}

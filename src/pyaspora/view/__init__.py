@@ -39,6 +39,7 @@ class SubscriptionGroup:
 class User:
     create_form = _Template("user/create_form.tpl")
     created = _Template("user/created.tpl")
+    edit = _Template("user/edit.tpl")
     activation_failed = _Template("user/activation_failed.tpl")
     activation_success = _Template("user/activation_success.tpl")
     login = _Template("user/login.tpl")

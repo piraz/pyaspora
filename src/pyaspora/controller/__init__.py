@@ -55,8 +55,15 @@ class User:
         if not user.password_is(password):
             return view.User.login(error='Incorrect login details')
         cherrypy.session['logged_in_user'] = user.id
-        raise cherrypy.HTTPRedirect("/contact/profile?username={}".format(quote_plus(user.contact.username)), 303)
-          
+        self._show_my_profile(user)
+        
+    
+    @classmethod
+    def _show_my_profile(cls, user=None):
+        if not user:
+            user = User.logged_in()
+        raise cherrypy.HTTPRedirect("/contact/profile?username={}".format(quote_plus(user.contact.username)), 303)    
+    
     @cherrypy.expose
     def logout(self):
         """
@@ -79,7 +86,36 @@ class User:
             return model.User.get(user_id)
         except:
             return None
+
+    @cherrypy.expose
+    def edit(self, bio=None, avatar=None):
+        logged_in = User.logged_in()
         
+        if not logged_in:
+            return view.denied(status=403, reason="You must be logged in")
+        
+        saved = False
+        
+        if bio:
+            c = logged_in.contact
+            new_bio = c.bio
+            if not c.bio:
+                new_bio = model.MimePart()
+                session.add(new_bio)
+                c.bio = new_bio
+            new_bio.type = 'text/plain'
+            new_bio.body = bio.encode('utf-8')
+            new_bio.text_preview = bio
+            session.add(c)
+            saved = True
+            
+        if saved:
+            session.commit()
+            self._show_my_profile(logged_in) 
+            
+        return view.User.edit(logged_in=logged_in)
+
+                
     @cherrypy.expose
     def test(self):
         """
@@ -121,6 +157,13 @@ class Contact:
         posts = [ p.post for p in posts if p.post.parent is None ]
         formatted_posts = Post.format(posts, show_all=full) 
         
+        bio = None
+        if contact.bio:
+            try:
+                bio = contact.bio.render_as('text/plain', inline=True)
+            except:
+                pass
+        
         logged_in_user = User.logged_in()
         can_remove = False
         can_add = False
@@ -140,7 +183,8 @@ class Contact:
                 can_add=can_add,
                 can_remove=can_remove,
                 can_post=can_post,
-                logged_in=logged_in_user
+                logged_in=logged_in_user,
+                bio=bio
         )
     
     @cherrypy.expose
@@ -214,7 +258,7 @@ class Contact:
             return view.denied(status=404, reason='No such avatar')
 
         return view.raw(mime_type=part.type, body=part.body)
-        
+    
 class System:
     @cherrypy.expose
     def initialise_database(self):
@@ -228,25 +272,33 @@ class System:
 
 class Post:
     @cherrypy.expose
-    def create(self, body=None, parent=None, wall_too=False):
+    def create(self, body=None, parent=None, share_level=None, walls_too=False):
         """
         Create a new Post and put it on my wall. May also put it on friends walls', depending
         on the Post's privacy level.
         """
         author = User.logged_in()
+        walls_too = bool(walls_too)
         
         # Need to be logged in to create a post
         if not author:
             return view.denied(status=403, reason='You must be logged in to post')
 
         share_with_options = {
-            'Everyone': dict(walls="also post to friends' walls"),
             'Groups': dict([("group-{}".format(g.id), g.name) for g in author.groups]),
             'Contacts': dict([("friend-{}".format(f.id), f.realname) for f in author.friends()]),
         }
         for opt, subopt in share_with_options.items():
             if not subopt:
                 del share_with_options[opt]
+        share_with_options.update({
+            'Everyone': None,
+            'Me': None,
+        })
+        if parent:
+            share_with_options.update({
+                'PersonReplyingTo': None
+            })
         
         # If the mandatory fields aren't supplied, we are probably creating a new post
         if not body:
@@ -268,11 +320,24 @@ class Post:
         post.add_part(part, inline=True, order=1)
         
         # post to author's wall
-        post.share_with([author.contact], show_on_wall=wall_too)
+        post.share_with([author.contact], show_on_wall=walls_too)
         
-        #if (privacy in ('public', 'contacts')):
-        #    post.share_with(author.friends(), privacy)
-        
+        if share_level.lower() == "group":
+            for g in author.groups:
+                if cherrypy.request.params['group-{}'.format(g.id)]:
+                    post.share_with([s.contact for s in g.subscriptions],
+                            show_on_wall=walls_too)
+                    
+        if share_level.lower() in ("everyone", "contacts"):
+            for f in author.friends():
+                if share_level.lower() == 'contacts':
+                    if not cherrypy.request.params['friend-{}'.format(f.id)]:
+                        continue
+                post.share_with([f], show_on_wall=walls_too)
+
+        if share_level.lower() == 'personreplyingto' and parent_post:
+            post.share_with([parent_post.author], show_on_wall=walls_too)
+                    
         # commit everything to get the Post ID
         session.commit()
         
@@ -284,21 +349,17 @@ class Post:
         """
         Convert a list of posts into a series of text/{html,plain} parts for web display
         """
-        user = User.logged_in()
         formatted_posts = []
         for post in posts:
-            authored_by_me = False
             to_display = []
-            if user:
-                authored_by_me = (post.author == user.contact)
-            if (show_all or authored_by_me) and Post.permission_to_view(post):
+            if Post.permission_to_view(post):
                 for link in post.parts:
                     if link.inline:
                         try:
-                            rendered = link.part.render_as('text/html', inline=True)
+                            rendered = link.mime_part.render_as('text/html', inline=True)
                             to_display.append({ 'type': 'text/html', 'body': rendered })
                         except:
-                            rendered = link.part.render_as('text/plain', inline=True)
+                            rendered = link.mime_part.render_as('text/plain', inline=True)
                             to_display.append({ 'type': 'text/plain', 'body': rendered })                    
                     elif (show_all):
                         to_display.append({ 'type': 'text/plain', 'body': 'Attachment' })

@@ -1,2 +1,15 @@
-h1 { font-family: sans-serif }
+h1,h2,h3 { font-family: sans-serif }
+
+th { text-align: left; font-family: sans-serif; }
+
 #header { text-align: right }
+
+.button {
+	border: solid medium;
+	font-family: sans-serif;
+	font-weight: bold;
+	font-size: large;
+	text-decoration: none;
+}
+
+.nobullet { list-style-typex: none }

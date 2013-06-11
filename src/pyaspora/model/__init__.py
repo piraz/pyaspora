@@ -10,7 +10,7 @@ from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import func
 from sqlalchemy.types import Boolean, DateTime, Integer, LargeBinary, String
 
-#import pyaspora.renderer
+import pyaspora.renderer
 #import pyaspora.transport
 
 from pyaspora.tools.sqlalchemy import metadata, session
@@ -281,12 +281,16 @@ class Contact(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
     realname = Column(String, nullable=False)    
-    avatar = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
+    bio_id = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
+    avatar_id = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
     public_key = Column(String, nullable=False)
     user = relationship("User", single_parent=True, backref='contact', uselist=False)
     posts = relationship("Post", backref='author')
     feed = relationship("Share", backref="contact", order_by='Share.shared_at')
     subscriptions = relationship("Subscription", backref="contact")
+    avatar = relationship("MimePart", foreign_keys=[avatar_id], primaryjoin='Contact.avatar_id==MimePart.id')
+    bio = relationship("MimePart", foreign_keys=[bio_id], primaryjoin='Contact.bio_id==MimePart.id')
+
     transport_engine = None
     
     @classmethod
@@ -305,14 +309,16 @@ class Contact(Base):
         # FIXME support import
         return session.query(cls).filter(cls.username == username).first()
     
-    def subscribe(self, user, group='All', subtype='friend', privacy='self'):
+    def subscribe(self, user, group='All', subtype='friend'):
         """
         Subscribe User <user> _to_ this Contact, onto <user>'s group named <group> with subscription
         type <subtype> and PrivacyLevel <privacy>.
         """
-        sub = Subscription.create(user, self, group=group, subtype=subtype, privacy=privacy)
+        sub = Subscription.create(user, self, group=group, subtype=subtype)
         session.add(sub)
-        self.transport().subscribe(user, subtype)
+        if not self.user:
+            # FIXME send req via diasp
+            pass
 
 class PostPart(Base):
     """
@@ -332,8 +338,7 @@ class PostPart(Base):
     post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
     mime_part_id = Column(Integer, ForeignKey('mime_parts.id'), primary_key=True)
     order = Column(Integer, nullable=False, default=0)
-    inline = Column(Boolean, nullable=False, default=True)
-    
+    inline = Column(Boolean, nullable=False, default=True)    
     
 class Post(Base):
     """
@@ -369,17 +374,16 @@ class Post(Base):
         Whether the Contact <contact> is permitted to view this post.
         """
         # Is it visible to the world anywhere?
-        is_public = session.query(Share).filter(and_(Share.privacy=='public', Share.post == self)).first()
-        if is_public is not None:
+        is_public = session.query(Share).filter(and_(Share.public == True, Share.post == self)).first()
+        if is_public:
             return True
 
-        if contact is None:
+        if not contact:
             return False
         
         # Can always view my own stuff
         if contact.id == self.author_id:
             return True
-
         # Check for other shares to the contact        
         return self.shared_with(contact)
     
@@ -393,11 +397,11 @@ class Post(Base):
         """
         Adds MIMEPart <mimepart> to this Post, creating the linking PostPart (which is returned).
         """
-        link = PostPart(post=self, part=mimepart, inline=inline, order=order)
+        link = PostPart(post=self, mime_part=mimepart, inline=inline, order=order)
         session.add(link)
         return link
     
-    def share_with(self, contacts, privacy):
+    def share_with(self, contacts, show_on_wall=False):
         """
         Share this Post with all the contacts in list <contacts>. This method doesn't share the
         post if the Contact already has this Post shared with them.
@@ -405,13 +409,14 @@ class Post(Base):
         for contact in contacts:
             existing_share = session.query(Share).filter(and_(Share.post == self, Share.contact == contact)).first()
             if not existing_share:
-                session.add(Share(contact=contact, post=self, privacy=privacy))
-                contact.transport().share(self, privacy)
+                session.add(Share(contact=contact, post=self, public=show_on_wall))
+                if not contact.user:
+                    # FIXME share via diasp
+                    pass
             
     def shared_with(self, contact):
         """
-        Returns a boolean indicating whether this Post has already been shared with Contact <contact>
-        (who may have hidden it.
+        Returns a boolean indicating whether this Post has already been shared with Contact <contact>.
         """
         share = session.query(Share).filter(and_(Share.contact == contact, Share.post == self)).first()
         return share
