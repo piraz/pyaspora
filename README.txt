@@ -75,14 +75,6 @@ Issues
 
 I have recently realised some of my design decision were foolish. They include:
 
-PrivacyLevels - it's not really clear how much use they are, as not all levels
-are always relevant, and how do you stop people re-sharing anyway? Should the
-platform?
-
-In some ways Shares already circumvent PrivacyLevels - if you Share a "hidden"
-Post, what does that mean? I think the Share probably implicitly defines that
-something is viewable making the PrivacyLevel redundant.
-
 I wanted to make the user's password encrypt their private key, so if the
 database is stolen then the keys can't be quickly and easily decrypted.
 However that is no use if a post is received from a remote node as the user is
