@@ -238,22 +238,30 @@ class Post:
         # Need to be logged in to create a post
         if not author:
             return view.denied(status=403, reason='You must be logged in to post')
+
+        share_with_options = {
+            'Everyone': dict(walls="also post to friends' walls"),
+            'Groups': dict([("group-{}".format(g.id), g.name) for g in author.groups]),
+            'Contacts': dict([("friend-{}".format(f.id), f.realname) for f in author.friends()]),
+        }
+        for opt, subopt in share_with_options.items():
+            if not subopt:
+                del share_with_options[opt]
         
         # If the mandatory fields aren't supplied, we are probably creating a new post
         if not body:
-            return view.Post.create_form(parent=parent)
+            return view.Post.create_form(parent=parent, share_with_options=share_with_options)
+
+        post = model.Post(author=author.contact)
 
         # figure out if this is a comment on another post
-        parent_post = None
         if parent:
             parent_post = model.Post.get(parent)
             # are we permitted to comment on it?
             if not(parent_post) or not(self.permission_to_view(parent_post)):
                 return view.denied(status=403)
-        
-        post = model.Post(author=author.contact)
-        if parent_post:
-            post.parent = parent_post        
+            if parent_post:
+                post.parent = parent_post        
         
         # prepare the MIME part and link it to the post
         part = model.MimePart(type='text/plain', body=body.encode('utf-8'), text_preview=body)
