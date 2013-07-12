@@ -3,6 +3,7 @@ try:
 except:
     from urllib import quote_plus # py2
 
+import cherrypy
 import cherrypy.lib.sessions
 import pyaspora.model as model
 import pyaspora.view as view
@@ -207,8 +208,10 @@ class Contact:
             return view.denied(status=404, reason='Contact cannot be found')
         contact.subscribe(user, subtype=subtype)
         session.commit()
-        return view.Contact.subscribed()
+        raise cherrypy.HTTPRedirect("/contact/profile?username={}".format(
+                quote_plus(contact.username)))
 
+    @cherrypy.expose
     def unsubscribe(self, contactid):
         """
         "Unfriend" a contact.
@@ -219,9 +222,9 @@ class Contact:
         contact = model.Contact.get(contactid)
         if not contact or not user.subscribed_to(contact):
             return view.denied(status=404, reason='Subscription cannot be found')
-        contact.transport().unsubscribe(user)
+        contact.unsubscribe(user)
         session.commit()
-        return view.Contact.unsubscribed()
+        raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
     
     def groups(self, contactid, groups=[]):
         pass
@@ -292,7 +295,6 @@ class Post:
             if not subopt:
                 del share_with_options[opt]
         share_with_options.update({
-            'Everyone': None,
             'Me': None,
         })
         if parent:
@@ -321,19 +323,22 @@ class Post:
         
         # post to author's wall
         post.share_with([author.contact], show_on_wall=walls_too)
-        
+
         if share_level.lower() == "group":
             for g in author.groups:
                 if cherrypy.request.params['group-{}'.format(g.id)]:
                     post.share_with([s.contact for s in g.subscriptions],
                             show_on_wall=walls_too)
                     
-        if share_level.lower() in ("everyone", "contacts"):
+        if walls_too or share_level.lower() == 'contacts':
             for f in author.friends():
-                if share_level.lower() == 'contacts':
-                    if not cherrypy.request.params['friend-{}'.format(f.id)]:
-                        continue
-                post.share_with([f], show_on_wall=walls_too)
+                if share_level.lower() == 'contacts' and \
+                        cherrypy.request.params['friend-{}'.format(f.id)]:
+                    post.share_with([f], show_on_wall=walls_too)
+                else:
+                    # If I post it publicly on author's wall, all the contacts
+                    # will see it, so ensure all the contacts get it.
+                    post.share_with([f], show_on_wall=False)
 
         if share_level.lower() == 'personreplyingto' and parent_post:
             post.share_with([parent_post.author], show_on_wall=walls_too)

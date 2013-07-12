@@ -14,7 +14,7 @@ displaying one's own wall.
 
 <p id="contactProfileUserManagement">
 {% if can_remove %}
-<a href="/contact/remove?contactid={{ contact.id |e}}" title="Unsubscribe" class="button">U</a>
+<a href="/contact/unsubscribe?contactid={{ contact.id |e}}" title="Unsubscribe" class="button">U</a>
 {% elif can_add %}
 <a href="/contact/subscribe?subtype=friend&amp;contactid={{ contact.id |e}}" title="Add as a friend" class="button">A</a>
 <a href="/contact/subscribe?subtype=subscription&amp;contactid={{ contact.id |e}}" title="Subscribe to public posts" class="button">S</a>

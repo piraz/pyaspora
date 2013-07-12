@@ -320,6 +320,19 @@ class Contact(Base):
             # FIXME send req via diasp
             pass
 
+    def unsubscribe(self, user):
+        """
+        Remove this Contact from User <user>'s list of subscriptions.
+        """
+        subs = session.query(Subscription).join(SubscriptionGroup). \
+                filter(and_(SubscriptionGroup.user_id == user.id,
+                    Subscription.contact_id == self.id))
+        if not self.user:
+            # FIXME send req via diasp
+            pass
+        for sub in subs:
+            session.delete(sub)
+
 class PostPart(Base):
     """
     A link between a Post and a MIMEPart, specifying the order of parts in a Post. This class exists
