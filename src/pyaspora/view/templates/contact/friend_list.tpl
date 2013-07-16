@@ -24,27 +24,19 @@ be providing a public view of a User's friend list.
 <h2>{{ group.name |e }}</h2>
 
 <p>
-	<a href="/subscriptiongroup/rename?groupid={{ group.id |e }}">
-		<img src="/static/icons/rename.png" alt="Rename group" />
-	</a>
+	<a href="/subscriptiongroup/rename?groupid={{ group.id |e }}" class="button" title="Rename group">R</a>
 	{% if not group.subscriptions %}
-		<a href="/subscriptiongroup/delete?groupid={{ group.id |e }}">
-			<img src="/static/icons/delete.png" alt="Delete group" />
-		</a>
+		<a href="/subscriptiongroup/delete?groupid={{ group.id |e }}" class="button" title="Delete group">D</a>
 	{% endif %}
-<ul>
+</p>
 
 {% for sub in group.subscriptions %}
 <li>
 	<a href="/contact/profile/{{ sub.contact.username |e }}">
 		{{ sub.contact.realname |e }}
 	</a>
- 	<a href="/contact/unsubscribe?contactid={{ sub.contact.id |e }}">
- 		<img src="/static/icons/delete.png" alt="Delete" />
- 	</a>
- 	<a href="/contact/groups?contactid={{ sub.contact.id |e }}">
- 		<img src="/static/icons/edit.png" alt="Edit groups" />
- 	</a>
+ 	<a href="/contact/unsubscribe?contactid={{ sub.contact.id |e }}" class="button" title="Delete contact from friend list">D</a>
+ 	<a href="/contact/groups?contactid={{ sub.contact.id |e }}" class="button" title="Edit groups this friend is in">E</a>
  </li>
 
 {% endfor %}

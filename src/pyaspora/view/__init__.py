@@ -25,7 +25,7 @@ class Contact:
     friend_list = _Template("contact/friend_list.tpl")
     profile = _Template("contact/profile.tpl")
     subscribed = _Template("contact/subscribed.tpl")
-    unsubscribed = _Template("contact/unsubscribed.tpl")
+    edit_groups = _Template("contact/edit_groups.tpl")
 
 class Post:
     create_form = _Template("post/create_form.tpl")
@@ -33,7 +33,6 @@ class Post:
     render = _Template("post/render.tpl")
 
 class SubscriptionGroup:
-    renamed = _Template("subscriptiongroup/renamed.tpl")
     rename_form = _Template("subscriptiongroup/rename.tpl")
 
 class User:

@@ -226,9 +226,6 @@ class Contact:
         session.commit()
         raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
     
-    def groups(self, contactid, groups=[]):
-        pass
-    
     @cherrypy.expose
     def friends(self, contactid):
         """
@@ -261,6 +258,56 @@ class Contact:
             return view.denied(status=404, reason='No such avatar')
 
         return view.raw(mime_type=part.type, body=part.body)
+
+    @cherrypy.expose
+    def groups(self, contactid, groups=None, newgroup=None):
+        """
+        Edit which SubscriptionGroups this Contact is in.
+        """
+        contact = model.Contact.get(contactid)
+        if not contact:
+            return view.denied(status=404, reason='No such user')
+
+        user = User.logged_in()
+        
+        # Need to be logged in to create a post
+        if not user:
+            return view.denied(status=403, reason='You must be logged')
+
+        if not user.subscribed_to(contact):
+            return view.denied(status=400, reason='You are not subscribed to this contact')
+
+        if groups:
+            subtype = user.subscribed_to(contact).type
+
+            if not isinstance(groups, list):
+                groups = [groups]
+            target_groups = set(groups)
+
+            if newgroup:
+                newgroup = newgroup.strip()
+
+            if newgroup and 'new' in target_groups:
+                new_group_obj = model.SubscriptionGroup.get_by_name(user, newgroup, create=True)
+                session.add(new_group_obj)
+                session.commit()
+                target_groups.add(new_group_obj.id)
+
+            for group in user.groups:
+                if group.id in target_groups:
+                    group.add_contact(contact, subtype)
+                       
+                else:
+                    sub = group.has_contact(contact)
+                    if sub:
+                        session.delete(sub)
+
+            session.commit()
+
+            raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
+
+        group_status = dict([(g, g.has_contact(contact)) for g in user.groups])
+        return view.Contact.edit_groups(logged_in=user, contact=contact, groups=group_status)
     
 class System:
     @cherrypy.expose
@@ -438,7 +485,7 @@ class SubscriptionGroup:
         if newname:
             group.name = newname
             session.commit()
-            return view.SubscriptionGroup.renamed(logged_in=user)
+            raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
         else:
             return view.SubscriptionGroup.rename_form(group=group, logged_in=user)
  

@@ -90,6 +90,18 @@ class SubscriptionGroup(Base):
             session.add(dbgroup)
         return dbgroup
 
+    def has_contact(self, contact):
+        for sub in self.subscriptions:
+            if sub.contact_id == contact.id:
+                return sub
+        return None
+
+    def add_contact(self, contact, subtype):
+        if self.has_contact(contact):
+            return
+        sub = Subscription(contact=contact, group=self, type=subtype)
+        session.add(sub)
+
 class User(Base):
     """
     A local user who is based on this node, and who can log in, view their feed and manage their

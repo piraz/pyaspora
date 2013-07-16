@@ -15,9 +15,7 @@ Standard page layout.
 		{% block header %}
 			{% if logged_in %}
 				Logged in as 
-				<a href="/contact/profile?username={{ logged_in.contact.username |e }}">
-					{{ logged_in.contact.realname |e }}
-				</a>
+				<a href="/contact/profile?username={{ logged_in.contact.username |e }}">{{ logged_in.contact.realname |e }}</a>
 				-
 				<a href="/user/logout">Log out</a>
 			{% else %}
