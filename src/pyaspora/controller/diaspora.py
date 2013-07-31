@@ -7,40 +7,6 @@ from lxml import etree
 
 import pyaspora.model as model
 
-from pyaspora.transport.diaspora import DiasporaMessageParser
-
-class DiasporaDispatcher(cherrypy._cpdispatch.Dispatcher):
-    """
-    Diaspora hard-codes a variety of URLs. This Dispatcher traps them and maps them to
-    URLs on the DiasporaController.
-    
-    FIXME: This should perhaps be replaced with CherryPy's Rails Dispatcher so they are explicit,
-    but I rather like the CherryPy dispatcher and don't want to universally override it. I think
-    this can be done with CherryPy's configuration system, but this needs to be checked out.
-    """
-    def find_handler(self, path):
-        """
-        Given a string request path <path>, trap and re-map it if it's a Diaspora-specific URL,
-        otherwise do the default action.
-        """
-        
-        # Webfinger
-        if path=="/.well-known/host-meta":
-            return cherrypy._cpdispatch.Dispatcher.find_handler(self, '/diaspora/host_meta')
-        
-        # Salmon end-point
-        res = re.match('/receive/users/(.*)', path)
-        if res:
-            return cherrypy._cpdispatch.Dispatcher.find_handler(self, '/diaspora/receive/' + res.group(1))
-        
-        # JSON representation of the user public feed
-        res = re.match('/people/(.*)', path)
-        if res:
-            return cherrypy._cpdispatch.Dispatcher.find_handler(self, '/diaspora/feed/' + res.group(1) + '/json')        
-        
-        # None of the above
-        return cherrypy._cpdispatch.Dispatcher.find_handler(self, path)
-
 class DiasporaController:  
     @cherrypy.expose
     def host_meta(self):
@@ -173,7 +139,7 @@ class DiasporaController:
         return xml
     
     @cherrypy.expose
-    def feed(self, guid, form='atom'):
+    def json_feed(self, guid):
         """
         Look up the User identified by GUID and return the User's public feed in
         the requested format (eg. "atom", "json").
@@ -182,3 +148,12 @@ class DiasporaController:
         if form=='json':
             return json.dumps([])
         return "Cannot handle format"
+
+"""
+Diaspora hard-codes a variety of URLs. This Dispatcher traps them and maps them
+to URLs on the DiasporaController.
+"""
+diaspora_dispatcher = cherrypy.dispatch.RoutesDispatcher()
+diaspora_dispatcher.connect('well_known', '/.well-known/host-meta', DiasporaController(), action='host_meta')
+diaspora_dispatcher.connect('receive', '/receive/users/:guid', DiasporaController(), action='receive')
+diaspora_dispatcher.connect('receive', '/people/:guid', DiasporaController(), action='json_feed')
