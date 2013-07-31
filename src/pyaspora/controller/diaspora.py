@@ -8,7 +8,6 @@ from lxml import etree
 import pyaspora.model as model
 
 class DiasporaController:  
-    @cherrypy.expose
     def host_meta(self):
         """
         Return a WebFinder host-meta, which points the client to the end-point for
@@ -41,7 +40,7 @@ class DiasporaController:
         etree.SubElement(doc, "Link", 
             rel='http://microformats.org/profile/hcard',
             type='text/html',
-            href=cherrypy.request.base + '/diaspora/hcard/' + str(c.transport().guid(c))
+            href=cherrypy.request.base + '/diaspora/hcard/' + str(c.user.guid)
         )
         etree.SubElement(doc, "Link", 
             rel='http://joindiaspora.com/seed_location',
@@ -51,7 +50,7 @@ class DiasporaController:
         etree.SubElement(doc, "Link", 
             rel='http://joindiaspora.com/guid',
             type='text/html',
-            href=str(c.transport().guid(c))
+            href=str(c.user.guid)
         )
         etree.SubElement(doc, "Link", 
             rel='http://schemas.google.com/g/2010#updates-from',
@@ -61,7 +60,7 @@ class DiasporaController:
         etree.SubElement(doc, "Link", 
             rel='diaspora-public-key',
             type='RSA',
-            href=base64.b64encode(c.transport().public_key(c).encode('ascii'))
+            href=base64.b64encode(c.public_key.encode('ascii'))
         )                
         
         return self.send_xml(doc)
@@ -129,7 +128,6 @@ class DiasporaController:
         cherrypy.response.headers['Content-Type'] = content_type
         return etree.tostring(doc, xml_declaration=True, pretty_print=True, encoding="UTF-8")
     
-    @cherrypy.expose
     def receive(self, guid, xml):
         """
         Receive a Salmon Slap and handle it.
@@ -138,7 +136,6 @@ class DiasporaController:
         print(m.decode(xml, model.User.get_by_guid(guid), 'test'))
         return xml
     
-    @cherrypy.expose
     def json_feed(self, guid):
         """
         Look up the User identified by GUID and return the User's public feed in
