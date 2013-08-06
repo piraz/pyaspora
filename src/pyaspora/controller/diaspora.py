@@ -160,6 +160,41 @@ class DiasporaController:
         # FIXME - stub implementation
         return json.dumps([])
 
+    @classmethod
+    def import_contact(cls, uri, contact):
+        """
+        Fetch information about a Diaspora user and import it into the Contact provided.
+        """
+        WEBFINGER_NS = "http://docs.oasis-open.org/ns/xri/xrd-1.0"
+        w = WebfingerRequest(uri)
+        webfinger = w.fetch()
+        hcard_url = webfinger.find(".//{%s}Link[@rel='http://microformats.org/profile/hcard']" % WEBFINGER_NS).get("href")
+        hcard = etree.parse(urllib.request.urlopen(hcard_url), etree.HTMLParser())
+        contact.username = uri
+        contact.realname = hcard.find(".//span[@class='fn']").text
+        contact.engine = "diaspora"
+        contact.engine_info = json.dumps({
+            "guid": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/guid']" % WEBFINGER_NS).get("href"),
+            "server": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/seed_location']" % WEBFINGER_NS).get("href")
+        })
+        contact.public_key = base64.b64decode(webfinger.find(".//{%s}Link[@rel='diaspora-public-key']" % WEBFINGER_NS).get("href").encode("ascii"))
+    
+    def subscribe(self, user, group='All', subtype='friend'):
+        """
+        Local User <user> would like to subscribe to the Contact represented by this
+        transport. The Subscription object will be returned. The Subscription will be
+        of subscription type <subtype> (eg. "friend", "feed"), and will be added to the
+        User's SubscriptionGroup named by <group>.
+        """
+        req = etree.Element("request")
+        etree.SubElement(req, "sender_handle").text = user.contact.username
+        etree.SubElement(req, "recipient_handle").text = self.contact().username
+        m = DiasporaMessageBuilder(req, user)
+        url = self.get_server() + "receive/users/" + self.get_guid()
+        print("Sending message to " + url)
+        m.post(url, self.contact(), 'test') # FIXME
+        Transport.refresh_feeds(self, contact=self.contact())
+
 """
 Diaspora hard-codes a variety of URLs. This Dispatcher traps them and maps them
 to URLs on the DiasporaController.

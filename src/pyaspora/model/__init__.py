@@ -1,4 +1,3 @@
-import hashlib # for password hashing
 import random # salt generation for hashing
 import uuid # to construct the user GUIDs
 
@@ -109,7 +108,6 @@ class User(Base):
     
     Fields:
         id - an integer identifier uniquely identifying this group in the node
-        password - an opaque value representing the user's login password
         email - the user's email address. Must be unique across the node.
         guid - the user's GUID. Must be unique across the node.
         private_key - an encrypted private key for the user
@@ -118,15 +116,10 @@ class User(Base):
         contact_id - the database primary key for the above
         activated - None until the user activates their account by email. Afterwards a DateTime of activation.
         groups - a list of SubscriptionGroups the user owns
-        
-    Class fields:
-        password_version - which password algorithm to store new passwords with
-        salt_length - how many bytes of salt to hash the password with
     """
     
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
-    password = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     guid = Column(String, unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
     private_key = Column(String, nullable=False)
@@ -134,9 +127,6 @@ class User(Base):
     activated = Column(DateTime, nullable=True, default=None)
     groups = relationship('SubscriptionGroup', backref='user')
     message_queue = relationship('MessageQueue', backref='recipient')
-    
-    password_version = 1
-    salt_bytes = 32
     
     @classmethod
     def get(cls, userid):
@@ -187,35 +177,15 @@ class User(Base):
         if not self.activated:
             self.activated = func.now()
             
-    def set_password(self, password):
-        """
-        Set the user's password to <password> using the most recent password algorithm.
-        """
-        hasher = hashlib.sha256()
-        salt = ''.join("%x" % random.randint(0,255) for dummy in range(self.salt_bytes))
-        hasher.update(salt.encode('utf-8'))
-        hasher.update(password.encode('utf-8'))
-        self.password = str(self.password_version) + ':' + salt + ':' + hasher.hexdigest() 
-    
     def password_is(self, password):
         """
-        Check if the user's password is <password>, returning True or False. This uses the correct
-        algorithm for the password on file.
+        Check if the user's password is <password>, returning a boolean.
         """
-        (version, salt, hashed) = self.password.split(':')
-        if (not hasattr(self, 'password_is_v' + version)):
+        try:
+            RSA.importKey(self.private_key, passphrase=password)
+            return True
+        except (ValueError, IndexError, TypeError):
             return False
-        return getattr(self, 'password_is_v' + version)(password, salt, hashed)
-
-    def password_is_v1(self, password, salt, hashed):
-        """
-        Check if the user's password is <password>, using the version 1 algorithm. This shouldn't
-        be called directly.
-        """
-        hasher = hashlib.sha256()
-        hasher.update(salt.encode('utf-8'))
-        hasher.update(password.encode('utf-8'))
-        return (hashed == hasher.hexdigest())
     
     def subscribed_to(self, contact, subtype=None):
         """
