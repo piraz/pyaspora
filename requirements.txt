@@ -1,4 +1,5 @@
 cherrypy
 jinja2
+lxml
 pycrypto
 sqlalchemy

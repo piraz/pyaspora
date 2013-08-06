@@ -41,13 +41,8 @@ your friends can view).
 There is a very early test to show the Diaspora message building/parsing
 classes, and a stand-alone Webfinger demo.
 
-
 Quick start
 -----------
-
-* Webfinger demo
-
-PYTHONPATH=src ./webfinger_demo.py
 
 * "Social networking" website
 
@@ -69,18 +64,6 @@ Browse to:
 http://localhost:8080/user/test
 
 ...then check STDERR for the parsed response.
-
-Issues
-------
-
-I have recently realised some of my design decision were foolish. They include:
-
-I wanted to make the user's password encrypt their private key, so if the
-database is stolen then the keys can't be quickly and easily decrypted.
-However that is no use if a post is received from a remote node as the user is
-unlikely to be logged in. Unless these are queued until the user's next login
-(which is a bit stupid) then the private key needs to be accessible by the
-system.
 
 Dependencies
 ------------
