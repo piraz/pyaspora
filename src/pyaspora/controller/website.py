@@ -147,13 +147,13 @@ class Contact:
         # Don't want a visitor to cause us to do lots of network access
         should_import = User.logged_in()
         
-        try:
-            contact = model.Contact.get_by_username(username, try_import=should_import)
-        except:
-            contact = None
+        contact = model.Contact.get_by_username(username, try_import=should_import)
         
         if not contact:
             return view.denied(status=404)
+        
+        if should_import:
+            session.commit() # in case imported
             
         posts = contact.feed
         posts = [ p.post for p in posts if p.post.parent is None ]

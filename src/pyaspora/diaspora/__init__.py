@@ -4,6 +4,7 @@ import cherrypy._cpdispatch
 import Crypto.Random
 import json
 import re
+import urllib
 import urllib.parse
 import urllib.request
 from Crypto.Cipher import AES, PKCS1_v1_5
@@ -11,9 +12,9 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 
-from lxml import etree
+from lxml import etree, html
 
-import pyaspora.transport
+from pyaspora import model
 
 # This package contains Diaspora-protocol-specific code.
 
@@ -210,7 +211,7 @@ class DiasporaMessageParser:
         
         user = self.model.Contact.get_by_username(sender)
         if user is None:
-            user = pyaspora.transport.Diaspora.import_contact(sender)
+            user = import_contact(sender)
         self.verify_signature(user, doc)
         
         decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
@@ -293,11 +294,11 @@ class WebfingerRequest(object):
         """
         Fetch the WebFinger profile and return the XML document.
         """
+        print("in wf fetch")
         template_url = self._get_template()
         target_url = re.sub('\{uri\}', urllib.parse.quote_plus(self.request_email.scheme + ':' + self.request_email.path), template_url)
-        request = urllib.request.Request(target_url)
-        opener = urllib.request.build_opener(RedirectTrackingHandler())
-        return etree.parse(opener.open(request))
+        print("about to connect to {}".format(target_url))
+        return etree.parse(urllib.request.urlopen(target_url))
     
     def _get_template(self):
         """
@@ -339,9 +340,10 @@ class HostMeta(object):
         """
         Create the connection to the remote host.
         """
+        print("hostmeta connection to {}".format(url))
         request = urllib.request.Request(url)
         opener = urllib.request.build_opener(RedirectTrackingHandler())
-        return opener.open(request)
+        return opener.open(request, timeout=5)
     
     def _get_connection(self):
         """
@@ -401,3 +403,37 @@ class RedirectTrackingHandler(urllib.request.HTTPRedirectHandler):
         if not hasattr(result, "redirected_via"):
             result.redirected_via = []
         result.redirected_via.append(previous_url)
+        
+def import_contact(addr):
+    print("in import_contact")
+    try:
+        wf = WebfingerRequest(addr).fetch()
+    except urllib.error.URLError:
+        return None
+    print("wf returned {}".format(repr(wf)))
+    if not wf:
+        return None
+    
+    NS = {'XRD': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}
+    
+    c = model.Contact()
+    c.username = wf.xpath('//XRD:Subject/text()', namespaces=NS)[0].split(':')[1]
+    pk = wf.xpath('//XRD:Link[@rel="diaspora-public-key"]/@href', namespaces=NS)[0]
+    c.public_key = base64.b64decode(pk).decode("ascii")
+    hcard_url = wf.xpath('//XRD:Link[@rel="http://microformats.org/profile/hcard"]/@href', namespaces=NS)[0]
+    
+    hcard = html.parse(urllib.request.urlopen(hcard_url))
+    print(etree.tostring(hcard, pretty_print=True))
+    c.realname = hcard.xpath('//*[@class="fn"]')[0].text
+    
+    photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')
+    if photo_url:
+        resp = urllib.request.urlopen(urllib.parse.urljoin(hcard_url, photo_url[0]))
+        mp = model.MimePart()
+        mp.type = resp.info().get('Content-Type')
+        mp.body = resp.read()
+        mp.text_preview = '(picture for {})'.format(c.realname)
+        c.avatar = mp
+    
+    return c
+    

@@ -1,11 +1,12 @@
 import base64
 import cherrypy
 import json
-import re
 
 from lxml import etree
 
 import pyaspora.model as model
+
+from pyaspora.tools.sqlalchemy import session
 
 class DiasporaController:  
     def host_meta(self):
@@ -130,11 +131,26 @@ class DiasporaController:
     
     def receive(self, guid, xml):
         """
-        Receive a Salmon Slap and handle it.
+        Receive a Salmon Slap and save it for when the user logs in.
         """
-        m = DiasporaMessageParser(model)
-        print(m.decode(xml, model.User.get_by_guid(guid), 'test'))
-        return xml
+        u = model.User.get_by_guid(guid)
+        if u is None:
+            cherrypy.response.status = 404
+            return "No such contact"
+        
+        queue_item = model.MessageQueue()
+        queue_item.recipient = u
+        queue_item.sender = None
+        queue_item.format = 'application/x-diaspora-slap'
+        queue_item.body = xml
+        session.add(queue_item)
+        session.commit()
+        
+        return 'OK'
+
+        #m = DiasporaMessageParser(model)
+        #print(m.decode(xml, model.User.get_by_guid(guid), 'test'))
+        #return xml
     
     def json_feed(self, guid):
         """
@@ -142,9 +158,7 @@ class DiasporaController:
         the requested format (eg. "atom", "json").
         """ 
         # FIXME - stub implementation
-        if form=='json':
-            return json.dumps([])
-        return "Cannot handle format"
+        return json.dumps([])
 
 """
 Diaspora hard-codes a variety of URLs. This Dispatcher traps them and maps them

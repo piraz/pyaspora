@@ -11,7 +11,6 @@ from sqlalchemy.sql.expression import func
 from sqlalchemy.types import Boolean, DateTime, Integer, LargeBinary, String
 
 import pyaspora.renderer
-#import pyaspora.transport
 
 from pyaspora.tools.sqlalchemy import metadata, session
 
@@ -134,6 +133,7 @@ class User(Base):
     contact_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
     activated = Column(DateTime, nullable=True, default=None)
     groups = relationship('SubscriptionGroup', backref='user')
+    message_queue = relationship('MessageQueue', backref='recipient')
     
     password_version = 1
     salt_bytes = 32
@@ -318,8 +318,13 @@ class Contact(Base):
         Get a Contact by "user@node" address. Returns None if the <username> is not known on
         this node.
         """
-        # FIXME support import
-        return session.query(cls).filter(cls.username == username).first()
+        contact = session.query(cls).filter(cls.username == username).first()
+        print("try_import={}".format(try_import))
+        if try_import and not contact:
+            import pyaspora.diaspora
+            contact = pyaspora.diaspora.import_contact(username)
+            session.add(contact)           
+        return contact
     
     def subscribe(self, user, group='All', subtype='friend'):
         """
@@ -485,7 +490,7 @@ class MessageQueue(Base):
     """
     __tablename__ = 'message_queue'
     id = Column(Integer, primary_key=True)
-    recipient = Column(Integer, ForeignKey('users.id'), nullable=False)
-    sender = Column(Integer, ForeignKey('contacts.id'), nullable=True)
+    recipient_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    sender_id = Column(Integer, ForeignKey('contacts.id'), nullable=True)
     format = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)

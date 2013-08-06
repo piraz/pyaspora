@@ -96,19 +96,7 @@ class Diaspora(Transport):
         """
         Fetch information about a Diaspora user and import it into the Contact provided.
         """
-        WEBFINGER_NS = "http://docs.oasis-open.org/ns/xri/xrd-1.0"
-        w = WebfingerRequest(uri)
-        webfinger = w.fetch()
-        hcard_url = webfinger.find(".//{%s}Link[@rel='http://microformats.org/profile/hcard']" % WEBFINGER_NS).get("href")
-        hcard = etree.parse(urllib.request.urlopen(hcard_url), etree.HTMLParser())
-        contact.username = uri
-        contact.realname = hcard.find(".//span[@class='fn']").text
-        contact.engine = "diaspora"
-        contact.engine_info = json.dumps({
-            "guid": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/guid']" % WEBFINGER_NS).get("href"),
-            "server": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/seed_location']" % WEBFINGER_NS).get("href")
-        })
-        contact.public_key = base64.b64decode(webfinger.find(".//{%s}Link[@rel='diaspora-public-key']" % WEBFINGER_NS).get("href").encode("ascii"))
+        #    "server": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/seed_location']" % WEBFINGER_NS).get("href")
     
     def subscribe(self, user, group='All', subtype='friend'):
         """
