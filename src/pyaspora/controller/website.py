@@ -54,9 +54,14 @@ class User:
         user = model.User.get_by_email(username)
         if not user: # FIXME: if user is None or user.activated is None: (activated users only)
             return view.User.login(error='Incorrect login details')
-        if not user.password_is(password):
+        key = user.unlock_key_with_password(password)
+        if not key:
             return view.User.login(error='Incorrect login details')
+
+        # Stash the key in the session, protected by the session password
+        import pyaspora
         cherrypy.session['logged_in_user'] = user.id
+        cherrypy.session['logged_in_user_key'] = key.exportKey(passphrase=pyaspora.session_password)
         self._show_my_profile(user)
         
     
@@ -78,15 +83,32 @@ class User:
     @classmethod
     def logged_in(cls):
         """
-        If a user session is active (the user is logged in), return the User for the logged
-        in user. Otherwise returns None.
+        If a user session is active (the user is logged in), return the User
+        for the logged in user. Otherwise returns None.
         """
         try:
             user_id = cherrypy.session.get("logged_in_user")
             if not user_id:
                 return None
+
             return model.User.get(user_id)
         except:
+            return None
+
+    @classmethod
+    def get_user_key(cls):
+        """
+        Get the session copy of the user's private key. If the session ID has
+        changed this may return None, in which case you'll need to ask the user
+        for their password again.
+        """
+        enc_key = cherrypy.session.get("logged_in_user_key")
+        if not enc_key:
+            return None
+        try:
+            import pyaspora
+            key = RSA.importKey(enc_key, passphrase=pyaspora.session_password)
+        except (ValueError, IndexError, TypeError):
             return None
 
     @cherrypy.expose

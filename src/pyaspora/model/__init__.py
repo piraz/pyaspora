@@ -177,15 +177,15 @@ class User(Base):
         if not self.activated:
             self.activated = func.now()
             
-    def password_is(self, password):
+    def unlock_key_with_password(self, password):
         """
-        Check if the user's password is <password>, returning a boolean.
+        Check if the user's password is <password>, returning a private key is
+        possible, or None if the private key cannot be decrypted.
         """
         try:
-            RSA.importKey(self.private_key, passphrase=password)
-            return True
+            return RSA.importKey(self.private_key, passphrase=password)
         except (ValueError, IndexError, TypeError):
-            return False
+            return None
     
     def subscribed_to(self, contact, subtype=None):
         """
