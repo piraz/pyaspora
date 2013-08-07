@@ -189,38 +189,37 @@ class DiasporaMessageParser:
     def __init__(self, model):
         self.model = model
             
-    def decode(self, raw, user, passphrase):
+    def decode(self, raw, key):
         """
         Extract the envelope XML from its wrapping.
         """
         # It has already been URL-decoded once by cherrypy
-        xml = urllib.parse.unquote(raw)
-        return self.process_salmon_envelope(xml, user, passphrase)
+        xml = urllib.parse.unquote_plus(raw)
+        return self.process_salmon_envelope(xml, key)
     
-    def process_salmon_envelope(self, xml, user, passphrase):
+    def process_salmon_envelope(self, xml, key):
         """
         Given the Slap XML, extract out the author and payload.
         """
         xml = xml.lstrip().encode("utf-8")
-        print("salmon_envelope=" + repr(xml))
+        #print("salmon_envelope=" + repr(xml))
         doc = etree.fromstring(xml)
-        header = self.parse_header(doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text, user, passphrase)
+        header = self.parse_header(doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text, key)
         sender = header.find(".//author_id").text
         inner_iv = base64.b64decode(header.find(".//iv").text.encode("ascii"))
         inner_key = base64.b64decode(header.find(".//aes_key").text.encode("ascii"))
         
-        user = self.model.Contact.get_by_username(sender)
-        if user is None:
-            user = import_contact(sender)
-        self.verify_signature(user, doc)
+        sending_contact = self.model.Contact.get_by_username(sender)
+        if sending_contact is None:
+            sending_contact = import_contact(sender)
+        self.verify_signature(sending_contact, doc)
         
         decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
         body = doc.find(".//{http://salmon-protocol.org/ns/magic-env}data").text
         body = base64.b64decode(base64.urlsafe_b64decode(body.encode("ascii")))
         body = decrypter.decrypt(body)
         body = self.pkcs7_unpad(body)
-        self.parse_data(body)
-        return 'OK'
+        return body
     
     def verify_signature(self, user, message):
         """
@@ -229,31 +228,25 @@ class DiasporaMessageParser:
         """
         pass # FIXME
     
-    def parse_data(self, data):
-        """
-        Given the inner payload, act on it accordingly.
-        """
-        print("parse_data: " + repr(data)) # FIXME - understand the payload
-    
-    def parse_header(self, b64data, user, passphrase):
+    def parse_header(self, b64data, key):
         """
         Extract the header and decrypt it. This requires the User's private key and hence
         the passphrase for the key.
         """
         decoded_json = base64.b64decode(b64data.encode("ascii"))
         rep = json.loads(decoded_json.decode("ascii"))
-        outer_key_details = self.decrypt_outer_aes_key_bundle(rep["aes_key"], user, passphrase)
+        outer_key_details = self.decrypt_outer_aes_key_bundle(rep["aes_key"], key)
         header = self.get_decrypted_header(base64.b64decode(rep["ciphertext"].encode("ascii")),
             key=base64.b64decode(outer_key_details["key"].encode("ascii")), 
             iv=base64.b64decode(outer_key_details["iv"].encode("ascii")))
         return header
 
-    def decrypt_outer_aes_key_bundle(self, data, user, passphrase):
+    def decrypt_outer_aes_key_bundle(self, data, key):
         """
         Decrypt the AES "outer key" credentials using the private key and passphrase.
         """
-        rsa = RSA.importKey(user.private_key, passphrase)
-        cipher = PKCS1_v1_5.new(rsa)
+        assert(key)
+        cipher = PKCS1_v1_5.new(key)
         decoded_json = cipher.decrypt(base64.b64decode(data.encode("ascii")), sentinel=None)
         return json.loads(decoded_json.decode("ascii"))
     
