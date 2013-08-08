@@ -139,9 +139,9 @@ class DiasporaController:
             return "No such contact"
         
         queue_item = model.MessageQueue()
-        queue_item.recipient = u
-        queue_item.sender = None
-        queue_item.format = 'application/x-diaspora-slap'
+        queue_item.local = u
+        queue_item.remote = None
+        queue_item.format = model.MessageQueue.INCOMING
         queue_item.body = xml
         session.add(queue_item)
         session.commit()

@@ -126,7 +126,7 @@ class User(Base):
     contact_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
     activated = Column(DateTime, nullable=True, default=None)
     groups = relationship('SubscriptionGroup', backref='user')
-    message_queue = relationship('MessageQueue', backref='recipient')
+    message_queue = relationship('MessageQueue', backref='local')
     
     @classmethod
     def get(cls, userid):
@@ -257,7 +257,6 @@ class Contact(Base):
         posts - a list of Posts that the user has authored. May be incomplete for non-local users.
         feed - a list of Shares that is on this Contact's feed/wall. May be incomplete for non-local users.
         subscriptions - a list of Subscriptions for Users who are subscribed to this Contact
-        transport_engine - None, or a transport engine object. Use self.transport() to be guaranteed one. 
     """
     __tablename__ = 'contacts'
     id = Column(Integer, primary_key=True)
@@ -273,8 +272,6 @@ class Contact(Base):
     avatar = relationship("MimePart", foreign_keys=[avatar_id], primaryjoin='Contact.avatar_id==MimePart.id')
     bio = relationship("MimePart", foreign_keys=[bio_id], primaryjoin='Contact.bio_id==MimePart.id')
 
-    transport_engine = None
-    
     @classmethod
     def get(cls, contactid):
         """
@@ -453,14 +450,17 @@ class MessageQueue(Base):
     
     Fields:
         id - an integer identifier uniquely identifying the message in the queue
-        user - the User recipient of the message
-        sender - the Contact originator of the message, if known
+        local_id - the User receiving/sending the message
+        remote_id - the Contact the message is to/from
         format - the protocol format of the payload
         body - the message payload, in a protocol-specific format
     """
+    OUTGOING = 'application/x-pyaspora-outbound'
+    INCOMING = 'application/x-diaspora-slap'
+
     __tablename__ = 'message_queue'
     id = Column(Integer, primary_key=True)
-    recipient_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    sender_id = Column(Integer, ForeignKey('contacts.id'), nullable=True)
+    local_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    remote_id = Column(Integer, ForeignKey('contacts.id'), nullable=True)
     format = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)
