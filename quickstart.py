@@ -17,8 +17,8 @@ app_config = {
     'tools.sessions.timeout': 60,
     
     'tools.sessions.storage_type': "file",
-    'tools.sessions.storage_path': "/home/lukeross/Workspace/Pyaspora/tmp/sessions",
-    'tools.staticdir.root': "/home/lukeross/Workspace/Pyaspora/src/pyaspora/view"
+    'tools.sessions.storage_path': "/home/luke/Workspace/Pyaspora/tmp/sessions",
+    'tools.staticdir.root': "/home/luke/Workspace/Pyaspora/src/pyaspora/view"
     
 }
 app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={ 
@@ -39,7 +39,9 @@ app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={
 }) 
 configure_session_for_app(app)
 
-cherrypy.engine.subscribe('start', pyaspora.initialise_session_key)
+cherrypy.config.update({'server.socket_port': 8081})
+
+cherrypy.engine.subscribe('start', pyaspora.initialise_session_password)
 
 if hasattr(cherrypy.engine, 'block'):
     # 3.1 syntax

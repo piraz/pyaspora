@@ -266,9 +266,6 @@ class DiasporaMessageParser:
         """
         return data[0:-data[-1]]
 
-# To be moved into the main Transport class.
-
-        
 class WebfingerRequest(object):
     '''
     A request for WebFinder information for a particular Diaspora user. 
@@ -429,4 +426,25 @@ def import_contact(addr):
         c.avatar = mp
     
     return c
-    
+
+class DiasporaMessageProcessor:
+    @classmethod
+    def process(cls, message):
+        xml = xml.lstrip().encode("utf-8")
+        doc = etree.fromstring(xml)
+        for xpath, handler in cls.TYPES:
+            if doc.xpath(xpath):
+                return handler(cls, doc)
+
+    @classmethod
+    def subscription_request(cls, doc):
+        pass
+
+    @classmethod
+    def profile_receive(cls, doc):
+        pass
+
+    TYPES = {
+        '/diaspora/post/receive', subscription_request,
+        '/diaspora/post/profile', profile_receive,
+    }
