@@ -1,7 +1,11 @@
 {#
 Render a Post, displaying each PostPart in turn.
 #}
-{% for part in parts %}
+{% extends "layout.tpl" %}
+
+{% block content %}
+{% for post in posts %}
+{% for part in post.formatted_parts %}
 <div class="postpart">
 {% if part.type == "text/html" %}
 {{ part.body |safe }}
@@ -10,8 +14,10 @@ Render a Post, displaying each PostPart in turn.
 {{ part.body |e }}
 </p>
 {% else %}
-<!-- type is {{ part.type |e }} -->
+<!-- type is {{part}} {{ part.type |e }} -->
 (cannot display this part)
 {% endif %}
 </div>
 {% endfor %}
+{% endfor %}
+{% endblock %}

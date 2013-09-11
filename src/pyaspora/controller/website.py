@@ -345,7 +345,7 @@ class System:
 
 class Post:
     @cherrypy.expose
-    def create(self, body=None, parent=None, share_level=None, walls_too=False):
+    def create(self, body=None, parent=None, share_level=None, walls_too=False, **kwargs):
         """
         Create a new Post and put it on my wall. May also put it on friends walls', depending
         on the Post's privacy level.
@@ -396,14 +396,14 @@ class Post:
 
         if share_level.lower() == "group":
             for g in author.groups:
-                if cherrypy.request.params['group-{}'.format(g.id)]:
+                if kwargs.get('group-{}'.format(g.id)):
                     post.share_with([s.contact for s in g.subscriptions],
                             show_on_wall=walls_too)
                     
         if walls_too or share_level.lower() == 'contacts':
             for f in author.friends():
                 if share_level.lower() == 'contacts' and \
-                        cherrypy.request.params['friend-{}'.format(f.id)]:
+                        kwargs.get('friend-{}'.format(f.id)):
                     post.share_with([f], show_on_wall=walls_too)
                 else:
                     # If I post it publicly on author's wall, all the contacts
@@ -451,11 +451,12 @@ class Post:
         """
         Display a single post.
         """
+        logged_in = User.logged_in()
         post = session.query(model.Post).get(post_id)
         if not self.permission_to_view(post):
             return view.denied(status=403)
         to_display = self.format([post], show_all=True)
-        return view.Post.render(post=post, parts=to_display)
+        return view.Post.render(posts=to_display, logged_in=logged_in)
 
     @cherrypy.expose
     def raw_part(self, part_id):
