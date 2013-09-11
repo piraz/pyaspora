@@ -9,10 +9,6 @@ Standard widgets associated with Contacts
 		{% if contact.avatar %}
 			<img src="/contact/avatar/{{ contact.id |e }}" alt="Avatar" class="avatar" />
 		{% endif %}
-		{% if logged_in %}
-			<strong>{{ contact.realname |e }}</strong>
-		{% else %}
-			{{ contact.realname |e }}
-		{% endif %}
+		<strong><a href="/contact/profile/{{ contact.username |e }}">{{ contact.realname |e }}</a></strong>
     </div>
 {% endmacro %}
