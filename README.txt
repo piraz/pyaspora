@@ -38,13 +38,8 @@ Thus, there is a CherryPy web site that offers basic social networking (you
 can create users, befriend local users and post messages onto your wall that
 your friends can view).
 
-There is a very early test to show the Diaspora message building/parsing
-classes, and a stand-alone Webfinger demo.
-
 Quick start
 -----------
-
-* "Social networking" website
 
 PYTHONPATH=src ./quickstart.py
 
@@ -54,16 +49,6 @@ http://localhost:8080/system/initialise_database
 http://localhost:8080/user/create
 http://localhost:8080/user/login
 http://localhost:8080/contact/profile?username=lukeross%40localhost (replace username as appropriate)
-
-* Diaspora protocol building/parsing:
-
-PYTHONPATH=src ./quickstart.py
-
-Browse to:
-
-http://localhost:8080/user/test
-
-...then check STDERR for the parsed response.
 
 Dependencies
 ------------
