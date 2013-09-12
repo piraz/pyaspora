@@ -286,7 +286,6 @@ class Contact(Base):
         this node.
         """
         contact = session.query(cls).filter(cls.username == username).first()
-        print("try_import={}".format(try_import))
         if try_import and not contact:
             import pyaspora.diaspora
             contact = pyaspora.diaspora.import_contact(username)
