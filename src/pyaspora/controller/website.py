@@ -81,18 +81,21 @@ class User:
         return view.User.logged_out(logged_out=None)
     
     @classmethod
-    def logged_in(cls):
+    def logged_in(cls, required=False):
         """
         If a user session is active (the user is logged in), return the User
         for the logged in user. Otherwise returns None.
         """
         try:
             user_id = cherrypy.session.get("logged_in_user")
-            if not user_id:
-                return None
-
-            return model.User.get(user_id)
+            if user_id:
+                return model.User.get(user_id)
         except:
+            pass
+
+        if required:
+            raise cherrypy.HTTPError(403, 'You must be logged in')
+        else:
             return None
 
     @classmethod
@@ -115,8 +118,6 @@ class User:
     def edit(self, bio=None, avatar=None):
         logged_in = User.logged_in()
         
-        if not logged_in:
-            return view.denied(status=403, reason="You must be logged in")
         
         saved = False
         
@@ -223,9 +224,7 @@ class Contact:
         """
         Subscribe (form a friendship of some sort) with a Contact. This is a one-way relationship.
         """
-        user = User.logged_in()
-        if not user:
-            return view.denied(status=403, reason='You must be logged in to subscribe')
+        user = User.logged_in(required=True)
         contact = model.Contact.get(contactid)
         if not contact:
             return view.denied(status=404, reason='Contact cannot be found')
@@ -239,9 +238,7 @@ class Contact:
         """
         "Unfriend" a contact.
         """
-        user = User.logged_in()
-        if not user:
-            return view.denied(status=403, reason='You must be logged in to unsubscribe')
+        user = User.logged_in(required=True)
         contact = model.Contact.get(contactid)
         if not contact or not user.subscribed_to(contact):
             return view.denied(status=404, reason='Subscription cannot be found')
@@ -291,11 +288,9 @@ class Contact:
         if not contact:
             return view.denied(status=404, reason='No such user')
 
-        user = User.logged_in()
+        user = User.logged_in(required=True)
         
         # Need to be logged in to create a post
-        if not user:
-            return view.denied(status=403, reason='You must be logged')
 
         if not user.subscribed_to(contact):
             return view.denied(status=400, reason='You are not subscribed to this contact')
@@ -345,18 +340,14 @@ class System:
 
 class Post:
     @cherrypy.expose
-    def create(self, body=None, parent=None, share_level=None, walls_too=False, **kwargs):
+    def create(self, body=None, parent=None, share=None, share_level=None, walls_too=False, **kwargs):
         """
         Create a new Post and put it on my wall. May also put it on friends walls', depending
         on the Post's privacy level.
         """
-        author = User.logged_in()
+        author = User.logged_in(required=True)
         walls_too = bool(walls_too)
         
-        # Need to be logged in to create a post
-        if not author:
-            return view.denied(status=403, reason='You must be logged in to post')
-
         share_with_options = {
             'Groups': dict([("group-{}".format(g.id), g.name) for g in author.groups]),
             'Contacts': dict([("friend-{}".format(f.id), f.realname) for f in author.friends()]),
@@ -454,7 +445,7 @@ class Post:
         logged_in = User.logged_in()
         post = session.query(model.Post).get(post_id)
         if not self.permission_to_view(post):
-            return view.denied(status=403)
+            raise cherrypy.HTTPError(403)
         to_display = self.format([post], show_all=True)
         return view.Post.render(posts=to_display, logged_in=logged_in)
 
@@ -465,7 +456,7 @@ class Post:
         """
         part = session.query(model.MimePart).get(part_id)
         if not part:
-            return view.denied(status=404, reason="No such part")
+            raise cherrypy.HTTPError(404)
             
         # If anyone has shared this part with us (or the public), we get to view it
         for link in part.posts:
@@ -473,7 +464,7 @@ class Post:
                 return view.raw(part.type, part.body)
 
         # Nobody shared it with us
-        return view.denied(status=403)
+        raise cherrypy.HTTPError(403)
     
     @classmethod
     def permission_to_view(cls, post, contact=None):
@@ -497,18 +488,15 @@ class SubscriptionGroup:
         """
         Give a group a new name.
         """
+        if not newname:
+            return view.SubscriptionGroup.rename_form(group=group, logged_in=user)
 
-        user = User.logged_in()
-        if not user:
-            return view.denied(status=403, reason='You must be logged in')
+        user = User.logged_in(required=True)
         group = model.SubscriptionGroup.get(groupid)        
         if not group:
-            return view.denied(status=404, reason='No such group')        
+            raise cherrypy.HTTPError(404)
         if group.user_id != user.id:
-            return view.denied(status=403, reason="You don't own this group")
-        if newname:
-            group.name = newname
-            session.commit()
-            raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
-        else:
-            return view.SubscriptionGroup.rename_form(group=group, logged_in=user)
+            raise cherrypy.HTTPError(403)
+        group.name = newname
+        session.commit()
+        raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
