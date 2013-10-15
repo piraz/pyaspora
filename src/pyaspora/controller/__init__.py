@@ -1,6 +1,7 @@
 import cherrypy
 from pyaspora.controller import website, diaspora
 
+
 class Root:
     """
     Top level of the website.
@@ -11,8 +12,8 @@ class Root:
     post = website.Post()
     subscriptiongroup = website.SubscriptionGroup()
     diaspora = diaspora.DiasporaController()
-    
-    @cherrypy.expose   
+
+    @cherrypy.expose
     def index(self):
         """
         A welcome-and-sign-up page.

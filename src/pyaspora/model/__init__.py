@@ -1,5 +1,5 @@
-import random # salt generation for hashing
-import uuid # to construct the user GUIDs
+import random  # salt generation for hashing
+import uuid  # to construct the user GUIDs
 
 from Crypto.PublicKey import RSA
 from sqlalchemy.ext.declarative import declarative_base
@@ -15,11 +15,13 @@ from pyaspora.tools.sqlalchemy import metadata, session
 
 Base = declarative_base(metadata=metadata)
 
+
 class Subscription(Base):
     """
-    A one-way 'friendship' between a user and a contact (that could be local or external).
-    This class doesn't store the user explicitly, but via a SubscriptionGroup.
-    
+    A one-way 'friendship' between a user and a contact (that could be local
+    or external).  This class doesn't store the user explicitly, but via a
+    SubscriptionGroup.
+
     Fields:
         group - the SubscriptionGroup this Subscription is part of
         group_id - the database primary key of the above
@@ -27,28 +29,31 @@ class Subscription(Base):
         contact_id - the database primary key of the above
         type - the nature of this subscription (eg. "friend", "feed")
     """
-    
+
     __tablename__ = "subscriptions"
     group_id = Column(Integer, ForeignKey('subscription_groups.id'), primary_key=True)
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
     type = Column(String, nullable=False)
-    
+
     @classmethod
     def create(cls, user, contact, group, subtype='friend'):
         """
-        Create a new subscription, where <user> subscribes to <contact> with type <subtype>.
-        The group name <group> will be used, and the group will be created if it doesn't already
-        exist. A privacy level of <private> will be assigned to the Subscription.
+        Create a new subscription, where <user> subscribes to <contact> with
+        type <subtype>.  The group name <group> will be used, and the group
+        will be created if it doesn't already exist. A privacy level of
+        <private> will be assigned to the Subscription.
         """
         dbgroup = SubscriptionGroup.get_by_name(user=user, group=group, create=True)
         sub = cls(group=dbgroup, contact_id=contact.id, type=subtype)
         session.add(sub)
         return sub
 
+
 class SubscriptionGroup(Base):
     """
-    A group of subscriptions ("friendships") by category, rather like "Circles" in G+.
-    
+    A group of subscriptions ("friendships") by category, rather like
+    "Circles" in G+.
+
     Fields:
         id - an integer identifier uniquely identifying this group in the node
         user - the User this group belongs to
@@ -56,7 +61,7 @@ class SubscriptionGroup(Base):
         name - the category name. Must be unique for the user
         subscriptions - a list of Subscriptions that art part of this group
     """
-    
+
     __tablename__ = "subscription_groups"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -65,21 +70,21 @@ class SubscriptionGroup(Base):
         UniqueConstraint(user_id, name),
     )
     subscriptions = relationship('Subscription', backref='group')
-    
+
     @classmethod
     def get(cls, groupid):
         """
-        Given a primary key ID, return the SubscriptionGroup. Returns None if the group
-        doesn't exist.
+        Given a primary key ID, return the SubscriptionGroup. Returns None if
+        the group doesn't exist.
         """
         return session.query(cls).get(groupid)
-    
+
     @classmethod
     def get_by_name(cls, user, group, create=False):
         """
-        Returns the group named <group> owned by User <user>. If the group does not exist and
-        <create> is False, None will be returned. If <create> is True, a new SubscriptionGroup
-        will be created and returned.
+        Returns the group named <group> owned by User <user>. If the group
+        does not exist and <create> is False, None will be returned. If
+        <create> is True, a new SubscriptionGroup will be created and returned.
         """
         dbgroup = session.query(cls).filter(and_(cls.name == group, cls.user_id == user.id)). \
             first()
@@ -100,12 +105,13 @@ class SubscriptionGroup(Base):
         sub = Subscription(contact=contact, group=self, type=subtype)
         session.add(sub)
 
+
 class User(Base):
     """
-    A local user who is based on this node, and who can log in, view their feed and manage their
-    account. Users are associated with a Contact which is their external representation - thus,
-    all Users must have a contact.
-    
+    A local user who is based on this node, and who can log in, view their
+    feed and manage their account. Users are associated with a Contact which
+    is their external representation - thus, all Users must have a contact.
+
     Fields:
         id - an integer identifier uniquely identifying this group in the node
         email - the user's email address. Must be unique across the node.
@@ -114,10 +120,11 @@ class User(Base):
         public_key - the public key for the above private key
         contact - the Contact this user is associated with
         contact_id - the database primary key for the above
-        activated - None until the user activates their account by email. Afterwards a DateTime of activation.
+        activated - None until the user activates their account by email.
+                    Afterwards a DateTime of activation.
         groups - a list of SubscriptionGroups the user owns
     """
-    
+
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, nullable=False)
@@ -127,7 +134,7 @@ class User(Base):
     activated = Column(DateTime, nullable=True, default=None)
     groups = relationship('SubscriptionGroup', backref='user')
     message_queue = relationship('MessageQueue', backref='local')
-    
+
     @classmethod
     def get(cls, userid):
         """
@@ -141,7 +148,7 @@ class User(Base):
         Fetches a user with GUID <guid>.
         """
         return session.query(cls).filter(cls.guid == guid).first()
-        
+
     @classmethod
     def get_unactivated(cls, guid):
         """
@@ -158,25 +165,25 @@ class User(Base):
         Fetches a user by email address.
         """
         return session.query(cls).filter(cls.email == email).first()
-    
+
     def __init__(self, contact=None):
         """
-        Creates a new user, creating a new Contact for the user if none is supplied. The contact
-        is then associated with the newly created User.
+        Creates a new user, creating a new Contact for the user if none is
+        supplied. The contact is then associated with the newly created User.
         """
         Base.__init__(self)
         if not contact:
             contact = Contact()
         self.contact = contact
         session.add(self)
-    
+
     def activate(self):
         """
         Mark the user as having activated successfully.
         """
         if not self.activated:
             self.activated = func.now()
-            
+
     def unlock_key_with_password(self, password):
         """
         Check if the user's password is <password>, returning a private key is
@@ -186,27 +193,28 @@ class User(Base):
             return RSA.importKey(self.private_key, passphrase=password)
         except (ValueError, IndexError, TypeError):
             return None
-    
+
     def subscribed_to(self, contact, subtype=None):
         """
-        Check if the user is subscribed to <contact> and return the Subscription object if so.
-        Can be constrained to check for only subscriptions of type <subtype>; if not supplied it
-        will return the first Subscription to the contact of any type. If the user has no
+        Check if the user is subscribed to <contact> and return the
+        Subscription object if so.  Can be constrained to check for only
+        subscriptions of type <subtype>; if not supplied it will return the
+        first Subscription to the contact of any type. If the user has no
         subscriptions to Contact then None will be returned.
         """
         sub = session.query(Subscription).join(SubscriptionGroup). \
-                filter(and_(SubscriptionGroup.user_id == self.id,
-                    Subscription.contact_id == contact.id))
+            filter(and_(SubscriptionGroup.user_id == self.id,
+                   Subscription.contact_id == contact.id))
         if subtype:
             sub = sub.filter(Subscription.type == subtype)
         sub = sub.first()
         return sub
-    
+
     def friends(self, subtype=None):
         """
-        Returns a list of Subscriptions (of type <subtype>, or all types if none supplied), de-duped
-        by Contact (a Contact may exist in several SubscriptionGroups, this will select one at
-        random if so).
+        Returns a list of Subscriptions (of type <subtype>, or all types if
+        none supplied), de-duped by Contact (a Contact may exist in several
+        SubscriptionGroups, this will select one at random if so).
         """
         friends = []
         for group in self.groups:
@@ -215,20 +223,21 @@ class User(Base):
                     if sub.contact not in friends:
                         friends.append(sub.contact)
         return friends
-    
+
     def generate_keypair(self, passphrase):
         """
         Generate a 2048-bit RSA key. The key will be stored in the User object. The private key
         will be protected with password <passphrase>, which is usually the user password.
-        """ 
+        """
         RSAkey = RSA.generate(2048)
         self.private_key = RSAkey.exportKey(format='PEM', pkcs=1, passphrase=passphrase).decode("ascii")
         self.contact.public_key = RSAkey.publickey().exportKey(format='PEM', pkcs=1).decode("ascii")
-        
+
+
 class Share(Base):
     """
     Represents a Post being displayed to a Contact, for example in their feed or on their wall.
-    
+
     Fields:
         contact - the Contact the Post is being displayed to
         contact_id - the database primary key of the above
@@ -243,13 +252,14 @@ class Share(Base):
     public = Column(Boolean, nullable=False)
     shared_at  = Column(DateTime, nullable=False, default=func.now())
 
+
 class Contact(Base):
     """
     A person or entity that can be befriended, shared-with and the like. They may be a local User
     or they may be an entity on a remote note, merely cached here.
-    
+
     Fields:
-        id - an integer identifier uniquely identifying this group in the node        
+        id - an integer identifier uniquely identifying this group in the node
         username - the "user@node" address of the user
         realname - the user's "real" name (how they wish to be known)
         avatar - a displayable MIME part that represents the user, typically a photo
@@ -261,7 +271,7 @@ class Contact(Base):
     __tablename__ = 'contacts'
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
-    realname = Column(String, nullable=False)    
+    realname = Column(String, nullable=False)
     bio_id = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
     avatar_id = Column(Integer, ForeignKey("mime_parts.id"), nullable=True)
     public_key = Column(String, nullable=False)
@@ -278,7 +288,7 @@ class Contact(Base):
         Get a contact by primary key ID. None is returned if the Contact doesn't exist.
         """
         return session.query(cls).get(contactid)
-    
+
     @classmethod
     def get_by_username(cls, username, try_import=False):
         """
@@ -289,9 +299,9 @@ class Contact(Base):
         if try_import and not contact:
             import pyaspora.diaspora
             contact = pyaspora.diaspora.import_contact(username)
-            session.add(contact)           
+            session.add(contact)
         return contact
-    
+
     def subscribe(self, user, group='All', subtype='friend'):
         """
         Subscribe User <user> _to_ this Contact, onto <user>'s group named <group> with subscription
@@ -316,12 +326,13 @@ class Contact(Base):
         for sub in subs:
             session.delete(sub)
 
+
 class PostPart(Base):
     """
     A link between a Post and a MIMEPart, specifying the order of parts in a Post. This class exists
     because one MIMEPart may be part of several Posts, for example where a Post is re-shared (which
     creates a new Post but with the same content (plus an additional comment).
-    
+
     Fields:
         post - the Post this PostPart belongs to
         post_id - the database primary key for the above
@@ -334,12 +345,13 @@ class PostPart(Base):
     post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
     mime_part_id = Column(Integer, ForeignKey('mime_parts.id'), primary_key=True)
     order = Column(Integer, nullable=False, default=0)
-    inline = Column(Boolean, nullable=False, default=True)    
-    
+    inline = Column(Boolean, nullable=False, default=True)
+
+
 class Post(Base):
     """
     A post (a collection of parts (text, images, etc) that together form an entry on a wall/feed etc.
-    
+
     Fields:
         id - an integer identifier uniquely identifying this group in the node
         author - the Contact that authored the post
@@ -364,7 +376,7 @@ class Post(Base):
         Get a Post by primary key ID. Returns None if the Post doesn't exist.
         """
         return session.query(cls).get(postid)
-    
+
     def has_permission_to_view(self, contact=None):
         """
         Whether the Contact <contact> is permitted to view this post.
@@ -376,19 +388,19 @@ class Post(Base):
 
         if not contact:
             return False
-        
+
         # Can always view my own stuff
         if contact.id == self.author_id:
             return True
-        # Check for other shares to the contact        
+        # Check for other shares to the contact
         return self.shared_with(contact)
-    
+
     def viewable_children(self, contact=None):
         """
         List of child posts that the Contact <contact> is permitted to view
         """
         return [child for child in self.children if child.permission_to_view(contact)]
-    
+
     def add_part(self, mimepart, inline=False, order=1):
         """
         Adds MIMEPart <mimepart> to this Post, creating the linking PostPart (which is returned).
@@ -396,7 +408,7 @@ class Post(Base):
         link = PostPart(post=self, mime_part=mimepart, inline=inline, order=order)
         session.add(link)
         return link
-    
+
     def share_with(self, contacts, show_on_wall=False):
         """
         Share this Post with all the contacts in list <contacts>. This method doesn't share the
@@ -409,18 +421,19 @@ class Post(Base):
                 if not contact.user:
                     # FIXME share via diasp
                     pass
-            
+
     def shared_with(self, contact):
         """
         Returns a boolean indicating whether this Post has already been shared with Contact <contact>.
         """
         share = session.query(Share).filter(and_(Share.contact == contact, Share.post == self)).first()
         return share
-    
+
+
 class MimePart(Base):
     """
     A piece of content (eg. text, HTML, image, video) that forms part of a Post.
-    
+
     Fields:
         id - an integer identifier uniquely identifying this group in the node
         type - the MIME type (eg. "text/plain") of the body
@@ -434,19 +447,20 @@ class MimePart(Base):
     body = Column(LargeBinary, nullable=False)
     text_preview = Column(String, nullable=False)
     posts = relationship('PostPart', backref='mime_part')
-    
+
     def render_as(self, mime_type, inline=False):
         """
         Attempt to render (convert) this part into MIME type <mime_type>. Throws an exception if
-        the conversion is not possible/not defined. 
+        the conversion is not possible/not defined.
         """
         return pyaspora.renderer.Renderer.render(self, mime_type, inline)
+
 
 class MessageQueue(Base):
     """
     Messages that have been received but that cannot be actioned until the User's public key
     has been unlocked (at which point they will be deleted).
-    
+
     Fields:
         id - an integer identifier uniquely identifying the message in the queue
         local_id - the User receiving/sending the message

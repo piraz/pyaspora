@@ -1,9 +1,10 @@
 import base64
 import sqlalchemy
- 
+
 import Crypto.Random
 
 session_password = None
+
 
 def initialise_session_password(password=None):
     global session_password

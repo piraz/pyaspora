@@ -48,6 +48,7 @@ session = scoped_session(sessionmaker(autoflush=True, autocommit=False))
 # A dict in which keys are connection strings and values are SA engine objects
 _engines = {}
 
+
 def configure_session(dburi='sqlite:///database.sqlite',
                       echo=False, convert_unicode=True):
     """This function is called on each request.
@@ -56,16 +57,17 @@ def configure_session(dburi='sqlite:///database.sqlite',
     creates a corresponding SQLAlchemy engine if it doesn't exist,
     chooses the corresponding SQLALchemy engine,
     and binds the session to it.
-   
+
     Additional arguments or configuration are used if an engine is created:
     *echo*: whether to print SQL statements, default is False.
     *convert_unicode*: default is True, so you should use unicode strings
     """
-    engine = _engines.get(dburi, None) # Look up the dict.
+    engine = _engines.get(dburi, None)  # Look up the dict.
     if engine is None:              # If missing engine, create and store it.
         _engines[dburi] = engine = \
             create_engine(dburi, echo=echo, convert_unicode=convert_unicode)
-    metadata.bind = engine # Set engine for this thread or request
+    metadata.bind = engine  # Set engine for this thread or request
+
 
 def configure_session_for_app(app, echo=False, convert_unicode=True):
     '''Useful when you are at the interpreter, or whenever you are outside
@@ -90,8 +92,8 @@ class SATransaction(cherrypy.Tool):
     See this module's docstring for more details.
     """
     # A list of exceptions that do not cause rollback. Extendable by apps.
-    passable_exceptions=[cherrypy.HTTPRedirect] # KeyboardInterrupt, SystemExit
-   
+    passable_exceptions = [cherrypy.HTTPRedirect]  # KeyboardInterrupt, SystemExit
+
     def __init__(self):
         self._name = 'SATransaction'
         self._point = 'on_start_resource'
@@ -100,21 +102,21 @@ class SATransaction(cherrypy.Tool):
         # If this priority is not appropriate for both hook points, know that
         # you can set a 'priority' attribute on the actual functions.
         # Tool.priority is just a shortcut for that.
-   
+
     def _setup(self):
         '''This method is called on each request to attach this tool's hooks,
         unless tools.SATransaction.on = False.
-       
+
         If in a static request (using tools.staticdir or tools.staticfile),
         the transaction is certainly not needed,
         and thus is disabled to (probably) save some CPU time.
         '''
         if request.config.get('tools.staticdir.on', False) or \
-            request.config.get('tools.staticfile.on', False):
-                return
+                request.config.get('tools.staticfile.on', False):
+            return
         cherrypy.Tool._setup(self)
         cherrypy.request.hooks.attach('on_end_resource', self.on_end_resource)
-   
+
     def on_end_resource(self):
         """Method that is called after the CherryPy request handler.
         Tries to commit the transaction, then if an exception is raised,
@@ -125,7 +127,7 @@ class SATransaction(cherrypy.Tool):
         # Rollback if exception raised in request handler
         if value is not None and not typ in self.passable_exceptions:
             session.rollback()  # undoes what has been flushed
-            session.expunge_all() # undoes what has not been flushed
+            session.expunge_all()  # undoes what has not been flushed
             # deconfigure (unbind) session so it is ready for next request
             session.remove()
             return
@@ -134,9 +136,9 @@ class SATransaction(cherrypy.Tool):
             session.flush()
             session.commit()
         except:
-            session.rollback()    # undoes what has been flushed
-            session.expunge_all() # undoes what has not been flushed
-            raise                 # let this exception propagate
+            session.rollback()  # undoes what has been flushed
+            session.expunge_all()  # undoes what has not been flushed
+            raise  # let this exception propagate
         finally:
             # deconfigure (unbind) session so it is ready for next request
             session.remove()

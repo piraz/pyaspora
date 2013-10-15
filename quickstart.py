@@ -12,16 +12,15 @@ app_config = {
     'tools.SATransaction.dburi': 'sqlite:///database.sqlite',
     'tools.SATransaction.echo': True,
     'tools.SATransaction.convert_unicode': True,
-    
+
     'tools.sessions.on': True,
     'tools.sessions.timeout': 60,
-    
+
     'tools.sessions.storage_type': "file",
     'tools.sessions.storage_path': "/home/luke/Workspace/Pyaspora/tmp/sessions",
     'tools.staticdir.root': "/home/luke/Workspace/Pyaspora/src/pyaspora/view"
-    
 }
-app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={ 
+app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={
     '/': app_config,
     '/static': {
         'tools.staticdir.on': True,
@@ -35,8 +34,8 @@ app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={
     #},
     #'/people': {
     #    'request.dispatch': DiasporaDispatcher()
-    #}                                                                   
-}) 
+    #}
+})
 configure_session_for_app(app)
 
 cherrypy.config.update({'server.socket_port': 8081})
