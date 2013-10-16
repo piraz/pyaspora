@@ -6,7 +6,7 @@ import Crypto.Random
 session_password = None
 
 
-def initialise_session_password(password=None):
+def initialise_session_password(password='foo'):
     global session_password
     if not session_password:
         session_password = password or \

@@ -10,6 +10,7 @@ class Root:
     contact = website.Contact()
     system = website.System()
     post = website.Post()
+    test = website.Test() # FIXME
     subscriptiongroup = website.SubscriptionGroup()
     diaspora = diaspora.DiasporaController()
 

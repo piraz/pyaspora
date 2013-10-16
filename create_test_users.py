@@ -13,7 +13,7 @@ model.Base.metadata.create_all()
 
 u = model.User()
 u.contact.realname = 'Not Luke'
-u.contact.username = 'notluke@localhost'
+u.contact.username = 'notluke@pyaspora-devel.lukeross.name'
 u.contact.public_key = ''
 u.private_key = ''
 u.email = 'notluke@example.com'
@@ -28,7 +28,7 @@ session.commit()
 
 u = model.User()
 u.contact.realname = 'Luke Test'
-u.contact.username = 'luke@localhost'
+u.contact.username = 'luke@pyaspora-devel.lukeross.name'
 u.contact.public_key = ''
 u.private_key = ''
 u.email = 'luke@example.com'
@@ -43,7 +43,7 @@ session.commit()
 
 u = model.User()
 u.contact.realname = 'Nosy Nosy'
-u.contact.username = 'nosy@localhost'
+u.contact.username = 'nosy@pyaspora-devel.lukeross.name'
 u.contact.public_key = ''
 u.private_key = ''
 u.email = 'nosy@example.com'

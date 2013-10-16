@@ -9,6 +9,8 @@ import cherrypy.lib.sessions
 import pyaspora.model as model
 import pyaspora.view as view
 
+from Crypto.PublicKey import RSA
+
 from pyaspora.tools.sqlalchemy import session
 
 
@@ -112,8 +114,10 @@ class User:
             return None
         try:
             import pyaspora
-            key = RSA.importKey(enc_key, passphrase=pyaspora.session_password)
+            return RSA.importKey(enc_key, passphrase=pyaspora.session_password)
         except (ValueError, IndexError, TypeError):
+            import traceback
+            traceback.print_exc()
             return None
 
     @cherrypy.expose
@@ -529,3 +533,30 @@ class SubscriptionGroup:
         session.commit()
         raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(
             user.contact.id))
+        if newname:
+            group.name = newname
+            session.commit()
+            raise cherrypy.HTTPRedirect("/contact/friends?contactid={}".format(user.contact.id))
+        else:
+            return view.SubscriptionGroup.rename_form(group=group, logged_in=user)
+
+class Test:
+    @cherrypy.expose
+    def queue(self):
+        u = User.logged_in()
+        k = User.get_user_key()
+        assert(k)
+        import pyaspora.diaspora
+        dmp = pyaspora.diaspora.DiasporaMessageParser(model)
+        op = '<html><body><table>'
+        import cgi
+        for msg in u.message_queue:
+            op += '<tr><th>raw</th><td>{}</td></tr>'.format(msg.body.decode('utf-8'))
+            try:
+                op += '<tr><th>parsed</th><td>{}</td></tr>'.format(cgi.escape(repr(dmp.decode(msg.body.decode('utf-8'), k))))
+            except Exception:
+                import traceback
+                op += '<tr><th>error</th><td>{}</td></tr>'.format(traceback.format_exc())
+        op += '</table></body></html>'
+        return op
+>>>>>>> Stashed changes

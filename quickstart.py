@@ -2,9 +2,13 @@
 
 import cherrypy
 
-import pyaspora.controller
-#from pyaspora.transport.diaspora.controller import DiasporaDispatcher
+from cherrypy.process import servers
+def fake_wait_for_occupied_port(host, port): return
+servers.wait_for_occupied_port = fake_wait_for_occupied_port
 
+
+import pyaspora.controller
+from pyaspora.controller.diaspora import diaspora_dispatcher
 from pyaspora.tools.sqlalchemy import configure_session_for_app
 
 app_config = {
@@ -17,8 +21,9 @@ app_config = {
     'tools.sessions.timeout': 60,
 
     'tools.sessions.storage_type': "file",
-    'tools.sessions.storage_path': "/home/luke/Workspace/Pyaspora/tmp/sessions",
-    'tools.staticdir.root': "/home/luke/Workspace/Pyaspora/src/pyaspora/view"
+    'tools.sessions.storage_path': "/home/lukeross/Development/Pyaspora/tmp/sessions",
+    'tools.staticdir.root': "/home/lukeross/Development/Pyaspora/src/pyaspora/view"
+    
 }
 app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={
     '/': app_config,
@@ -26,19 +31,17 @@ app = cherrypy.tree.mount(pyaspora.controller.Root(), "/", config={
         'tools.staticdir.on': True,
         'tools.staticdir.dir': 'static'
     },
-    #'/.well-known': {
-    #    'request.dispatch': DiasporaDispatcher()
-    #},
-    #'/receive': {
-    #    'request.dispatch': DiasporaDispatcher()
-    #},
-    #'/people': {
-    #    'request.dispatch': DiasporaDispatcher()
-    #}
-})
+    '/.well-known/host-meta': {
+        'request.dispatch': diaspora_dispatcher
+    },
+    '/receive': {
+        'request.dispatch': diaspora_dispatcher
+    },
+    '/people': {
+        'request.dispatch': diaspora_dispatcher
+    }                                                                   
+}) 
 configure_session_for_app(app)
-
-cherrypy.config.update({'server.socket_port': 8081})
 
 cherrypy.engine.subscribe('start', pyaspora.initialise_session_password)
 
