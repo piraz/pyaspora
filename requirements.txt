@@ -1,5 +1,5 @@
-cherrypy
+flask
+flask-sqlalchemy
 jinja2
 lxml
 pycrypto
-sqlalchemy

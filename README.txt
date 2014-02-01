@@ -4,7 +4,7 @@
 This software is licensed under the ISC license, which is similar to the
 simplied BSD license:
 
-Copyright (c) 2012-2013, Luke Ross <lr@lukeross.name>
+Copyright (c) 2012-2014, Luke Ross <lr@lukeross.name>
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -41,14 +41,14 @@ your friends can view).
 Quick start
 -----------
 
-PYTHONPATH=src ./quickstart.py
+./quickstart.py
 
 Browse to:
 
-http://localhost:8080/system/initialise_database
-http://localhost:8080/user/create
-http://localhost:8080/user/login
-http://localhost:8080/contact/profile?username=lukeross%40localhost (replace username as appropriate)
+http://localhost:5000/setup
+http://localhost:5000/user/create
+http://localhost:5000/user/login
+http://localhost:5000/contact/profile?username=lukeross%40localhost (replace username as appropriate)
 
 Dependencies
 ------------
@@ -56,8 +56,8 @@ Dependencies
 (I'm trying to track licenses to ensure I eventually release it under
 a suitable license).
 
+Flask
 Python (PSF LICENSE AGREEMENT) GPL=yes BSD=?
 PyCrypto (PSF)
 Jinja2 (BSD) GPL=yes BSD=yes
-CherryPy (BSD) GPL=yes BSD=yes
 LXML (BSD,MIT) GPL=yes BSD=yes
