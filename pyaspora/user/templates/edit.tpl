@@ -4,7 +4,7 @@ Sign-up form for creating a new account on the local server.
 {% extends "layout.tpl" %}
 {% block content %}
 <h1>Edit profile</h1>
-<form method="post" action="edit">
+<form method="post" action="{{ url_for('.edit') }}">
 
 <h2>Bio</h2>
 <textarea name="bio"></textarea>

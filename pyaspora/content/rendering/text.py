@@ -1,9 +1,9 @@
 import codecs
 
-import pyaspora.renderer
+from pyaspora.content.rendering import Renderer
 
 
-class Plain(pyaspora.renderer.Renderer):
+class Plain(Renderer):
     def render_as_text_plain(self, part, inline=False):
         """
         Render a text/plain MIMEPart as text/plain - no interconversion
@@ -12,7 +12,7 @@ class Plain(pyaspora.renderer.Renderer):
         return codecs.utf_8_decode(part.body)[0]
 
 
-class HTML(pyaspora.renderer.Renderer):
+class HTML(Renderer):
     def render_as_text_html(self, part, inline=False):
         """
         Render a text/html MIMEPart as text/html - no interconversion required.

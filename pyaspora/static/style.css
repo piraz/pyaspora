@@ -5,11 +5,22 @@ th { text-align: left; font-family: sans-serif; }
 #header { text-align: right }
 
 .button {
-	border: solid medium;
+	border: outset medium;
 	font-family: sans-serif;
-	font-weight: bold;
-	font-size: large;
+	font-weight: normal;
+	font-size: small;
 	text-decoration: none;
+	color: #8080ff;
+	padding: 1px;
+}
+
+a:active.button {
+	border: inset medium;
+	color: #ff8080;
+}
+
+.button.selected {
+	border: inset medium;
 }
 
 .nobullet { list-style-type: none }

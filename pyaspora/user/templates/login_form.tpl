@@ -7,7 +7,7 @@ Login UI.
 	<table>
 		<tr>
 			<th>Email address</th>
-			<td><input type="text" name="username" /></td>
+			<td><input type="text" name="email" /></td>
 		</tr>
 		<tr>
 			<th>Password</th>

@@ -248,3 +248,19 @@ class Test:
                 op += '<tr><th>error</th><td>{}</td></tr>'.format(traceback.format_exc())
         op += '</table></body></html>'
         return op
+
+#     @cherrypy.expose
+#     def test(self):
+#         """
+#         temporary test of round-tripping the message builder and parser
+#         """
+#         #u = model.User.get(1)
+#         #m = DiasporaMessageBuilder('Hello, world!', u)
+#         #print(m.post('http://localhost:8080/receive/users/'+u.guid, u.contact, 'test'))
+#         #return "OK"
+#         #c = pyaspora.transport.diaspora.Transport.import_contact("lukeross@diasp.eu")
+#         #session.add(c)
+#         u = model.User.get(1)
+#         c = model.Contact.get_by_username("lukeross@diasp.eu")
+#         c.subscribe(u, "friend")
+#         return "OK"

@@ -3,13 +3,15 @@ from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import func
 
-from pyaspota.content.models import MimePart
+from pyaspora.content.models import MimePart
 from pyaspora.contact.models import Contact
-from pyaspora.database import Base, db_session
+from pyaspora.database import db
 
-class Share(Base):
+
+class Share(db.Model):
     """
-    Represents a Post being displayed to a Contact, for example in their feed or on their wall.
+    Represents a Post being displayed to a Contact, for example in their feed
+    or on their wall.
 
     Fields:
         contact - the Contact the Post is being displayed to
@@ -17,7 +19,8 @@ class Share(Base):
         post - the Post that is being shared with <contact>
         post_id - the database primary key of the above
         public - whether the post is shown on the user's public wall
-        shared_at - the DateTime the Post was shared with the Contact (that is, the Share creation date)
+        shared_at - the DateTime the Post was shared with the Contact (that
+                    is, the Share creation date)
     """
     __tablename__ = 'shares'
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
@@ -25,41 +28,47 @@ class Share(Base):
     public = Column(Boolean, nullable=False)
     hidden = Column(Boolean, nullable=False, default=False)
     shared_at = Column(DateTime, nullable=False, default=func.now())
-    
-    contact = relationship(Contact, backref="feed", order_by='Share.shared_at')
-    
 
-class PostPart(Base):
+    contact = relationship(Contact, backref="feed", order_by='Share.shared_at')
+
+
+class PostPart(db.Model):
     """
-    A link between a Post and a MIMEPart, specifying the order of parts in a Post. This class exists
-    because one MIMEPart may be part of several Posts, for example where a Post is re-shared (which
-    creates a new Post but with the same content (plus an additional comment).
+    A link between a Post and a MIMEPart, specifying the order of parts in a
+    Post. This class exists because one MIMEPart may be part of several Posts,
+    for example where a Post is re-shared (which creates a new Post but with
+    the same content (plus an additional comment).
 
     Fields:
         post - the Post this PostPart belongs to
         post_id - the database primary key for the above
         mime_part - the MimePart this PostPart links to
         mime_part_id - the database primary key for the above
-        order - an integer specifying the sort order for the Post's PostParts, sorted ascending numerically
-        inline - a boolean hint as to whether the part should be displayed inline or as an attachment
+        order - an integer specifying the sort order for the Post's PostParts,
+                sorted ascending numerically
+        inline - a boolean hint as to whether the part should be displayed
+                 inline or as an attachment
     """
     __tablename__ = 'post_parts'
     post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
-    mime_part_id = Column(Integer, ForeignKey('mime_parts.id'), primary_key=True)
+    mime_part_id = Column(Integer, ForeignKey('mime_parts.id'),
+                          primary_key=True)
     order = Column(Integer, nullable=False, default=0)
     inline = Column(Boolean, nullable=False, default=True)
     mime_part = relationship(MimePart, backref='posts')
 
 
-class Post(Base):
+class Post(db.Model):
     """
-    A post (a collection of parts (text, images, etc) that together form an entry on a wall/feed etc.
+    A post (a collection of parts (text, images, etc) that together form an
+    entry on a wall/feed etc.
 
     Fields:
         id - an integer identifier uniquely identifying this group in the node
         author - the Contact that authored the post
         author_id - the database primary key for the above
-        parent - if this Post is a comment on another Post, this links to the parent Post. May be None.
+        parent - if this Post is a comment on another Post, this links to the
+                 parent Post. May be None.
         parent_id - the database primary key for the above
         shares - Shares of this Post (occurrences in feeds/on walls)
         parts - PostParts that this Post consists of (the Post contents)
@@ -68,11 +77,14 @@ class Post(Base):
     __tablename__ = 'posts'
     id = Column(Integer, primary_key=True)
     author_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
-    parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True, default=None)
-    author   = relationship(Contact, backref='posts')
-    parts    = relationship(PostPart, backref='post', order_by=PostPart.order)
-    children = relationship('Post', backref=backref('parent', remote_side=[id]))
-    
+    parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True,
+                       default=None)
+    author = relationship(Contact, backref='posts')
+    parts = relationship(PostPart, backref='post', order_by=PostPart.order)
+    children = relationship('Post',
+                            backref=backref('parent', remote_side=[id]))
+    created_at = Column(DateTime, nullable=False, default=func.now())
+
     shares = relationship(Share, backref='post')
 
     @classmethod
@@ -80,14 +92,15 @@ class Post(Base):
         """
         Get a Post by primary key ID. Returns None if the Post doesn't exist.
         """
-        return db_session.query(cls).get(postid)
+        return db.session.query(cls).get(postid)
 
     def has_permission_to_view(self, contact=None):
         """
         Whether the Contact <contact> is permitted to view this post.
         """
         # Is it visible to the world anywhere?
-        is_public = db_session.query(Share).filter(and_(Share.public == True, Share.post == self)).first()
+        is_public = db.session.query(Share).filter(
+            and_(Share.public, Share.post == self)).first()
         if is_public:
             return True
 
@@ -97,6 +110,7 @@ class Post(Base):
         # Can always view my own stuff
         if contact.id == self.author_id:
             return True
+
         # Check for other shares to the contact
         return self.shared_with(contact)
 
@@ -104,33 +118,44 @@ class Post(Base):
         """
         List of child posts that the Contact <contact> is permitted to view
         """
-        return [child for child in self.children if child.permission_to_view(contact)]
+        return [child for child in self.children
+                if child.permission_to_view(contact)]
 
-    def add_part(self, mimepart, inline=False, order=1):
+    def add_part(self, mime_part, inline=False, order=1):
         """
-        Adds MIMEPart <mimepart> to this Post, creating the linking PostPart (which is returned).
+        Adds MIMEPart <mimepart> to this Post, creating the linking PostPart
+        (which is returned).
         """
-        link = PostPart(post=self, mime_part=mimepart, inline=inline, order=order)
-        db_session.add(link)
+        link = PostPart(post=self, mime_part=mime_part, inline=inline,
+                        order=order)
+        db.session.add(link)
         return link
 
     def share_with(self, contacts, show_on_wall=False):
         """
-        Share this Post with all the contacts in list <contacts>. This method doesn't share the
-        post if the Contact already has this Post shared with them.
+        Share this Post with all the contacts in list <contacts>. This method
+        doesn't share the post if the Contact already has this Post shared
+        with them.
         """
         for contact in contacts:
-            existing_share = db_session.query(Share).filter(and_(Share.post == self, Share.contact == contact)).first()
+            existing_share = None
+            if self.id:
+                existing_share = db.session.query(Share).filter(
+                    and_(Share.post == self,
+                         Share.contact == contact)).first()
             if not existing_share:
-                db_session.add(Share(contact=contact, post=self, public=show_on_wall))
+                db.session.add(Share(contact=contact, post=self,
+                                     public=show_on_wall))
                 if not contact.user:
                     # FIXME share via diasp
                     pass
 
     def shared_with(self, contact):
         """
-        Returns a boolean indicating whether this Post has already been shared with Contact <contact>.
+        Returns a boolean indicating whether this Post has already been shared
+        with Contact <contact>.
         """
-        share = db_session.query(Share).filter(and_(Share.contact == contact, Share.post == self)).first()
+        share = db.session.query(Share).filter(
+            and_(Share.contact == contact,
+                 Share.post == self)).first()
         return share
-

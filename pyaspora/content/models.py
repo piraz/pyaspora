@@ -1,16 +1,19 @@
 from sqlalchemy import Column, Integer, LargeBinary, String
 
-from pyaspora.database import Base
+from pyaspora.database import db
 
-class MimePart(Base):
+
+class MimePart(db.Model):
     """
-    A piece of content (eg. text, HTML, image, video) that forms part of a Post.
+    A piece of content (eg. text, HTML, image, video) that forms part of a
+    Post.
 
     Fields:
         id - an integer identifier uniquely identifying this group in the node
         type - the MIME type (eg. "text/plain") of the body
         body - the raw content blob
-        text_preview - plain text that can be displayed in lieu of content if the body cannot be displayed
+        text_preview - plain text that can be displayed in lieu of content if
+                       the body cannot be displayed
     """
     __tablename__ = 'mime_parts'
     id = Column(Integer, primary_key=True)

@@ -15,44 +15,45 @@ displaying one's own wall.
 {{bio|e}}
 
 <p id="contactProfileUserManagement">
-{% if can_remove %}
-<a href="/contact/unsubscribe?contactid={{ id |e}}" title="Unsubscribe" class="button">U</a>
-{% elif can_add %}
-<a href="/contact/subscribe?subtype=friend&amp;contactid={{ id |e}}" title="Add as a friend" class="button">A</a>
-<a href="/contact/subscribe?subtype=subscription&amp;contactid={{ id |e}}" title="Subscribe to public posts" class="button">S</a>
+{% if actions.remove %}
+<a href="{{actions.remove}}" class="button selected">Subscribed</a>
+{% elif actions.add %}
+<a href="{{actions.add}}"class="button">Subscribe</a>
 {% endif %}
-<a href="/contact/friends?contactid={{id |e }}" class="button" title="Friends list">F</a>
-{% if can_post %}
-<a href="/post/create" title="Post something new" class="button">P</a>
-<a href="/user/edit" title="Edit profile" class="button">E</a>
+<a href="{{friends}}" class="button">Friends</a>
+{% if actions.post %}
+<a href="{{actions.post}}" class="button">Send message</a>
+{% endif %}
+{% if actions.edit %}
+<a href="{{actions.edit}}" class="button">Edit</a>
 {% endif %}
 </p>
 
-{% for post in posts recursive %}
+{% for post in feed recursive %}
 <div class="post" style="border: medium outset #808080; background-color: #808080; margin: 1em; padding: 1em">
-{% for part in post.formatted_parts %}
+{% for part in post.parts %}
 <div class="postpart">
-	{{ contact_widgets.small_contact(post.post.author) }}
-	{% if part.type == "text/html" %}
-		{{ part.body |safe }}
-	{% elif part.type == "text/plain" %}
+	{{ contact_widgets.small_contact(post.author) }}
+	{% if part.mime_type == "text/html" %}
+		{{part.body |safe}}
+	{% elif part.mime_type == "text/plain" %}
 		<p>
-			{{ part.body |e }}
+			{{part.text_preview |e}}
 		</p>
 	{% else %}
-		<!-- type is {{ part.type |e }} -->
-		(cannot display this part)
+		<!-- type is {{ part.mime_type |e }} -->
+		(cannot display this part: {{part.text_preview|e}})
 	{% endif %}
-
-	<p>
-		<a href="/post/create?parent={{ post.post.id |e}}" title="Comment" class="button">C</a>
-		{% if logged_in and logged_in.contact.id != post.post.author.id %}
-			<a href="/post/create?share={{ post.post.id |e}}" title="Share" class="button">S</a>
-		{% endif %}
-	</p>
 
 </div>
 {% endfor %}
+
+	<p>
+		<a href="/post/create?parent={{ post.id |e}}" title="Comment" class="button">C</a>
+		{% if logged_in and logged_in.contact.id != post.author.id %}
+			<a href="/post/create?share={{ post.id |e}}" title="Share" class="button">S</a>
+		{% endif %}
+	</p>
 
 	{% if post.children %}
 		{{ loop(post.children) }}

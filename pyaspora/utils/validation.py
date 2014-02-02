@@ -2,6 +2,7 @@ from flask import request
 
 from pyaspora.utils.rendering import abort
 
+
 def post_param(name, optional=False, template=None):
     try:
         val = request.form[name]
