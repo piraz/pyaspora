@@ -34,7 +34,7 @@ I started by doing the webfinger protocol work to interact with existing
 Diaspora "pods" (nodes), but realised it would be more useful if I created a
 stand-alone "social network" and then integrated it with the Diaspora protocol.
 
-Thus, there is a CherryPy web site that offers basic social networking (you
+Thus, there is a Flask web site that offers basic social networking (you
 can create users, befriend local users and post messages onto your wall that
 your friends can view).
 
@@ -48,7 +48,7 @@ Browse to:
 http://localhost:5000/setup
 http://localhost:5000/user/create
 http://localhost:5000/user/login
-http://localhost:5000/contact/profile?username=lukeross%40localhost (replace username as appropriate)
+http://localhost:5000/contact/1/profile
 
 Dependencies
 ------------
@@ -56,8 +56,10 @@ Dependencies
 (I'm trying to track licenses to ensure I eventually release it under
 a suitable license).
 
-Flask
+Flask (BSD) GPL=yes BSD=yes
+Flask-SQLAlchemy (BSD) GPL=yes BSD=yes
 Python (PSF LICENSE AGREEMENT) GPL=yes BSD=?
 PyCrypto (PSF)
 Jinja2 (BSD) GPL=yes BSD=yes
 LXML (BSD,MIT) GPL=yes BSD=yes
+SQLAlchemy

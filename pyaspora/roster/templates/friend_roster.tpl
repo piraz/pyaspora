@@ -3,26 +3,30 @@ List the friends of the User. We may be showing a User their own friend list, or
 be providing a public view of a User's friend list.
 #}
 {% extends "layout.tpl" %}
+{% from 'widgets/common.tpl' import buttonform %}
 {% block content %}
 <h1>Friend list</h1>
+
+Foo
 
 {% for group in friends %}
 <h2>{{group.name |e}}</h2>
 
 <p>
-	<a href="{{group.actions.edit}}" class="button" title="Rename group">R</a>
+	<a href="{{group.actions.edit}}" class="button">Rename group</a>
 	{% if group.actions.delete %}
-		<a href="{{group.actions.de;ete}}" class="button" title="Delete group">D</a>
+		<a href="{{group.actions.delete}}" class="button">Delete group</a>
 	{% endif %}
 </p>
+
+<ul>
 
 {% for sub in group.contacts %}
 <li>
 	<a href="{{sub.link}}">
 		{{sub.name |e}}
 	</a>
- 	<a href="{{sub.actions.remove}}" class="button" title="Delete contact from friend list">D</a>
- 	<a href="/contact/groups?contactid={{ sub.contact.id |e }}" class="button" title="Edit groups this friend is in">E</a>
+	{{buttonform(sub.actions.remove,'Subscribed',True)}}
  </li>
 
 {% endfor %}
@@ -30,8 +34,5 @@ be providing a public view of a User's friend list.
 </ul>
 
 {% endfor %}
-
-{% endif %}
-
 
 {% endblock %}

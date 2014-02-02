@@ -20,3 +20,11 @@ class MimePart(db.Model):
     type = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)
     text_preview = Column(String, nullable=False)
+
+    @classmethod
+    def get(cls, part_id):
+        """
+        Get a contact by primary key ID. None is returned if the Contact
+        doesn't exist.
+        """
+        return db.session.query(cls).get(part_id)

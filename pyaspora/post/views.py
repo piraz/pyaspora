@@ -1,7 +1,17 @@
+from flask import Blueprint, url_for
+from sqlalchemy.sql import and_, not_
+
+from pyaspora.content.rendering import render
 from pyaspora.contact.views import json_contact
+from pyaspora.database import db
+from pyaspora.post.models import Share
+from pyaspora.utils.rendering import abort, redirect
+from pyaspora.user.session import logged_in_user
+
+blueprint = Blueprint('posts', __name__, template_folder='templates')
 
 
-def json_post(post, viewing_as=None):
+def json_post(post, viewing_as=None, wall=False):
     sorted_parts = sorted(post.parts, key=lambda p: p.order)
     sorted_children = sorted(post.children, key=lambda p: p.created_at)
     data = {
@@ -10,20 +20,96 @@ def json_post(post, viewing_as=None):
         'parts': [json_part(p) for p in sorted_parts],
         'children': [json_post(p) for p in sorted_children
                      if p.has_permission_to_view(viewing_as)],
-        'created_at': post.created_at.isoformat()
+        'created_at': post.created_at.isoformat(),
+        'actions': {
+            'share': None,
+            'comment': None,
+            'hide': None,
+            'make_public': None,
+            'unmake_public': None,
+        }
     }
+    if viewing_as:
+        data['actions']['comment'] = url_for('posts.comment',
+                                             post_id=post.id, _external=True)
+        if viewing_as.id != post.author_id:
+            data['actions']['share'] = \
+                url_for('posts.share', post_id=post.id, _external=True)
+        if wall:
+            data['actions']['hide'] = url_for('posts.hide',
+                                              post_id=post.id, _external=True)
+            if wall.public:
+                data['actions']['unmake_public'] = \
+                    url_for('posts.set_public',
+                            post_id=post.id, toggle='0', _external=True)
+            else:
+                data['actions']['make_public'] = \
+                    url_for('posts.set_public',
+                            post_id=post.id, toggle='1', _external=True)
     return data
 
 
 def json_part(part):
+    url = url_for('content.raw', part_id=part.mime_part.id, _external=True)
     return {
         'inline': part.inline,
         'mime_type': part.mime_part.type,
         'text_preview': part.mime_part.text_preview,
-        'link': 'fixme' if not part.inline else None,  # FIXME
-        'body': str(part.mime_part.body) if part.inline else None,
+        'link': url,
+        'body': {
+            'raw': str(part.mime_part.body) if part.inline else None,
+            'text': render(part, 'text/plain', url),
+            'html': render(part, 'text/html', url),
+        }
     }
 
+
+@blueprint.route('/<int:post_id>/share', methods=['GET'])
+def share(post_id):
+    return "share"
+
+
+@blueprint.route('/<int:post_id>/comment', methods=['GET'])
+def comment(post_id):
+    return "comment"
+
+
+def _get_share_for_post(post_id):
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
+    share = db.session.query(Share).filter(and_(
+        Share.contact == user.contact,
+        Share.post_id == post_id,
+        not_(Share.hidden))).first()
+    if not share:
+        abort(403, 'Not available')
+
+    return share
+
+    
+@blueprint.route('/<int:post_id>/hide', methods=['POST'])
+def hide(post_id):
+    share = _get_share_for_post(post_id)
+
+    share.hidden = True
+    db.session.add(share)
+    db.session.commit()
+
+    return redirect(url_for('feed.view', _external=True))
+
+
+@blueprint.route('/<int:post_id>/set_public/<int:toggle>', methods=['POST'])
+def set_public(post_id, toggle):
+    share = _get_share_for_post(post_id)
+
+    if share.public != toggle:
+        share.public = toggle
+        db.session.add(share)
+        db.session.commit()
+
+    return redirect(url_for('feed.view', _external=True))
 
 # class Post:
 #     @cherrypy.expose
@@ -135,48 +221,3 @@ def json_part(part):
 #                         shared_children, all_parts=all_parts, show_all=True)
 #                 formatted_posts.append(formatted_post)
 #         return formatted_posts
-# 
-#     @cherrypy.expose
-#     def view(self, post_id):
-#         """
-#         Display a single post.
-#         """
-#         logged_in = User.logged_in()
-#         post = session.query(model.Post).get(post_id)
-#         if not self.permission_to_view(post):
-#             raise cherrypy.HTTPError(403)
-#         to_display = self.format([post], show_all=True)
-#         return view.Post.render(posts=to_display, logged_in=logged_in)
-# 
-#     @cherrypy.expose
-#     def raw_part(self, part_id):
-#         """
-#         Show a raw MIME part (such as an attachment) with no reformatting.
-#         """
-#         part = session.query(model.MimePart).get(part_id)
-#         if not part:
-#             raise cherrypy.HTTPError(404)
-# 
-#         # If anyone has shared this part with us (or the public), we get to
-#         # view it
-#         for link in part.posts:
-#             if self.permission_to_view(link.post):
-#                 return view.raw(part.type, part.body)
-# 
-#         # Nobody shared it with us
-#         raise cherrypy.HTTPError(403)
-# 
-#     @classmethod
-#     def permission_to_view(cls, post, contact=None):
-#         """
-#         Can the contact <contact> (or the logged in user if not supplied) view
-#         this Post? Returns a boolean.
-#         """
-#         # Defaults to current logged in user
-#         if not contact:
-#             user = User.logged_in()
-#             if user is not None:
-#                 contact = user.contact
-#         return post.has_permission_to_view(contact)
-
-

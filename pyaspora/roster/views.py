@@ -1,7 +1,9 @@
+import json
 from flask import Blueprint, url_for
 
 from pyaspora.contact.models import Contact
 from pyaspora.contact.views import json_contact
+from pyaspora.content.models import MimePart
 from pyaspora.database import db
 from pyaspora.utils.rendering import abort, redirect, render_response
 from pyaspora.user.session import logged_in_user
@@ -19,9 +21,9 @@ def view():
 
     data = json_user(user)
 
-    data['friends'] = [json_group(g) for g in user.groups]
+    data['friends'] = [json_group(g, user) for g in user.groups]
 
-    return render_response('friend_list.tpl', data)
+    return render_response('friend_roster.tpl', data)
 
 
 def json_group(g, user):
@@ -34,12 +36,13 @@ def json_group(g, user):
         'contacts': [json_contact(s.contact, user) for s in g.subscriptions]
     }
     if not g.subscriptions:
-        data['action']['edit'] = 'FIXME'
+        data['actions']['edit'] = 'FIXME'
     return data
 
 
 @blueprint.route('/subscribe/<int:contact_id>', methods=['POST'])
 def subscribe(contact_id):
+    from pyaspora.post.models import Post
     user = logged_in_user()
     if not user:
         abort(401, 'Not logged in')
@@ -49,6 +52,25 @@ def subscribe(contact_id):
         abort(404, 'No such contact', force_status=True)
 
     contact.subscribe(user)
+
+    p = Post(author=user.contact)
+    db.session.add(p)
+
+    p.add_part(
+        order=0,
+        inline=True,
+        mime_part=MimePart(
+            body=json.dumps({
+                'from': user.contact.id,
+                'to': contact.id,
+            }).encode('utf-8'),
+            type='application/x-pyaspora-subscribe',
+            text_preview='{} subscribed to {}'.format(
+                user.contact.realname, contact.realname),
+        )
+    )
+    p.share_with([user.contact, contact])
+
     db.session.commit()
     return redirect(url_for('contacts.profile', contact_id=user.contact.id))
 

@@ -2,6 +2,7 @@
 Actions concerning a local User, who is mastered on this node.
 """
 
+import json
 from flask import Blueprint, session, url_for
 
 from pyaspora.contact.views import json_contact
@@ -110,8 +111,10 @@ def edit():
         order=0,
         inline=True,
         mime_part=MimePart(
-            body=b'',
-            type='text/plain',
+            body=json.dumps({
+                'fields_changed': ['bio']
+            }).encode('utf-8'),
+            type='application/x-pyaspora-profile-update',
             text_preview='{} updated their profile'.format(
                 user.contact.realname),
         )
@@ -131,56 +134,3 @@ def edit():
 
     db.session.commit()
     return redirect(url_for('contacts.profile', contact_id=user.contact.id))
-
-# class User:
-#
-#     @classmethod
-#     def _show_my_profile(cls, user=None):
-#         if not user:
-#             user = User.logged_in()
-#         raise cherrypy.HTTPRedirect("/contact/profile?username={}".format(
-#             quote_plus(user.contact.username)), 303)
-#
-#     @classmethod
-#     def get_user_key(cls):
-#         """
-#         Get the session copy of the user's private key. If the session ID has
-#         changed this may return None, in which case you'll need to ask the user
-#         for their password again.
-#         """
-#         enc_key = cherrypy.session.get("logged_in_user_key")
-#         if not enc_key:
-#             return None
-#         try:
-#             import pyaspora
-#             return RSA.importKey(enc_key, passphrase=pyaspora.session_password)
-#         except (ValueError, IndexError, TypeError):
-#             import traceback
-#             traceback.print_exc()
-#             return None
-#
-#     @cherrypy.expose
-#     def edit(self, bio=None, avatar=None):
-#         logged_in = User.logged_in()
-# 
-#         saved = False
-# 
-#         if bio:
-#             c = logged_in.contact
-#             new_bio = c.bio
-#             if not c.bio:
-#                 new_bio = model.MimePart()
-#                 session.add(new_bio)
-#                 c.bio = new_bio
-#             new_bio.type = 'text/plain'
-#             new_bio.body = bio.encode('utf-8')
-#             new_bio.text_preview = bio
-#             session.add(c)
-#             saved = True
-# 
-#         if saved:
-#             session.commit()
-#             self._show_my_profile(logged_in)
-# 
-#         return view.User.edit(logged_in=logged_in)
-# 
