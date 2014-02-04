@@ -10,6 +10,9 @@ blueprint = Blueprint('feed', __name__, template_folder='templates')
 
 @blueprint.route('/', methods=['GET'])
 def view():
+    """
+    Show the logged-in user their own feed.
+    """
     from pyaspora.post.models import Post, Share
     from pyaspora.post.views import json_post
     user = logged_in_user()

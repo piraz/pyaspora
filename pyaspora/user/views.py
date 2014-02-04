@@ -28,7 +28,7 @@ def process_login():
     user = log_in_user(email, password)
     if not user:
         abort(403, 'Login failed')
-    return redirect(url_for('contacts.profile', contact_id=user.contact.id))
+    return redirect(url_for('feed.view'))
 
 
 @blueprint.route('/create', methods=['GET'])

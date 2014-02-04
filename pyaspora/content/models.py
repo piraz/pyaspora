@@ -24,7 +24,7 @@ class MimePart(db.Model):
     @classmethod
     def get(cls, part_id):
         """
-        Get a contact by primary key ID. None is returned if the Contact
+        Get a part by primary key ID. None is returned if the MimePart
         doesn't exist.
         """
         return db.session.query(cls).get(part_id)

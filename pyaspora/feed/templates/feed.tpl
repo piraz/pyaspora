@@ -1,13 +1,12 @@
 {#
-Display a contact's "wall"/"feed", which varies according to who is viewing it. Richest when
-displaying one's own wall.
+Display the user's "feed".
 #}
 {%extends "layout.tpl"%}
 {%from 'widgets.tpl' import show_feed%}
 
-{% block content %}
+{%block content%}
 <h1>News feed</h1>
 
 {{show_feed(feed)}}
 
-{% endblock %}
+{%endblock%}

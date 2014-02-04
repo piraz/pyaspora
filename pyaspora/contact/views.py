@@ -21,7 +21,7 @@ def avatar(contact_id):
     Display the photo (or other media) that represents a Contact.
     """
     contact = models.Contact.get(contact_id)
-    if not contact:
+    if not contact or not contact.user:
         abort(404, 'No such contact', force_status=True)
 
     part = contact.avatar
@@ -35,35 +35,46 @@ def avatar(contact_id):
 
 @blueprint.route('/<int:contact_id>/profile', methods=['GET'])
 def profile(contact_id):
+    """
+    Display the profile (possibly with feed) for the contact.
+    """
     from pyaspora.post.models import Post, Share
     from pyaspora.post.views import json_post
     contact = models.Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
 
-    viewing_as = logged_in_user()
+    viewing_as = logged_in_user() if not request.args.get('public', False) \
+        else None
 
     data = json_contact(contact, viewing_as)
     limit = int(request.args.get('limit', 99))
 
-    viewing_as = logged_in_user() if not request.args.get('public', False) \
-        else None
-    # user put it on their public wall
-    feed_query = and_(Share.contact_id == contact.id, Share.public)
-    if viewing_as:
-        # Also include things this user has shared with us
-        shared_query = and_(Post.author_id == contact.id,
-                            Share.contact_id == viewing_as.contact.id,
-                            not_(Share.hidden))
-        feed_query = or_(feed_query, shared_query)
-    feed = db.session.query(Share).join(Post).filter(feed_query) \
-        .order_by(desc(Post.created_at))[0:limit]
+    # If not local, we don't have a proper feed
+    if contact.user:
+        # user put it on their public wall
+        feed_query = and_(Share.contact_id == contact.id,
+                          Share.public,
+                          not_(Share.hidden))
+        if viewing_as:
+            # Also include things this user has shared with us
+            shared_query = and_(Post.author_id == contact.id,
+                                Share.contact_id == viewing_as.contact.id,
+                                not_(Share.hidden))
+            feed_query = or_(feed_query, shared_query)
+        feed = db.session.query(Share).join(Post).filter(feed_query) \
+            .order_by(desc(Post.created_at))[0:limit]
 
-    data['feed'] = [json_post(s.post, viewing_as) for s in feed]
+        data['feed'] = [json_post(s.post, viewing_as) for s in feed]
+
     return render_response('profile.tpl', data)
 
 
 def json_contact(contact, viewing_as=None):
+    """
+    A suitable representation of the contact that can be turned into JSON
+    without too much problem.
+    """
     resp = {
         'id': contact.id,
         'link': url_for('contacts.profile',
@@ -78,7 +89,8 @@ def json_contact(contact, viewing_as=None):
             'remove': None,
             'post': None,
             'edit': None
-        }
+        },
+        'feed': None
     }
     if contact.avatar:
         resp['avatar'] = url_for('contacts.avatar',
@@ -95,7 +107,9 @@ def json_contact(contact, viewing_as=None):
                                                 contact_id=contact.id,
                                                 _external=True)
         else:
-            resp['actions']['post'] = 'FIXME'  # FIXME
+            resp['actions']['post'] = url_for('posts.create',
+                                              target='contact',
+                                              target_id=contact.id)
             if viewing_as.id != contact.id:
                 resp['actions']['add'] = url_for('roster.subscribe',
                                                  contact_id=contact.id,
@@ -106,21 +120,22 @@ def json_contact(contact, viewing_as=None):
 
 @blueprint.route('/<int:contact_id>/friends', methods=['GET'])
 def friends(contact_id):
+    """
+    Display the friend list for the contact (who must be local to this
+    server.
+    """
     user = logged_in_user()
     if not user:
         abort(401, 'Not logged in')
 
     contact = models.Contact.get(contact_id)
-    if not contact:
+    if not contact or not contact.user:
         abort(404, 'No such contact', force_status=True)
 
     if contact.id == user.contact.id:
         return redirect(url_for('roster.view', _external=True))
 
-    if not user.subscribed_to(contact):
-        abort(403, 'Not allowed to view')
-
     data = json_contact(contact, user)
-    data['friends'] = [json_contact(c, user) for c in contact.friends()]
+    data['friends'] = [json_contact(c, user) for c in contact.user.friends()]
 
     return render_response('friend_list.tpl', data)

@@ -1,36 +1,33 @@
 {#
-Display a contact's "wall"/"feed", which varies according to who is viewing it. Richest when
-displaying one's own wall.
+Display a contact's "wall", which varies according to who is viewing it.
 #}
-{% extends "layout.tpl" %}
-{%from 'widgets.tpl' import show_feed%}
+{%extends 'layout.tpl'%}
+{%from 'widgets.tpl' import button_form,show_feed%}
 
 {% block content %}
-<h1>{{name |e}}</h1>
+<h1>{{name}}</h1>
 
 {% if avatar %}
-<img src="{{avatar |e}}" alt="User avatar" class="avatar" />
+<p><img src="{{avatar}}" alt="Avatar" class="avatar" /></p>
 {% endif %}
 
+<div class="profile-bio">
 {{bio|e}}
+</div>
 
 <p id="contactProfileUserManagement">
-{% if actions.remove %}
-<form method="post" action="{{actions.remove}}" class='buttonform'>
-	<input type='submit' value='Subscribed' class='button selected' />
-</form>
-{% elif actions.add %}
-<form method="post" action="{{actions.add}}" class='buttonform'>
-	<input type='submit' value='Subscribe' class='button' />
-</form>
-{% endif %}
-<a href="{{friends}}" class="button">Friends</a>
-{% if actions.post %}
-<a href="{{actions.post}}" class="button">Send message</a>
-{% endif %}
-{% if actions.edit %}
-<a href="{{actions.edit}}" class="button">Edit</a>
-{% endif %}
+	{%if actions.remove%}
+		{{button_form(actions.remove, 'Subscribed', True)}}
+	{%elif actions.add%}
+		{{button_form(actions.remove, 'Subscribe')}}
+	{%endif%}
+	{{button_form(friends, 'Friend list', method='get')}}
+	{% if actions.post %}
+		{{button_form(actions.post, 'Send message', method='get')}}
+	{% endif %}
+	{% if actions.edit %}
+		{{button_form(actions.edit, 'Edit profile', method='get')}}
+	{% endif %}
 </p>
 
 {{show_feed(feed)}}

@@ -5,7 +5,7 @@ from pyaspora.content.rendering import render
 from pyaspora.contact.views import json_contact
 from pyaspora.database import db
 from pyaspora.post.models import Share
-from pyaspora.utils.rendering import abort, redirect
+from pyaspora.utils.rendering import abort, redirect, render_response
 from pyaspora.user.session import logged_in_user
 
 blueprint = Blueprint('posts', __name__, template_folder='templates')
@@ -65,12 +65,26 @@ def json_part(part):
 
 
 @blueprint.route('/<int:post_id>/share', methods=['GET'])
+def share_form(post_id):
+    data = {
+        'type': 'share',
+        'next': url_for('.share', _external=True),
+        'default_with': 'all_friends'
+    }
+    return render_response('post_create.tpl', data)
+
+
+@blueprint.route('/<int:post_id>/share', methods=['POST'])
 def share(post_id):
     return "share"
 
 
 @blueprint.route('/<int:post_id>/comment', methods=['GET'])
 def comment(post_id):
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
     return "comment"
 
 
@@ -110,6 +124,25 @@ def set_public(post_id, toggle):
         db.session.commit()
 
     return redirect(url_for('feed.view', _external=True))
+
+
+@blueprint.route('/create', methods=['GET'])
+def create_form():
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
+    data = {
+        'next': url_for('.create', _external=True)
+    }
+    
+    return render_response('post_create_form.tpl', data)
+
+
+@blueprint.route('/create', methods=['POST'])
+def create():
+    pass
+
 
 # class Post:
 #     @cherrypy.expose

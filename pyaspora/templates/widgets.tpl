@@ -8,13 +8,13 @@ Standard widgets
 	#}
 	<div class="smallContact">
 		{% if contact.avatar %}
-			<img src="/contact/avatar/{{ contact.id |e }}" alt="Avatar" class="avatar" />
+			<img src="{{contact.avatar}}" alt="Avatar" class="avatar" />
 		{% endif %}
-		<strong><a href="/contact/profile/{{ contact.username |e }}">{{ contact.realname |e }}</a></strong>
+		<strong><a href="{{contact.link}}">{{contact.name}}</a></strong>
     </div>
 {%endmacro%}
 
-{%macro buttonform(url, text, selected=False, method='post')%}
+{%macro button_form(url, text, selected=False, method='post')%}
 <form method="{{method}}" action="{{url}}" class='buttonform'>
 	<input type='submit' value='{{text}}' class='button{%if selected%} selected{%endif%}' />
 </form>
@@ -24,36 +24,40 @@ Standard widgets
 {%for post in feed recursive%}
 <div class="feedpost">
 
+	<div class="author">
+		{{small_contact(post.author)}}
+	</div>
+
+
 	{%for part in post.parts%}
 		<div class="postpart">
-			{{small_contact(post.author)}}
 			{% if part.body.html %}
 				{{part.body.html |safe}}
 			{% elif part.body.text %}
 				<p>
-					{{part.body.text |e}}
+					{{part.body.text}}
 				</p>
 			{% else %}
-				<!-- type is {{ part.mime_type |e }} -->
-				(cannot display this part: {{part.text_preview|e}})
+				<!-- type is {{part.mime_type}} -->
+				(cannot display this part: {{part.text_preview}})
 			{% endif %}
 		</div>
 	{% endfor %}
 
 		{%if post.actions.comment%}
-			{{buttonform(post.actions.comment,'Comment')}}
+			{{button_form(post.actions.comment,'Comment')}}
 		{% endif %}
 		{%if post.actions.share%}
-			{{buttonform(post.actions.share,'Share')}}
+			{{button_form(post.actions.share,'Share')}}
 		{% endif %}
 		{%if post.actions.hide%}
-			{{buttonform(post.actions.hide,'Hide')}}
+			{{button_form(post.actions.hide,'Hide')}}
 		{% endif %}
 		{%if post.actions.make_public%}
-			{{buttonform(post.actions.make_public,'Show on public wall')}}
+			{{button_form(post.actions.make_public,'Show on public wall')}}
 		{% endif %}
 		{%if post.actions.unmake_public%}
-			{{buttonform(post.actions.unmake_public,'Shown on public wall', True)}}
+			{{button_form(post.actions.unmake_public,'Shown on public wall', True)}}
 		{% endif %}
 
 	{% if post.children %}

@@ -1,12 +1,15 @@
 import codecs
-import html
 import json
-from flask import url_for
+from flask import render_template_string, url_for
 
 renderers = {}
 
 
 def renderer(formats):
+    """
+    Decorator which remembers the functions and the MIME types that they
+    will render.
+    """
     def stash_format(f):
         for fmt in formats:
             renderers[fmt] = f
@@ -16,13 +19,22 @@ def renderer(formats):
 
 @renderer(['text/plain'])
 def text_plain(part, fmt, url):
+    """
+    Renderer for text/plain.
+    """
     if part.inline and fmt == 'text/html':
-        return '<pre>{}</pre>'.format(html.escape(part.mime_part.text_preview))
+        return render_template_string(
+            '<pre>{{preview}}</pre>',
+            preview=part.mime_part.text_preview
+        )
     return None
 
 
 @renderer(['text/html'])
 def text_html(part, fmt, url):
+    """
+    Renderer for text/html.
+    """
     if part.inline and fmt == 'text/html':
         return codecs.utf_8_decode(part.body)[0]
     return None
@@ -30,10 +42,14 @@ def text_html(part, fmt, url):
 
 @renderer(['image/jpeg', 'image/gif', 'image/png'])
 def common_images(part, fmt, url):
+    """
+    Renderer for image/* that a browser can display in an <img> tag.
+    """
     if fmt == 'text/html' and part.inline:
-        return '<img src="{}" alt="{}" />'.format(
-            url_for('content.raw', id=part.mime_part.id, _external=True),
-            part.mime_part.text_preview
+        return render_template_string(
+            '<img src="{{url}}" alt="{{alt}}" />',
+            url=url_for('content.raw', id=part.mime_part.id, _external=True),
+            alt=part.mime_part.text_preview
         )
 
 
@@ -44,14 +60,11 @@ def pyaspora_subscribe(part, fmt, url):
         return
 
     payload = json.loads(part.mime_part.body.decode('utf-8'))
-    from_contact = Contact.get(payload['from'])
     to_contact = Contact.get(payload['to'])
-    return '<a href="{}">{}</a> subscribed to <a href="{}">{}</a>'.format(
-        url_for('contacts.profile',
-                contact_id=from_contact.id, _external=True),
-        html.escape(from_contact.realname),
-        url_for('contacts.profile', contact_id=to_contact.id, _external=True),
-        html.escape(to_contact.realname),
+    return render_template_string(
+        'subscribed to <a href="{{profile}}">{{name}}</a>',
+        profile=url_for('contacts.profile', contact_id=to_contact.id, _external=True),
+        name=to_contact.realname
     )
 
 
@@ -68,12 +81,12 @@ def render(part, fmt, url=None):
 
     defaults = {
         'text/html': {
-            True: lambda p: html.escape(p.mime_part.text_preview),
-            False: lambda p: '<a href="{}">(link)</a>'.format(url)
+            True: lambda p: render_template_string('{{t}}', t=p.mime_part.text_preview),
+            False: lambda p: render_template_string('<a href="{{u}}">(link)</a>', u=url),
         },
         'text/plain': {
             True: lambda p: p.mime_part.text_preview,
-            False: lambda p: 'Link: {}'.format(url)
+            False: lambda p: render_template_string('Link: {{u}}', u=url),
         }
     }
 
