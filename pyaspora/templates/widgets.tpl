@@ -15,9 +15,13 @@ Standard widgets
 {%endmacro%}
 
 {%macro button_form(url, text, selected=False, method='post')%}
+{%if method == 'get'%}
+<a href='{{url}}' class='button{%if selected%} selected{%endif%}'>{{text}}</a>
+{%else %}
 <form method="{{method}}" action="{{url}}" class='buttonform'>
 	<input type='submit' value='{{text}}' class='button{%if selected%} selected{%endif%}' />
 </form>
+{%endif%}
 {%endmacro%}
 
 {%macro show_feed(feed)%}
@@ -45,7 +49,7 @@ Standard widgets
 	{% endfor %}
 
 		{%if post.actions.comment%}
-			{{button_form(post.actions.comment,'Comment')}}
+			{{button_form(post.actions.comment,'Comment', method='get')}}
 		{% endif %}
 		{%if post.actions.share%}
 			{{button_form(post.actions.share,'Share')}}

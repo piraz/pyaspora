@@ -20,7 +20,7 @@ def view():
         abort(401, 'Not logged in')
 
     limit = int(request.args.get('limit', 99))
-    feed_query = and_(Share.contact_id == user.contact.id, not_(Share.hidden))
+    feed_query = and_(Share.contact_id == user.contact.id, not_(Share.hidden), Post.parent_id==None)
     feed = db.session.query(Share).join(Post).filter(feed_query) \
         .order_by(desc(Post.created_at))[0:limit]
 

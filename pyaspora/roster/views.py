@@ -28,6 +28,7 @@ def view():
 
 def json_group(g, user):
     data = {
+        'id': g.id,
         'name': g.name,
         'actions': {
             'edit': 'FIXME',
