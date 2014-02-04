@@ -103,7 +103,7 @@ def _get_share_for_post(post_id):
 
     return share
 
-    
+
 @blueprint.route('/<int:post_id>/hide', methods=['POST'])
 def hide(post_id):
     share = _get_share_for_post(post_id)
@@ -160,7 +160,6 @@ def _create_form_targets(user):
     )
 
     return data
-       
 
 
 @blueprint.route('/create', methods=['GET'])
@@ -173,7 +172,7 @@ def create_form():
         'next': url_for('.create', _external=True),
         'targets': _create_form_targets(user)
     }
-    
+
     return render_response('post_create_form.tpl', data)
 
 

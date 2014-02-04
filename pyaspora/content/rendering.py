@@ -63,7 +63,8 @@ def pyaspora_subscribe(part, fmt, url):
     to_contact = Contact.get(payload['to'])
     return render_template_string(
         'subscribed to <a href="{{profile}}">{{name}}</a>',
-        profile=url_for('contacts.profile', contact_id=to_contact.id, _external=True),
+        profile=url_for('contacts.profile',
+                        contact_id=to_contact.id, _external=True),
         name=to_contact.realname
     )
 
@@ -81,8 +82,10 @@ def render(part, fmt, url=None):
 
     defaults = {
         'text/html': {
-            True: lambda p: render_template_string('{{t}}', t=p.mime_part.text_preview),
-            False: lambda p: render_template_string('<a href="{{u}}">(link)</a>', u=url),
+            True: lambda p: render_template_string(
+                '{{t}}', t=p.mime_part.text_preview),
+            False: lambda p: render_template_string(
+                '<a href="{{u}}">(link)</a>', u=url),
         },
         'text/plain': {
             True: lambda p: p.mime_part.text_preview,
