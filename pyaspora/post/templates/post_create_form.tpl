@@ -5,7 +5,7 @@ Allow a User to enter the contents of a new Post.
 
 {% block content %}
 <h2>Create a post</h2>
-<form method="post" action="create">
+<form method="post" action="{{next}}">
     <p>
         <textarea name="body" style="width: 95%"></textarea>
     </p>
@@ -13,29 +13,25 @@ Allow a User to enter the contents of a new Post.
     <p>
         
         <table>
-        {% for level, suboptions in share_with_options.items() %}
+        {%for target_type in targets%}
             <tr>
-            <th><label><input name="share_level" value="{{level.lower() |e}}" type="radio" /> {{level |e}}</label></th>
-            <td>{% if suboptions %}<ul>
-            {% for sublevel, subdesc in suboptions.items() %}
-                <li class="nobullet"><label><input type="checkbox" name="{{sublevel |e}}" /> {{subdesc}}</label></li>
-            {% endfor %}
-            </ul>
+            <th><label><input name="target_type" value="{{target_type.name}}" type="radio" /> {{target_type.description}}</label></th>
+            <td>{% if target_type.targets %}<select name="target_id">
+            {%for target in target_types%}
+                <option value={{target.id}}" />{{target.name}}</option>
+            {%endfor%}
+            </select>
             {% endif %}
             <td>
             </tr>
         {% endfor %}
-        	<tr>
-        		<td colspan="2">
-        			<label><input type="checkbox" name="walls_too" /> Also display this post publicly on wall(s)</label>
-        		</td>
-        	</tr>
         </table>
     </p>
     <p>
-        {% if parent is not none %}
-        <input type="hidden" name="parent" value="{{ parent |e}}" />
-        {% endif %}
+        {%if relationship%}
+        <input type="hidden" name="relationship_type" value="{{relationship.type}}" />
+        <input type="hidden" name="relationship_id" value="{{relationship.object.id}}" />
+        {%endif%}
         <input type="submit" value="Create" />
     </p>
 </form>

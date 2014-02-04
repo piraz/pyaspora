@@ -94,18 +94,17 @@ class User(db.Model):
         sub = sub.first()
         return sub
 
-    def friends(self, subtype=None):
+    def friends(self):
         """
-        Returns a list of Subscriptions (of type <subtype>, or all types if
-        none supplied), de-duped by Contact (a Contact may exist in several
-        SubscriptionGroups, this will select one at random if so).
+        Returns a list of Subscriptions de-duped by Contact (a Contact may
+        exist in several SubscriptionGroups, this will select one at random if
+        so).
         """
         friends = []
         for group in self.groups:
             for sub in group.subscriptions:
-                if not(subtype) or sub.type == subtype:
-                    if sub.contact not in friends:
-                        friends.append(sub.contact)
+                if sub.contact not in friends:
+                    friends.append(sub.contact)
         return friends
 
     def generate_keypair(self, passphrase):

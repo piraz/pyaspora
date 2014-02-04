@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, url_for
 from sqlalchemy.sql import and_, desc, not_
 
 from pyaspora.database import db
@@ -25,6 +25,7 @@ def view():
         .order_by(desc(Post.created_at))[0:limit]
 
     data = {
-        'feed': [json_post(s.post, user, s) for s in feed]
+        'feed': [json_post(s.post, user, s) for s in feed],
+        'new': url_for('posts.create', _external=True)
     }
     return render_response('feed.tpl', data)

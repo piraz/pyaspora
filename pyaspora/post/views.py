@@ -5,6 +5,7 @@ from pyaspora.content.rendering import render
 from pyaspora.contact.views import json_contact
 from pyaspora.database import db
 from pyaspora.post.models import Share
+from pyaspora.roster.views import json_group
 from pyaspora.utils.rendering import abort, redirect, render_response
 from pyaspora.user.session import logged_in_user
 
@@ -126,6 +127,42 @@ def set_public(post_id, toggle):
     return redirect(url_for('feed.view', _external=True))
 
 
+def _create_form_targets(user):
+    data = [
+        {
+            'name': 'self',
+            'description': 'Only visible to myself',
+            'targets': None
+        }
+    ]
+    user_list = [json_contact(c) for c in user.friends()]
+    if user_list:
+        data.append({
+            'name': 'contact',
+            'description': 'Share with someone',
+            'targets': user_list
+        })
+
+    group_list = user.groups
+    if group_list:
+        data.append({
+            'name': 'group',
+            'description': 'Share with a group of people',
+            'targets': group_list
+        })
+
+    data.append(
+        {
+            'name': 'wall',
+            'description': 'Show to everyone on my wall',
+            'targets': None
+        }
+    )
+
+    return data
+       
+
+
 @blueprint.route('/create', methods=['GET'])
 def create_form():
     user = logged_in_user()
@@ -133,7 +170,8 @@ def create_form():
         abort(401, 'Not logged in')
 
     data = {
-        'next': url_for('.create', _external=True)
+        'next': url_for('.create', _external=True),
+        'targets': _create_form_targets(user)
     }
     
     return render_response('post_create_form.tpl', data)

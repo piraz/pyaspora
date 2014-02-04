@@ -51,7 +51,7 @@ def create():
     my_user.generate_keypair(password)
     my_user.activate()  # FIXME
     db.session.commit()
-    return render_response('created.tpl')
+    return render_response('user_created.tpl')
 
 
 @blueprint.route('/logout', methods=['GET'])

@@ -7,6 +7,10 @@ Display the user's "feed".
 {%block content%}
 <h1>News feed</h1>
 
+<p>
+    <a href="{{new}}">Post something new</a>
+</p>
+
 {{show_feed(feed)}}
 
 {%endblock%}
