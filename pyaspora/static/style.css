@@ -20,24 +20,12 @@ a { color: #3b573f }
 
 #content { padding: 2em }
 
-.button {
-	border: outset medium #3b573f;
-	font-family: sans-serif;
-	font-weight: normal;
-	font-size: small;
-	text-decoration: none;
-	padding: 1px;
-	background: none;
-    color: #3b573f;
-}
-
 :active.button {
-	border: inset medium;
-	color: #ff8080;
+	background-color: #c0c0c0;
 }
 
 .button.selected {
-	border: inset medium #3b573f;
+	border-style: inset;
 }
 
 .nobullet { list-style-type: none }

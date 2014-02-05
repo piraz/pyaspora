@@ -16,12 +16,16 @@ Standard widgets
 
 {%macro button_form(url, text, selected=False, method='post')%}
 {%if method == 'get'%}
-<a href='{{url}}' class='button{%if selected%} selected{%endif%}'>{{text}}</a>
+{%set parsed_query = chunk_url_params(url)%}
+<form method="get" action='{{parsed_query[0]}}' class='buttonform'>
+    {%for param in parsed_query[1] %}
+        <input type="hidden" name="{{param[0]}}" value="{{param[1]}}" />
+    {%endfor%}
 {%else %}
 <form method="{{method}}" action="{{url}}" class='buttonform'>
+{%endif%}
 	<input type='submit' value='{{text}}' class='button{%if selected%} selected{%endif%}' />
 </form>
-{%endif%}
 {%endmacro%}
 
 {%macro show_feed(feed)%}

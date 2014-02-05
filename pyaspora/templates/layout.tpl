@@ -2,6 +2,7 @@
 {#
 Standard page layout.
 #}
+{%from 'widgets.tpl' import button_form%}
 <html lang="en">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -18,9 +19,9 @@ Standard page layout.
 				Logged in as 
 				<a href="/contact/profile?username={{ logged_in.contact.username |e }}">{{ logged_in.contact.realname |e }}</a>
 				-
-				<a href="/user/logout">Log out</a>
+                {{button_form(url_for('users.logout'), 'Log out')}}
 			{% else %}
-				<a href="{{ url_for('users.login') }}" class="button">Log in</a>
+                {{button_form(url_for('users.login'), 'Log in')}}
 			{% endif %}
 		{% endblock %}
 	</div>
