@@ -112,14 +112,15 @@ class Post(db.Model):
             return True
 
         # Check for other shares to the contact
-        return self.shared_with(contact)
+        share = self.shared_with(contact)
+        return share and not share.hidden
 
     def viewable_children(self, contact=None):
         """
         List of child posts that the Contact <contact> is permitted to view
         """
         return [child for child in self.children
-                if child.permission_to_view(contact)]
+                if child.has_permission_to_view(contact)]
 
     def add_part(self, mime_part, inline=False, order=1):
         """

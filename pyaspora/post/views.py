@@ -15,9 +15,16 @@ from pyaspora.user.session import logged_in_user
 blueprint = Blueprint('posts', __name__, template_folder='templates')
 
 
-def json_post(post, viewing_as=None, wall=False, children=True):
+def json_post(post, viewing_as=None, share=None, children=True):
+    """
+    Turn a Post in sensible representation for serialisation, from the view of
+    Contact 'viewing_as', or the public if not provided. If a Share is
+    provided then additional actions are provided. If 'children' is False then
+    child Posts of this Post will not be fetched.
+    """
     sorted_parts = sorted(post.parts, key=lambda p: p.order)
-    sorted_children = sorted(post.children, key=lambda p: p.created_at)
+    sorted_children = sorted(post.viewable_children(),
+                             key=lambda p: p.created_at)
     data = {
         'id': post.id,
         'author': json_contact(post.author),
@@ -33,19 +40,20 @@ def json_post(post, viewing_as=None, wall=False, children=True):
         }
     }
     if children:
-        data['children'] = [json_post(p, viewing_as, wall) for p in sorted_children
-                            if p.has_permission_to_view(viewing_as)]
+        data['children'] = [json_post(p, viewing_as, share)
+                            for p in sorted_children]
     if viewing_as:
         data['actions']['comment'] = url_for('posts.comment',
                                              post_id=post.id, _external=True)
         if viewing_as.id != post.author_id:
             data['actions']['share'] = \
                 url_for('posts.share', post_id=post.id, _external=True)
-        if wall:
+
+        if share:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
             if not post.parent:
-                if wall.public:
+                if share.public:
                     data['actions']['unmake_public'] = \
                         url_for('posts.set_public',
                                 post_id=post.id, toggle='0', _external=True)
@@ -57,6 +65,9 @@ def json_post(post, viewing_as=None, wall=False, children=True):
 
 
 def json_part(part):
+    """
+    Turn a PostPart into a sensible format for serialisation.
+    """
     url = url_for('content.raw', part_id=part.mime_part.id, _external=True)
     return {
         'inline': part.inline,
@@ -73,6 +84,9 @@ def json_part(part):
 
 @blueprint.route('/<int:post_id>/share', methods=['GET'])
 def share(post_id):
+    """
+    Form to share an existing Post with more Contacts.
+    """
     user = logged_in_user()
     if not user:
         abort(401, 'Not logged in')
@@ -96,11 +110,14 @@ def share(post_id):
             'id': None
         }
     })
-    return render_response('post_create_form.tpl', data)
+    return render_response('posts_create_form.tpl', data)
 
 
 @blueprint.route('/<int:post_id>/comment', methods=['GET'])
 def comment(post_id):
+    """
+    Comment on (reply to) an existing Post.
+    """
     user = logged_in_user()
     if not user:
         abort(401, 'Not logged in')
@@ -136,7 +153,7 @@ def comment(post_id):
             }
         })
 
-    return render_response('post_create_form.tpl', data)
+    return render_response('posts_create_form.tpl', data)
 
 
 def _get_share_for_post(post_id):
@@ -156,6 +173,9 @@ def _get_share_for_post(post_id):
 
 @blueprint.route('/<int:post_id>/hide', methods=['POST'])
 def hide(post_id):
+    """
+    Hide an existing Post from the user's wall and profile.
+    """
     share = _get_share_for_post(post_id)
 
     share.hidden = True
@@ -167,6 +187,10 @@ def hide(post_id):
 
 @blueprint.route('/<int:post_id>/set_public/<int:toggle>', methods=['POST'])
 def set_public(post_id, toggle):
+    """
+    Make the Post appear-on/disappear-from the User's publiv wall. If toggle
+    is True then the post will appear.
+    """
     share = _get_share_for_post(post_id)
 
     if share.public != toggle:
@@ -227,18 +251,26 @@ def _base_create_form(user=None):
 
     return {
         'next': url_for('.create', _external=True),
-        'targets': _create_form_targets(user)
+        'targets': _create_form_targets(user),
+        'use_advanced_form': False
     }
 
 
 @blueprint.route('/create', methods=['GET'])
 def create_form():
+    """
+    Start a new Post.
+    """
     data = _base_create_form()
-    return render_response('post_create_form.tpl', data)
+    data['use_advanced_form'] = True
+    return render_response('posts_create_form.tpl', data)
 
 
 @blueprint.route('/create', methods=['POST'])
 def create():
+    """
+    Create a new Post and Share it with the selected Contacts.
+    """
     user = logged_in_user()
     if not user:
         abort(401, 'Not logged in')
@@ -314,37 +346,3 @@ def create():
 
     data = json_post(post)
     return redirect(url_for('feed.view', _external=True), data_structure=data)
-
-#     @classmethod
-#     def format(cls, posts, all_parts=False, show_all=False):
-#         """
-#         Convert a list of posts into a series of text/{html,plain} parts for
-#         web display.
-#         """
-#         formatted_posts = []
-#         for post in posts:
-#             to_display = []
-#             if Post.permission_to_view(post):
-#                 for link in post.parts:
-#                     if link.inline:
-#                         try:
-#                             rendered = link.mime_part.render_as(
-#                                 'text/html', inline=True)
-#                             to_display.append(
-#                                 {'type': 'text/html', 'body': rendered})
-#                         except:
-#                             rendered = link.mime_part.render_as(
-#                                 'text/plain', inline=True)
-#                             to_display.append(
-#                                 {'type': 'text/plain', 'body': rendered})
-#                     elif (show_all):
-#                         to_display.append(
-#                             {'type': 'text/plain', 'body': 'Attachment'})
-#                 formatted_post = {'post': post,'formatted_parts': to_display}
-#                 child_posts = post.children
-#                 if child_posts:
-#                     shared_children = [p for p in child_posts]
-#                     formatted_post['children'] = cls.format(
-#                         shared_children, all_parts=all_parts, show_all=True)
-#                 formatted_posts.append(formatted_post)
-#         return formatted_posts

@@ -55,6 +55,9 @@ def common_images(part, fmt, url):
 
 @renderer(['application/x-pyaspora-subscribe'])
 def pyaspora_subscribe(part, fmt, url):
+    """
+    Standard message for when a contact subscribes to you.
+    """
     from pyaspora.contact.models import Contact
     if fmt != 'text/html' or not part.inline:
         return
@@ -69,7 +72,31 @@ def pyaspora_subscribe(part, fmt, url):
     )
 
 
+@renderer(['application/x-pyaspora-share'])
+def pyaspora_share(part, fmt, url):
+    """
+    Standard message for when a post is shared.
+    """
+    from pyaspora.contact.models import Contact
+    if fmt != 'text/html' or not part.inline:
+        return
+
+    payload = json.loads(part.mime_part.body.decode('utf-8'))
+    author = Contact.get(payload['author'])
+    return render_template_string(
+        "shared <a href='{{profile}}'>{{name}}</a>'s post",
+        profile=url_for('contacts.profile',
+                        contact_id=author.id, _external=True),
+        name=author.realname
+    )
+
+
 def render(part, fmt, url=None):
+    """
+    Attempt to render the PostPart <part> into MIME format <fmt>, which is
+    usually 'text/plain' or 'text/html'. There are fall-backs for these two
+    formats - otherwise you may have to handle a null return.
+    """
     if not url:
         url = url_for('content.raw', part_id=part.mime_part.id)
 

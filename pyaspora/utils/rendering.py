@@ -1,5 +1,7 @@
-from flask import jsonify, make_response, render_template, request, \
+from flask import jsonify, make_response, render_template, request, url_for, \
     abort as flask_abort, redirect as flask_redirect
+
+from pyaspora.user.session import logged_in_user
 
 
 def _desired_format(default='html'):
@@ -17,6 +19,10 @@ def render_response(template_name, data_structure=None, output_format=None):
 
     if not data_structure:
         data_structure = {}
+
+    if 'logged_in' not in data_structure:
+        add_logged_in_user_to_data(data_structure)
+
     if 'status' not in data_structure:
         data_structure['status'] = 'OK'
 
@@ -25,7 +31,6 @@ def render_response(template_name, data_structure=None, output_format=None):
         response.output_format = 'json'
         return response
     else:  # HTML
-        print(repr(data_structure))
         response = make_response(
             render_template(template_name, **data_structure))
         response.output_format = 'html'
@@ -33,7 +38,9 @@ def render_response(template_name, data_structure=None, output_format=None):
 
 
 def abort(status_code, message, extra={}, force_status=False,
-          template='error.tpl'):
+          template=None):
+    if not template:
+        template = 'error.tpl'
     data = {
         'status': 'error',
         'code': status_code,
@@ -59,3 +66,28 @@ def redirect(url, status_code=302, output_format=None, data_structure=None):
         return render_response(None, data, output_format='json')
 
     return flask_redirect(url, code=status_code)
+
+
+def add_logged_in_user_to_data(data, user=False):
+    from pyaspora.user.views import json_user
+
+    if user is False:
+        user = logged_in_user()
+
+    if user:
+        base = json_user(user)
+        if 'actions' not in base:
+            base['actions'] = {}
+        base['actions'].update({
+            'logout': url_for('users.logout'),
+            'feed': url_for('feed.view'),
+            'new_post': url_for('posts.create'),
+        })
+    else:
+        base = {
+            'actions': {
+                'login': url_for('users.login')
+            }
+        }
+
+    data['logged_in'] = base

@@ -5,9 +5,11 @@ from pyaspora.contact.models import Contact
 from pyaspora.contact.views import json_contact
 from pyaspora.content.models import MimePart
 from pyaspora.database import db
-from pyaspora.utils.rendering import abort, redirect, render_response
 from pyaspora.user.session import logged_in_user
 from pyaspora.user.views import json_user
+from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
+    redirect, render_response
+from pyaspora.utils.validation import post_param
 from pyaspora.roster.models import Subscription, SubscriptionGroup
 
 blueprint = Blueprint('roster', __name__, template_folder='templates')
@@ -21,9 +23,13 @@ def view():
 
     data = json_user(user)
 
-    data['friends'] = [json_group(g, user) for g in user.groups]
+    data['actions']['create_group'] = url_for(
+        'roster.create_group', _external=True)
+    data['groups'] = [json_group(g, user) for g in user.groups]
 
-    return render_response('friend_roster.tpl', data)
+    add_logged_in_user_to_data(data, user)
+
+    return render_response('roster_view.tpl', data)
 
 
 def json_group(g, user):
@@ -31,17 +37,96 @@ def json_group(g, user):
         'id': g.id,
         'name': g.name,
         'actions': {
-            'edit': 'FIXME',
-            'delete': None
+            'edit': url_for('.edit_group_form', group_id=g.id, _external=True),
+            'delete': None,
+            'rename': url_for('.rename_group', group_id=g.id, _external=True)
         },
         'contacts': [json_contact(s.contact, user) for s in g.subscriptions]
     }
     if not g.subscriptions:
-        data['actions']['edit'] = 'FIXME'
+        data['actions']['delete'] = url_for(
+            '.delete_group', group_id=g.id, _external=True)
     return data
 
 
-@blueprint.route('/subscribe/<int:contact_id>', methods=['POST'])
+@blueprint.route('/groups/create', methods=['POST'])
+def create_group():
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
+    name = post_param('name')
+
+    db.session.add(SubscriptionGroup(user=user, name=name))
+    db.session.commit()
+
+    return redirect(url_for('roster.view', _external=True))
+
+
+@blueprint.route('/groups/<int:group_id>/edit', methods=['GET'])
+def edit_group_form(group_id):
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
+    group = SubscriptionGroup.get(group_id)
+    if not(group) or group.user_id != user.id:
+        abort(404, 'No such group')
+
+    data = json_user(user)
+
+    data['actions'].update({
+        'create_group': url_for('roster.create_group', _external=True),
+        'move_contacts': "fixme"
+    })
+    data.update({
+        'group': json_group(group, user),
+        'other_groups': [json_group(g, user)
+                         for g in user.groups if g.id != group.id]
+    })
+
+    add_logged_in_user_to_data(data, user)
+
+    return render_response('roster_edit_group.tpl', data)
+
+
+@blueprint.route('/groups/<int:group_id>/rename', methods=['POST'])
+def rename_group(group_id):
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
+    group = SubscriptionGroup.get(group_id)
+    if not(group) or group.user_id != user.id:
+        abort(404, 'No such group')
+
+    group.name = post_param('name')
+    db.session.add(group)
+    db.session.commit()
+
+    return redirect(url_for('.view', _external=True))
+
+
+@blueprint.route('/groups/<int:group_id>/delete', methods=['POST'])
+def delete_group(group_id):
+    user = logged_in_user()
+    if not user:
+        abort(401, 'Not logged in')
+
+    group = SubscriptionGroup.get(group_id)
+    if not(group) or group.user_id != user.id:
+        abort(404, 'No such group')
+
+    if group.subscriptions:
+        abort(400, 'Only empty groups can be deleted')
+
+    db.session.delete(group)
+    db.session.commit()
+
+    return redirect(url_for('.view', _external=True))
+
+
+@blueprint.route('/contacts/<int:contact_id>/subscribe', methods=['POST'])
 def subscribe(contact_id):
     from pyaspora.post.models import Post
     user = logged_in_user()
@@ -76,7 +161,7 @@ def subscribe(contact_id):
     return redirect(url_for('contacts.profile', contact_id=user.contact.id))
 
 
-@blueprint.route('/unsubscribe/<int:contact_id>', methods=['POST'])
+@blueprint.route('/contacts/<int:contact_id>/unsubscribe', methods=['POST'])
 def unsubscribe(contact_id):
     user = logged_in_user()
     if not user:

@@ -5,20 +5,20 @@ h1,h2 { margin-top: 0em }
 
 h1 {
     background-color: #a2caa8;
-    color: black;
     padding: 0.2em;
     padding-left: 1em;
+    margin-bottom: 0.1em;
 }
 
 th { text-align: left; font-family: sans-serif; }
 
-#header { width: 98%; padding: 0.2em; text-align: right; font-family: sans-serif; position: absolute; top: 0em; margin-top: 1em; }
+#header { padding: 0.2em; font-family: sans-serif; position: absolute; top: 0em; margin-top: 0.5em; right: 1em }
 
 #header a { color: black }
 
 a { color: #3b573f }
 
-#content { padding: 2em }
+#content { padding: 0.4em; padding-left: 2em; padding-right: 2em }
 
 :active.button {
 	background-color: #c0c0c0;
@@ -34,6 +34,6 @@ a { color: #3b573f }
 
 .buttonform { display: inline-block }
 
-.feedpost { padding: 1em; background-color: #f0f0f0; margin: 0.2em; }
+.feedpost { padding: 1em; background-color: #e0e0e0; margin: 0.2em; }
 
-.smallContact { font-size: small; font-family: sans-serif }
+.smallContact { font-size: small; font-family: sans-serif; display: inline-block }

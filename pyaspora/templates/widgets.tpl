@@ -7,10 +7,10 @@ Standard widgets
 	Provide a small representation of a Contact next to content from that Contact.
 	#}
 	<div class="smallContact">
-		{% if contact.avatar %}
+		{%if contact.avatar%}
 			<img src="{{contact.avatar}}" alt="Avatar" class="avatar" />
-		{% endif %}
-		<strong><a href="{{contact.link}}">{{contact.name}}</a></strong>
+		{%endif%}
+		<a href="{{contact.link}}">{{contact.name}}</a>
     </div>
 {%endmacro%}
 
@@ -32,10 +32,7 @@ Standard widgets
 {%for post in feed recursive%}
 <div class="feedpost">
 
-	<div class="author">
-		{{small_contact(post.author)}}
-	</div>
-
+	{{small_contact(post.author)}}
 
 	{%for part in post.parts%}
 		<div class="postpart">

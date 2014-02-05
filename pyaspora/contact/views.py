@@ -9,7 +9,8 @@ from sqlalchemy.sql import and_, desc, not_, or_
 
 from pyaspora.contact import models
 from pyaspora.database import db
-from pyaspora.utils.rendering import abort, redirect, render_response
+from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
+    redirect, render_response
 from pyaspora.user.session import logged_in_user
 
 blueprint = Blueprint('contacts', __name__, template_folder='templates')
@@ -55,19 +56,23 @@ def profile(contact_id):
         # user put it on their public wall
         feed_query = and_(Share.contact_id == contact.id,
                           Share.public,
-                          not_(Share.hidden))
+                          not_(Share.hidden),
+                          Post.parent_id == None)
         if viewing_as:
             # Also include things this user has shared with us
             shared_query = and_(Post.author_id == contact.id,
                                 Share.contact_id == viewing_as.contact.id,
-                                not_(Share.hidden))
+                                not_(Share.hidden),
+                                Post.parent_id == None)
             feed_query = or_(feed_query, shared_query)
         feed = db.session.query(Share).join(Post).filter(feed_query) \
             .order_by(desc(Post.created_at))[0:limit]
 
         data['feed'] = [json_post(s.post, viewing_as) for s in feed]
 
-    return render_response('profile.tpl', data)
+    add_logged_in_user_to_data(data)
+
+    return render_response('contacts_profile.tpl', data)
 
 
 def json_contact(contact, viewing_as=None):
@@ -79,8 +84,8 @@ def json_contact(contact, viewing_as=None):
         'id': contact.id,
         'link': url_for('contacts.profile',
                         contact_id=contact.id, _external=True),
-        'friends': url_for('contacts.friends',
-                           contact_id=contact.id, _external=True),
+        'subscriptions': url_for('contacts.subscriptions',
+                                 contact_id=contact.id, _external=True),
         'name': contact.realname,
         'bio': '',
         'avatar': None,
@@ -118,8 +123,8 @@ def json_contact(contact, viewing_as=None):
     return resp
 
 
-@blueprint.route('/<int:contact_id>/friends', methods=['GET'])
-def friends(contact_id):
+@blueprint.route('/<int:contact_id>/subscriptions', methods=['GET'])
+def subscriptions(contact_id):
     """
     Display the friend list for the contact (who must be local to this
     server.
@@ -136,6 +141,9 @@ def friends(contact_id):
         return redirect(url_for('roster.view', _external=True))
 
     data = json_contact(contact, user)
-    data['friends'] = [json_contact(c, user) for c in contact.user.friends()]
+    data['subscriptions'] = [json_contact(c, user)
+                             for c in contact.user.friends()]
 
-    return render_response('friend_list.tpl', data)
+    add_logged_in_user_to_data(data, user)
+
+    return render_response('contacts_friend_list.tpl', data)
