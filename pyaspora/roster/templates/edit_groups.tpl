@@ -3,7 +3,7 @@ Let the logged-in user change which of their groups the contact is in.
 #}
 {% extends "layout.tpl" %}
 {% block content %}
-<h1>Edit contact groups</h1>
+<h2>Edit contact groups</h2>
 
 <form method="post">
     <ul>

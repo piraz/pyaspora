@@ -5,7 +5,7 @@ be providing a public view of a User's friend list.
 {% extends "layout.tpl" %}
 {% from 'widgets/common.tpl' import buttonform %}
 {% block content %}
-<h1>Friend list</h1>
+<h2>Friend list</h2>
 
 Foo
 

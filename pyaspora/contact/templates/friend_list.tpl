@@ -6,7 +6,7 @@ bare-bones.
 {%from 'widgets.tpl' import small_contact%}
 
 {%block content%}
-<h1>Friend list</h1>
+<h2>Friend list</h2>
 
 <ul>
 	{%for sub in friends%}

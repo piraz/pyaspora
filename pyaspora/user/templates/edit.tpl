@@ -3,15 +3,15 @@ Sign-up form for creating a new account on the local server.
 #}
 {% extends "layout.tpl" %}
 {% block content %}
-<h1>Edit profile</h1>
+<h2>Edit profile</h2>
 <form method="post" action="{{ url_for('.edit') }}">
 
-<h2>Bio</h2>
-<textarea name="bio"></textarea>
+<h3>Bio</h3>
+<p><textarea name="bio"></textarea></p>
 
-<h2>Profile photo</h2>
-<p>Coming soon.</p>
+<h3>Upload profile photo</h3>
+<p><input type="file" name="avatar" /></p>
 
-<input type="submit" value="Save" />
+<p><input type="submit" value="Save" class="button" /></p>
 </form>
 {% endblock %}

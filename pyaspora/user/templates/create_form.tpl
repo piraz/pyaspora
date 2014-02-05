@@ -19,7 +19,7 @@ Sign-up form for creating a new account on the local server.
 	</tr>
 	<tr>
 		<td></td>
-		<td><input type="submit" value="Create" /></td>
+		<td><input type="submit" value="Create" class="button" /></td>
 	</tr>
 </table>
 </form>

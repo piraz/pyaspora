@@ -33,7 +33,7 @@ def json_post(post, viewing_as=None, wall=False, children=True):
         }
     }
     if children:
-        data['children'] = [json_post(p) for p in sorted_children
+        data['children'] = [json_post(p, viewing_as, wall) for p in sorted_children
                             if p.has_permission_to_view(viewing_as)]
     if viewing_as:
         data['actions']['comment'] = url_for('posts.comment',
@@ -44,14 +44,15 @@ def json_post(post, viewing_as=None, wall=False, children=True):
         if wall:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
-            if wall.public:
-                data['actions']['unmake_public'] = \
-                    url_for('posts.set_public',
-                            post_id=post.id, toggle='0', _external=True)
-            else:
-                data['actions']['make_public'] = \
-                    url_for('posts.set_public',
-                            post_id=post.id, toggle='1', _external=True)
+            if not post.parent:
+                if wall.public:
+                    data['actions']['unmake_public'] = \
+                        url_for('posts.set_public',
+                                post_id=post.id, toggle='0', _external=True)
+                else:
+                    data['actions']['make_public'] = \
+                        url_for('posts.set_public',
+                                post_id=post.id, toggle='1', _external=True)
     return data
 
 

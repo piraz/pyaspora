@@ -11,6 +11,7 @@ Standard page layout.
     {% endblock %}
 </head>
 <body>
+    <h1>Pyaspora</h1>
 	<div id="header">
 		{% block header %}
 			{% if logged_in %}
@@ -19,7 +20,7 @@ Standard page layout.
 				-
 				<a href="/user/logout">Log out</a>
 			{% else %}
-				<a href="{{ url_for('users.login') }}">Log in</a>
+				<a href="{{ url_for('users.login') }}" class="button">Log in</a>
 			{% endif %}
 		{% endblock %}
 	</div>

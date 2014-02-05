@@ -5,10 +5,10 @@ Display the user's "feed".
 {%from 'widgets.tpl' import show_feed%}
 
 {%block content%}
-<h1>News feed</h1>
+<h2>News feed</h2>
 
 <p>
-    <a href="{{new}}">Post something new</a>
+    <a href="{{new}}" class="button">Post something new</a>
 </p>
 
 {{show_feed(feed)}}
