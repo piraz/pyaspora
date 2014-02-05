@@ -51,6 +51,7 @@ def redirect(url, status_code=302, output_format=None, data_structure=None):
         output_format = _desired_format()
 
     if output_format == 'json':
+        print("json redirect")
         data = {
             'next_page': url
         }

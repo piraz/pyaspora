@@ -34,7 +34,7 @@ def json_post(post, viewing_as=None, wall=False, children=True):
     }
     if children:
         data['children'] = [json_post(p) for p in sorted_children
-                     if p.has_permission_to_view(viewing_as)] 
+                            if p.has_permission_to_view(viewing_as)]
     if viewing_as:
         data['actions']['comment'] = url_for('posts.comment',
                                              post_id=post.id, _external=True)
@@ -81,9 +81,9 @@ def share(post_id):
         abort(404, 'No such post', force_status=True)
     if not post.has_permission_to_view(user.contact):
         abort(403, 'Forbidden')
-        
-    data = _base_create_form()        
-    
+
+    data = _base_create_form()
+
     data.update({
         'relationship': {
             'type': 'share',
@@ -103,14 +103,14 @@ def comment(post_id):
     user = logged_in_user()
     if not user:
         abort(401, 'Not logged in')
-        
+
     post = Post.get(post_id)
     if not post:
         abort(404, 'No such post', force_status=True)
     if not post.has_permission_to_view(user.contact):
         abort(403, 'Forbidden')
-        
-    data = _base_create_form()   
+
+    data = _base_create_form()
 
     data.update({
         'relationship': {
@@ -119,22 +119,22 @@ def comment(post_id):
             'description': 'Comment on this item'
         }
     })
-    
+
     if post.author_id == user.contact_id:
-        data.update({             
+        data.update({
             'default_target': {
                 'type': 'all_friends',
                 'id': None
             }
         })
-    else:        
-        data.update({             
+    else:
+        data.update({
             'default_target': {
                 'type': 'contact',
                 'id': post.author_id
             }
         })
-                
+
     return render_response('post_create_form.tpl', data)
 
 
@@ -247,16 +247,17 @@ def create():
         'type': post_param('relationship_type', optional=True),
         'id': post_param('relationship_id', optional=True),
     }
-    
+
     target = {
         'type': post_param('target_type'),
-        'id': post_param('target_id', optional=True),              
+        'id': post_param('target_id', optional=True),
     }
-    
+
     # Loathe inflexible HTML forms
     if target['id'] is None:
-        target['id'] = post_param('target_%s_id' % target['type'], optional=True)
-        
+        target['id'] = post_param(
+            'target_%s_id' % target['type'], optional=True)
+
     if relationship['type']:
         post = Post.get(relationship['id'])
         if not post:
@@ -267,7 +268,7 @@ def create():
 
     post = Post(author=user.contact)
     body_part = MimePart(type='text/plain', body=b'', text_preview=body)
-    
+
     if relationship['type'] == 'comment':
         post.parent = relationship['post']
         post.add_part(body_part, order=0, inline=True)
@@ -294,98 +295,25 @@ def create():
         post.add_part(body_part, order=0, inline=True)
 
     db.session.add(post)
-        
-    if target['type'] == 'wall':
-        db.session.add(Share(post=post, public=True, contact=user.contact))
+
+    post.share_with([user.contact], show_on_wall=(target['type'] == 'wall'))
     if target['type'] == 'all_contacts':
-        for friend in user.friends(): 
-            db.session.add(Share(post=post, public=False, contact=friend))
-    else:
-        db.session.add(Share(post=post, public=False, contact=user.contact))
+        for friend in user.friends():
+            post.share_with([friend])
+    if target['type'] == 'contact':
+        for friend in user.friends():
+            if str(friend.id) == target['id']:
+                post.share_with([friend])
+    if target['type'] == 'group':
+        for group in user.groups():
+            if str(group.id) == target['id']:
+                post.share_with([s.contact for s in g.subscriptions])
 
     db.session.commit()
 
     data = json_post(post)
-    return redirect(url_for('feed.view', _external=True, data_structure=data))
+    return redirect(url_for('feed.view', _external=True), data_structure=data)
 
-
-# class Post:
-#     @cherrypy.expose
-#     def create(self, body=None, parent=None, share=None, share_level=None,
-#                walls_too=False, **kwargs):
-#         """
-#         Create a new Post and put it on my wall. May also put it on friends
-#         walls', depending on the Post's privacy level.
-#         """
-#         author = User.logged_in(required=True)
-#         walls_too = bool(walls_too)
-# 
-#         share_with_options = {
-#             'Groups': {"group-{}".format(g.id): g.name for g in author.groups},
-#             'Contacts': {"friend-{}".format(f.id): f.realname
-#                          for f in author.friends()},
-#         }
-#         for opt, subopt in share_with_options.items():
-#             if not subopt:
-#                 del share_with_options[opt]
-#         share_with_options.update({
-#             'Me': None,
-#         })
-#         if parent:
-#             share_with_options.update({
-#                 'PersonReplyingTo': None
-#             })
-# 
-#         # If the mandatory fields aren't supplied, we are probably creating a
-#         # new post
-#         if not body:
-#             return view.Post.create_form(parent=parent,
-#                                          share_with_options=share_with_options)
-# 
-#         post = model.Post(author=author.contact)
-# 
-#         # figure out if this is a comment on another post
-#         if parent:
-#             parent_post = model.Post.get(parent)
-#             # are we permitted to comment on it?
-#             if not(parent_post) or not(self.permission_to_view(parent_post)):
-#                 return view.denied(status=403)
-#             if parent_post:
-#                 post.parent = parent_post
-# 
-#         # prepare the MIME part and link it to the post
-#         part = model.MimePart(type='text/plain', body=body.encode('utf-8'),
-#                               text_preview=body)
-#         post.add_part(part, inline=True, order=1)
-# 
-#         # post to author's wall
-#         post.share_with([author.contact], show_on_wall=walls_too)
-# 
-#         if share_level.lower() == "group":
-#             for g in author.groups:
-#                 if kwargs.get('group-{}'.format(g.id)):
-#                     post.share_with([s.contact for s in g.subscriptions],
-#                                     show_on_wall=walls_too)
-# 
-#         if walls_too or share_level.lower() == 'contacts':
-#             for f in author.friends():
-#                 if share_level.lower() == 'contacts' and \
-#                         kwargs.get('friend-{}'.format(f.id)):
-#                     post.share_with([f], show_on_wall=walls_too)
-#                 else:
-#                     # If I post it publicly on author's wall, all the contacts
-#                     # will see it, so ensure all the contacts get it.
-#                     post.share_with([f], show_on_wall=False)
-# 
-#         if share_level.lower() == 'personreplyingto' and parent_post:
-#             post.share_with([parent_post.author], show_on_wall=walls_too)
-# 
-#         # commit everything to get the Post ID
-#         session.commit()
-# 
-#         # done
-#         return view.Post.created(post=post)
-# 
 #     @classmethod
 #     def format(cls, posts, all_parts=False, show_all=False):
 #         """
@@ -411,7 +339,7 @@ def create():
 #                     elif (show_all):
 #                         to_display.append(
 #                             {'type': 'text/plain', 'body': 'Attachment'})
-#                 formatted_post = {'post': post, 'formatted_parts': to_display}
+#                 formatted_post = {'post': post,'formatted_parts': to_display}
 #                 child_posts = post.children
 #                 if child_posts:
 #                     shared_children = [p for p in child_posts]
