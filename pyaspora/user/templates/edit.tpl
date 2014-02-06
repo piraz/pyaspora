@@ -2,16 +2,39 @@
 Sign-up form for creating a new account on the local server.
 #}
 {% extends "layout.tpl" %}
+
 {% block content %}
 <h2>Edit profile</h2>
+
 <form method="post" action="{{ url_for('.edit') }}">
 
 <h3>Bio</h3>
-<p><textarea name="bio"></textarea></p>
+<p>
+    Tell everyone about yourself:<br />
+    <textarea name="bio">{{bio}}</textarea>
+</p>
 
-<h3>Upload profile photo</h3>
-<p><input type="file" name="avatar" /></p>
+<h3>Profile photo</h3>
 
-<p><input type="submit" value="Save" class="button" /></p>
+<p>
+    Choose a photo of yourself to display on your profile:
+    <input type="file" name="avatar" />
+</p>
+
+<h3>Interests</h3>
+
+<p>
+    Enter your interests here, separated by spaces. Interests should consist
+    of lower-case letters, numbers and underscores, such as
+    <tt>kittens</tt>,
+    <tt>sliced_bread</tt> and
+    <tt>channel_9</tt>:<br />
+    <input type="text" name="tags" value="{{' '.join(tags)}}" />
+</p>
+
+<p>
+    <input type="submit" value="Save" class="button" />
+</p>
+
 </form>
 {% endblock %}

@@ -7,6 +7,7 @@ from pyaspora.contact.views import blueprint as contacts_blueprint
 from pyaspora.feed.views import blueprint as feed_blueprint
 from pyaspora.post.views import blueprint as posts_blueprint
 from pyaspora.roster.views import blueprint as roster_blueprint
+from pyaspora.tag.views import blueprint as tags_blueprint
 from pyaspora.user.views import blueprint as users_blueprint
 from pyaspora.utils import templates
 
@@ -19,6 +20,7 @@ app.register_blueprint(contacts_blueprint, url_prefix='/contacts')
 app.register_blueprint(feed_blueprint, url_prefix='/feed')
 app.register_blueprint(posts_blueprint, url_prefix='/posts')
 app.register_blueprint(roster_blueprint, url_prefix='/roster')
+app.register_blueprint(tags_blueprint, url_prefix='/tags')
 app.register_blueprint(users_blueprint, url_prefix='/users')
 
 # Global template utility functions

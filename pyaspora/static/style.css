@@ -20,7 +20,7 @@ a { color: #3b573f }
 
 #content { padding: 0.4em; padding-left: 2em; padding-right: 2em }
 
-:active.button {
+:active.button.selected {
 	background-color: #c0c0c0;
 }
 

@@ -66,6 +66,18 @@ Allow a User to enter the contents of a new Post.
         {% endfor %}
     </table>
 
+    {% if use_advanced_form %}
+        <h3>Topics</h3>
+
+        <p>
+            Enter the topics that this post is about, separated by spaces.
+            Topics should consist of lower-case letters, numbers and
+            underscores, such as <tt>kittens</tt>, <tt>sliced_bread</tt>
+            and <tt>channel_9</tt>:<br />
+            <input type="text" name="tags" />
+        </p>
+    {% endif %}
+
     <p>
         {% if relationship %}
             <input type="hidden" name="relationship_type" value="{{relationship.type}}" />

@@ -9,6 +9,7 @@ from sqlalchemy.sql import and_, desc, not_, or_
 
 from pyaspora.contact import models
 from pyaspora.database import db
+from pyaspora.tag.views import json_tag
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
     redirect, render_response
 from pyaspora.user.session import logged_in_user
@@ -95,7 +96,8 @@ def json_contact(contact, viewing_as=None):
             'post': None,
             'edit': None
         },
-        'feed': None
+        'feed': None,
+        'tags': [json_tag(t) for t in contact.interests]
     }
     if contact.avatar:
         resp['avatar'] = url_for('contacts.avatar',

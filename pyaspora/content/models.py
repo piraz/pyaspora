@@ -19,7 +19,7 @@ class MimePart(db.Model):
     id = Column(Integer, primary_key=True)
     type = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)
-    text_preview = Column(String, nullable=False)
+    text_preview = Column(String, nullable=True)
 
     @classmethod
     def get(cls, part_id):

@@ -22,11 +22,14 @@ def text_plain(part, fmt, url):
     """
     Renderer for text/plain.
     """
-    if part.inline and fmt == 'text/html':
-        return render_template_string(
-            '<pre>{{preview}}</pre>',
-            preview=part.mime_part.text_preview
-        )
+    if part.inline:
+        if fmt == 'text/html':
+            return render_template_string(
+                '{{text}}',
+                text=codecs.utf_8_decode(part.mime_part.body)[0]
+            )
+        if fmt == 'text/plain':
+            return codecs.utf_8_decode(part.mime_part.body)[0]
     return None
 
 
@@ -36,7 +39,7 @@ def text_html(part, fmt, url):
     Renderer for text/html.
     """
     if part.inline and fmt == 'text/html':
-        return codecs.utf_8_decode(part.body)[0]
+        return codecs.utf_8_decode(part.mime_part.body)[0]
     return None
 
 
@@ -121,6 +124,7 @@ def render(part, fmt, url=None):
     }
 
     if fmt in defaults:
-        return defaults[fmt][part.inline](part)
+        display_inline = bool(part.inline and p.mime_part.text_preview)
+        return defaults[fmt][display_inline](part)
 
     return None
