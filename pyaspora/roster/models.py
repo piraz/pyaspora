@@ -21,8 +21,17 @@ class Subscription(db.Model):
     __tablename__ = "subscriptions"
     group_id = Column(Integer, ForeignKey('subscription_groups.id'),
                       primary_key=True)
-    contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
+    contact_id = Column(Integer, ForeignKey('contacts.id'),
+                        primary_key=True, index=True)
     contact = relationship("Contact", backref="subscriptions")
+
+    class Queries:
+        @classmethod
+        def user_shares_for_contacts(cls, user, contact_ids):
+            return and_(
+                Subscription.contact_id.in_(contact_ids),
+                SubscriptionGroup.user_id == user.id
+            )
 
     @classmethod
     def create(cls, user, contact, group):
@@ -54,7 +63,8 @@ class SubscriptionGroup(db.Model):
 
     __tablename__ = "subscription_groups"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"),
+                     nullable=False, index=True)
     name = Column(String, nullable=False)
     __table_args__ = (
         UniqueConstraint(user_id, name),

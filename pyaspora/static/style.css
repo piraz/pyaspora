@@ -1,7 +1,7 @@
 html,body { margin: 0em; padding: 0em }
-h1,h2,h3 { font-family: sans-serif }
+h1, h2, h3 { font-family: sans-serif }
 
-h1,h2 { margin-top: 0em }
+h1 { margin-top: 0em }
 
 h1 {
     background-color: #a2caa8;
@@ -37,3 +37,9 @@ a { color: #3b573f }
 .feedpost { padding: 1em; background-color: #e0e0e0; margin: 0.2em; }
 
 .smallContact { font-size: small; font-family: sans-serif; display: inline-block }
+
+.feedpost .tags { font-size: x-small; font-family: sans-serif }
+
+.feedpost .smallContact img { vertical-align: text-top }
+
+.feedpost .postpart { padding-top: 0.3em; padding-bottom: 0.2em }

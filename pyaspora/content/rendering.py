@@ -17,6 +17,14 @@ def renderer(formats):
     return stash_format
 
 
+def renderer_exists(fmt):
+    """
+    Returns true if there's a renderer for
+    specific formats.
+    """
+    return renderers.get(fmt, None)
+
+
 @renderer(['text/plain'])
 def text_plain(part, fmt, url):
     """
@@ -51,7 +59,8 @@ def common_images(part, fmt, url):
     if fmt == 'text/html' and part.inline:
         return render_template_string(
             '<img src="{{url}}" alt="{{alt}}" />',
-            url=url_for('content.raw', id=part.mime_part.id, _external=True),
+            url=url_for('content.raw',
+                        part_id=part.mime_part.id, _external=True),
             alt=part.mime_part.text_preview
         )
 
@@ -80,17 +89,16 @@ def pyaspora_share(part, fmt, url):
     """
     Standard message for when a post is shared.
     """
-    from pyaspora.contact.models import Contact
     if fmt != 'text/html' or not part.inline:
         return
 
     payload = json.loads(part.mime_part.body.decode('utf-8'))
-    author = Contact.get(payload['author'])
+    author = payload['author']
     return render_template_string(
         "shared <a href='{{profile}}'>{{name}}</a>'s post",
         profile=url_for('contacts.profile',
-                        contact_id=author.id, _external=True),
-        name=author.realname
+                        contact_id=author['id'], _external=True),
+        name=author['name']
     )
 
 
@@ -104,8 +112,9 @@ def render(part, fmt, url=None):
         url = url_for('content.raw', part_id=part.mime_part.id)
 
     ret = None
-    if part.mime_part.type in renderers:
-        ret = renderers[part.mime_part.type](part, fmt, url)
+    renderer = renderer_exists(part.mime_part.type)
+    if renderer:
+        ret = renderer(part, fmt, url)
 
     if ret is not None:  # might be empty string!
         return ret
@@ -124,7 +133,7 @@ def render(part, fmt, url=None):
     }
 
     if fmt in defaults:
-        display_inline = bool(part.inline and p.mime_part.text_preview)
+        display_inline = bool(part.inline and part.mime_part.text_preview)
         return defaults[fmt][display_inline](part)
 
     return None

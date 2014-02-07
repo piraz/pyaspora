@@ -6,7 +6,7 @@ Allow a User to enter the contents of a new Post.
 
 {% block content %}
 <h2>Create a post</h2>
-<form method="post" action="{{next}}">
+<form method="post" action="{{next}}" enctype="multipart/form-data">
 
     {% if relationship %}
         <h3>{{relationship.description}}</h3>
@@ -25,7 +25,7 @@ Allow a User to enter the contents of a new Post.
 
         <p>
             You can attach a file to this post if you wish:
-               <input type="file" />
+               <input type="file" name="attachment" />
            </p>
     {% endif %}
 

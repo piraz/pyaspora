@@ -14,6 +14,9 @@ from pyaspora.utils import templates
 app = Flask(__name__)
 db.init_app(app)
 
+# Global configuration
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
 # Register modules
 app.register_blueprint(content_blueprint, url_prefix='/content')
 app.register_blueprint(contacts_blueprint, url_prefix='/contacts')
@@ -39,7 +42,7 @@ def setup():
 
 @app.route('/')
 def index():
-    from pyaspora.user.views import logged_in_user
+    from pyaspora.user.session import logged_in_user
     from pyaspora.utils.rendering import redirect
     if logged_in_user():
         return redirect(url_for('feed.view'))

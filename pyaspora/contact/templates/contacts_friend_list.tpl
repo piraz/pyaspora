@@ -21,6 +21,9 @@ pretty bare-bones.
         {% for sub in subscriptions %}
             <li>
                 {{small_contact(sub)}}
+                {% if sub.actions.add %}
+                    {{button_form(sub.actions.add, 'Subscribe')}}
+                {% endif %}
             </li>
         {% endfor %}
 

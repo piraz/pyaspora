@@ -21,7 +21,7 @@ Let the logged-in user change which of their groups the contact is in.
     {{button_form(group.actions.delete, 'Delete')}}
 {% endif %}
 
-{% if group.contacts and group.actions.move_contacts %}
+{% if group.contacts and actions.move_contacts and other_groups %}
 <form method="post" action="{{actions.move_contacts}}">
 
     <h2>Move contacts</h2>

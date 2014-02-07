@@ -1,7 +1,7 @@
 import re
-from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import and_
+from sqlalchemy.sql import and_, not_
 
 from pyaspora.database import db
 
@@ -18,7 +18,8 @@ class Interest(db.Model):
 
     __tablename__ = 'interests'
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
-    tag_id = Column(Integer, ForeignKey('tags.id'), primary_key=True)
+    tag_id = Column(Integer, ForeignKey('tags.id'),
+                    primary_key=True, index=True)
 
 
 class PostTag(db.Model):
@@ -32,8 +33,9 @@ class PostTag(db.Model):
     '''
 
     __tablename__ = 'post_tags'
-    contact_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
-    tag_id = Column(Integer, ForeignKey('tags.id'), primary_key=True)
+    post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
+    tag_id = Column(Integer, ForeignKey('tags.id'),
+                    primary_key=True, index=True)
 
 
 class Tag(db.Model):
@@ -52,8 +54,19 @@ class Tag(db.Model):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
 
-    contacts = relationship('Contact', secondary='interests', backref='interests')
+    contacts = relationship('Contact',
+                            secondary='interests', backref='interests')
     posts = relationship('Post', secondary='post_tags', backref='tags')
+
+    class Queries:
+        @classmethod
+        def public_posts_for_tags(cls, tag_ids):
+            from pyaspora.post.models import Share
+            return and_(
+                Tag.id.in_(tag_ids),
+                not_(Share.hidden),
+                Share.public,
+            )
 
     @classmethod
     def name_is_valid(cls, name):
@@ -86,7 +99,6 @@ class Tag(db.Model):
         if create and not tag and cls.name_is_valid(name):
             tag = cls(name=name)
             db.session.add(tag)
-            db.session.commit()
 
         return tag
 

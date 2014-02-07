@@ -3,28 +3,40 @@ Actions concerning a local User, who is mastered on this node.
 """
 
 import json
-from flask import Blueprint, session, url_for
+from flask import Blueprint, request, session, url_for
 
 from pyaspora.contact.views import json_contact
 from pyaspora.content.models import MimePart
+from pyaspora.content.rendering import renderer_exists
 from pyaspora.database import db
+from pyaspora.tag.models import Tag
 from pyaspora.user import models
-from pyaspora.user.session import log_in_user, logged_in_user
-from pyaspora.utils.validation import post_param
-from pyaspora.utils.rendering import abort, redirect, render_response
+from pyaspora.user.session import log_in_user, logged_in_user, \
+    require_logged_in_user
+from pyaspora.utils.validation import check_attachment_is_safe, post_param
+from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
+    redirect, render_response
 
 blueprint = Blueprint('users', __name__, template_folder='templates')
 
 
 @blueprint.route('/login', methods=['GET'])
 def login():
-    return render_response('login_form.tpl')
+    user = logged_in_user()
+    if user:
+        abort(400, 'Already logged in')
+
+    data = {}
+    add_logged_in_user_to_data(data, None)
+
+    return render_response('users_login_form.tpl', data)
 
 
 @blueprint.route('/login', methods=['POST'])
 def process_login():
-    password = post_param('password', template='login_form.tpl')
-    email = post_param('email', template='login_form.tpl')
+
+    password = post_param('password', template='users_login_form.tpl')
+    email = post_param('email', template='users_login_form.tpl')
     user = log_in_user(email, password)
     if not user:
         abort(403, 'Login failed')
@@ -33,7 +45,7 @@ def process_login():
 
 @blueprint.route('/create', methods=['GET'])
 def create_form():
-    return render_response('create_form.tpl')
+    return render_response('users_create_form.tpl')
 
 
 @blueprint.route('/create', methods=['POST'])
@@ -41,6 +53,10 @@ def create():
     """
     Create a new User (sign-up).
     """
+    user = logged_in_user()
+    if user:
+        abort(400, 'Already logged in')
+
     name = post_param('name', template='create_form.tpl')
     password = post_param('password', template='create_form.tpl')
     email = post_param('email', template='create_form.tpl')
@@ -49,16 +65,23 @@ def create():
     my_user.email = email
     my_user.contact.realname = name
     my_user.generate_keypair(password)
-    my_user.activate()  # FIXME
     db.session.commit()
-    return render_response('user_created.tpl')
+
+    data = {}
+    add_logged_in_user_to_data(data, None)
+
+    return render_response('users_created.tpl', data)
 
 
 @blueprint.route('/logout', methods=['GET'])
 def logout():
     session['key'] = None
     session['user_id'] = None
-    return render_response('logout.tpl')
+
+    data = {}
+    add_logged_in_user_to_data(data, None)
+
+    return render_response('users_logged_out.tpl', data)
 
 
 @blueprint.route('/activate/<int:user_id>/<string:key_hash>', methods=['GET'])
@@ -74,16 +97,15 @@ def activate(user_id, key_hash):
         abort(404, 'Not found')
 
     matched_user.activate()
-    return render_response('activation_success.tpl')
+    return render_response('users_activation_success.tpl')
 
 
 @blueprint.route('/info', methods=['GET'])
-def info():
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
-
-    return render_response('edit.tpl', json_user(user))
+@require_logged_in_user
+def info(_user):
+    data = json_user(_user)
+    add_logged_in_user_to_data(data, _user)
+    return render_response('users_edit.tpl', data)
 
 
 def json_user(user):
@@ -96,41 +118,75 @@ def json_user(user):
 
 
 @blueprint.route('/info', methods=['POST'])
-def edit():
+@require_logged_in_user
+def edit(_user):
     from pyaspora.post.models import Post
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
 
-    bio = post_param('bio', template='edit.tpl')
+    p = Post(author=_user.contact)
+    changed = []
+    order = 0
 
-    p = Post(author=user.contact)
-    db.session.add(p)
+    attachment = request.files.get('avatar', None)
+    if attachment and attachment.content_length:
+        changed.append('avatar')
+        order += 1
+        check_attachment_is_safe(attachment)
+
+        if not renderer_exists(attachment.mimetype) or \
+                not attachment.mimetype.startswith('image/'):
+            abort(400, 'Avatar format unsupported')
+
+        attachment_part = MimePart(
+            type=attachment.mimetype,
+            body=attachment.stream.read(),
+            text_preview=attachment.filename
+        )
+
+        p.add_part(attachment_part, order=order, inline=True)
+        _user.contact.avatar = attachment_part
+
+    bio = post_param('bio', template='edit.tpl', optional=True)
+    if bio:
+        bio = bio.encode('utf-8')
+    else:
+        bio = b''
+    if bio and (not _user.contact.bio or _user.contact.bio.body != bio):
+        changed.append('bio')
+        order += 1
+        bio_part = MimePart(body=bio, type='text/plain', text_preview=None)
+        p.add_part(
+            order=order,
+            inline=True,
+            mime_part=bio_part
+        )
+        _user.contact.bio = bio_part
+
+    tags = post_param('tags', optional=True)
+    if tags is not None:
+        tag_objects = Tag.parse_line(tags, create=True)
+        old_tags = {t.id for t in _user.contact.interests}
+        new_tags = {t.id for t in tag_objects}
+        if old_tags != new_tags:
+            changed.append('tags')
+            _user.contact.interests = tag_objects
 
     p.add_part(
         order=0,
         inline=True,
         mime_part=MimePart(
             body=json.dumps({
-                'fields_changed': ['bio']
+                'fields_changed': changed
             }).encode('utf-8'),
             type='application/x-pyaspora-profile-update',
             text_preview='{} updated their profile'.format(
-                user.contact.realname),
+                _user.contact.realname),
         )
     )
 
-    bio_part = MimePart(body=b'', type='text/plain', text_preview=bio)
-    p.add_part(
-        order=1,
-        inline=True,
-        mime_part=bio_part,
-    )
+    if changed:
+        db.session.add(p)
+        db.session.add(_user.contact)
+        p.share_with([_user.contact])
+        db.session.commit()
 
-    user.contact.bio = bio_part
-    db.session.add(user.contact)
-
-    p.share_with([user.contact])
-
-    db.session.commit()
-    return redirect(url_for('contacts.profile', contact_id=user.contact.id))
+    return redirect(url_for('contacts.profile', contact_id=_user.contact.id))

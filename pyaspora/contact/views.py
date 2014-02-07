@@ -5,14 +5,14 @@ cached information.
 """
 
 from flask import Blueprint, make_response, request, url_for
-from sqlalchemy.sql import and_, desc, not_, or_
+from sqlalchemy.sql import desc, or_
 
 from pyaspora.contact import models
 from pyaspora.database import db
 from pyaspora.tag.views import json_tag
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
     redirect, render_response
-from pyaspora.user.session import logged_in_user
+from pyaspora.user.session import logged_in_user, require_logged_in_user
 
 blueprint = Blueprint('contacts', __name__, template_folder='templates')
 
@@ -42,12 +42,13 @@ def profile(contact_id):
     """
     from pyaspora.post.models import Post, Share
     from pyaspora.post.views import json_post
+
     contact = models.Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
 
-    viewing_as = logged_in_user() if not request.args.get('public', False) \
-        else None
+    viewing_as = None if request.args.get('public', False) \
+        else logged_in_user()
 
     data = json_contact(contact, viewing_as)
     limit = int(request.args.get('limit', 99))
@@ -55,23 +56,18 @@ def profile(contact_id):
     # If not local, we don't have a proper feed
     if contact.user:
         # user put it on their public wall
-        feed_query = and_(Share.contact_id == contact.id,
-                          Share.public,
-                          not_(Share.hidden),
-                          Post.parent_id == None)
+        feed_query = Post.Queries.public_wall_for_contact(contact)
         if viewing_as:
             # Also include things this user has shared with us
-            shared_query = and_(Post.author_id == contact.id,
-                                Share.contact_id == viewing_as.contact.id,
-                                not_(Share.hidden),
-                                Post.parent_id == None)
+            shared_query = Post.Queries.author_shared_with(
+                contact, viewing_as)
             feed_query = or_(feed_query, shared_query)
-        feed = db.session.query(Share).join(Post).filter(feed_query) \
-            .order_by(desc(Post.created_at))[0:limit]
+        feed = db.session.query(Post).join(Share).filter(feed_query) \
+            .order_by(desc(Post.created_at)).limit(limit)
 
-        data['feed'] = [json_post(s.post, viewing_as) for s in feed]
+        data['feed'] = [json_post(p, viewing_as) for p in feed]
 
-    add_logged_in_user_to_data(data)
+    add_logged_in_user_to_data(data, viewing_as)
 
     return render_response('contacts_profile.tpl', data)
 
@@ -104,7 +100,7 @@ def json_contact(contact, viewing_as=None):
                                  contact_id=contact.id, _external=True)
 
     if contact.bio:
-        resp['bio'] = contact.bio.text_preview
+        resp['bio'] = contact.bio.body.decode('utf-8')
 
     if viewing_as:
         if viewing_as.id == contact.id:
@@ -126,26 +122,23 @@ def json_contact(contact, viewing_as=None):
 
 
 @blueprint.route('/<int:contact_id>/subscriptions', methods=['GET'])
-def subscriptions(contact_id):
+@require_logged_in_user
+def subscriptions(contact_id, _user):
     """
     Display the friend list for the contact (who must be local to this
     server.
     """
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
-
     contact = models.Contact.get(contact_id)
     if not contact or not contact.user:
         abort(404, 'No such contact', force_status=True)
 
-    if contact.id == user.contact.id:
+    if contact.id == _user.contact.id:
         return redirect(url_for('roster.view', _external=True))
 
-    data = json_contact(contact, user)
-    data['subscriptions'] = [json_contact(c, user)
+    data = json_contact(contact, _user)
+    data['subscriptions'] = [json_contact(c, _user)
                              for c in contact.user.friends()]
 
-    add_logged_in_user_to_data(data, user)
+    add_logged_in_user_to_data(data, _user)
 
     return render_response('contacts_friend_list.tpl', data)

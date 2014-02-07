@@ -6,7 +6,7 @@ Sign-up form for creating a new account on the local server.
 {% block content %}
 <h2>Edit profile</h2>
 
-<form method="post" action="{{ url_for('.edit') }}">
+<form method="post" action="{{ url_for('.edit') }}" enctype="multipart/form-data">
 
 <h3>Bio</h3>
 <p>
@@ -29,7 +29,7 @@ Sign-up form for creating a new account on the local server.
     <tt>kittens</tt>,
     <tt>sliced_bread</tt> and
     <tt>channel_9</tt>:<br />
-    <input type="text" name="tags" value="{{' '.join(tags)}}" />
+    <input type="text" name="tags" value="{% for tag in tags %}{{tag.name}}{% if not loop.last %} {% endif %}{% endfor %}" />
 </p>
 
 <p>

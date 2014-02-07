@@ -1,8 +1,6 @@
 from flask import jsonify, make_response, render_template, request, url_for, \
     abort as flask_abort, redirect as flask_redirect
 
-from pyaspora.user.session import logged_in_user
-
 
 def _desired_format(default='html'):
     return request.args.get('alt', 'html')
@@ -58,7 +56,6 @@ def redirect(url, status_code=302, output_format=None, data_structure=None):
         output_format = _desired_format()
 
     if output_format == 'json':
-        print("json redirect")
         data = {
             'next_page': url
         }
@@ -69,6 +66,7 @@ def redirect(url, status_code=302, output_format=None, data_structure=None):
 
 
 def add_logged_in_user_to_data(data, user=False):
+    from pyaspora.user.session import logged_in_user
     from pyaspora.user.views import json_user
 
     if user is False:

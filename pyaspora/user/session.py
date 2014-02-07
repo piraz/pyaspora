@@ -1,7 +1,9 @@
+from functools import wraps
 from Crypto.PublicKey import RSA
 from flask import current_app, session
 
 from pyaspora.user.models import User
+from pyaspora.utils.rendering import abort
 
 
 def logged_in_user():
@@ -23,6 +25,16 @@ def logged_in_user():
         return user
     except (ValueError, IndexError, TypeError):
         return None
+
+
+def require_logged_in_user(fn):
+    @wraps(fn)
+    def _inner(*args, **kwargs):
+        user = logged_in_user()
+        if not user:
+            abort(401, 'Not logged in')
+        return fn(*args, _user=user, **kwargs)
+    return _inner
 
 
 def log_in_user(email, password):

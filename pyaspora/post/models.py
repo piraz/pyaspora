@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import backref, relationship
-from sqlalchemy.sql import and_
+from sqlalchemy.sql import and_, not_
 from sqlalchemy.sql.expression import func
 
 from pyaspora.content.models import MimePart
@@ -24,7 +24,8 @@ class Share(db.Model):
     """
     __tablename__ = 'shares'
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
-    post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
+    post_id = Column(Integer, ForeignKey('posts.id'),
+                     primary_key=True, index=True)
     public = Column(Boolean, nullable=False)
     hidden = Column(Boolean, nullable=False, default=False)
     shared_at = Column(DateTime, nullable=False, default=func.now())
@@ -52,9 +53,10 @@ class PostPart(db.Model):
     __tablename__ = 'post_parts'
     post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
     mime_part_id = Column(Integer, ForeignKey('mime_parts.id'),
-                          primary_key=True)
+                          primary_key=True, index=True)
     order = Column(Integer, nullable=False, default=0)
     inline = Column(Boolean, nullable=False, default=True)
+
     mime_part = relationship(MimePart, backref='posts')
 
 
@@ -76,16 +78,54 @@ class Post(db.Model):
     """
     __tablename__ = 'posts'
     id = Column(Integer, primary_key=True)
-    author_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
+    author_id = Column(Integer, ForeignKey('contacts.id'),
+                       nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True,
                        default=None)
+    created_at = Column(DateTime, nullable=False, default=func.now())
+
     author = relationship(Contact, backref='posts')
     parts = relationship(PostPart, backref='post', order_by=PostPart.order)
     children = relationship('Post',
                             backref=backref('parent', remote_side=[id]))
-    created_at = Column(DateTime, nullable=False, default=func.now())
-
     shares = relationship(Share, backref='post')
+
+    class Queries:
+        @classmethod
+        def public_wall_for_contact(cls, contact):
+            return and_(
+                Share.contact_id == contact.id,
+                Share.public,
+                not_(Share.hidden),
+                Post.parent_id == None
+            )
+
+        @classmethod
+        def author_shared_with(cls, author, target):
+            return and_(
+                Post.author_id == author.id,
+                Share.contact_id == target.contact.id,
+                not_(Share.hidden),
+                Post.parent_id == None
+            )
+
+        @classmethod
+        def shared_with_contact(cls, contact):
+            return and_(
+                Share.contact_id == contact.id,
+                not_(Share.hidden),
+                Post.parent_id == None
+            )
+
+        @classmethod
+        def authored_by_contacts_and_public(cls, contact_ids):
+            return and_(
+                Share.contact_id.in_(contact_ids),
+                Share.contact_id == Post.author_id,
+                Share.public,
+                not_(Share.hidden),
+                Post.parent_id == None
+            )
 
     @classmethod
     def get(cls, postid):

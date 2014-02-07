@@ -1,16 +1,19 @@
 import json
-from flask import Blueprint, url_for
+from flask import Blueprint, request, url_for
 from sqlalchemy.sql import and_, not_
 
 from pyaspora.content.models import MimePart
-from pyaspora.content.rendering import render
+from pyaspora.content.rendering import render, renderer_exists
 from pyaspora.contact.views import json_contact
 from pyaspora.database import db
 from pyaspora.post.models import Post, Share
 from pyaspora.roster.views import json_group
-from pyaspora.utils.rendering import abort, redirect, render_response
-from pyaspora.utils.validation import post_param
-from pyaspora.user.session import logged_in_user
+from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
+    redirect, render_response
+from pyaspora.utils.validation import check_attachment_is_safe, post_param
+from pyaspora.user.session import require_logged_in_user
+from pyaspora.tag.models import Tag
+from pyaspora.tag.views import json_tag
 
 blueprint = Blueprint('posts', __name__, template_folder='templates')
 
@@ -37,7 +40,8 @@ def json_post(post, viewing_as=None, share=None, children=True):
             'hide': None,
             'make_public': None,
             'unmake_public': None,
-        }
+        },
+        'tags': [json_tag(t) for t in post.tags]
     }
     if children:
         data['children'] = [json_post(p, viewing_as, share)
@@ -49,7 +53,7 @@ def json_post(post, viewing_as=None, share=None, children=True):
             data['actions']['share'] = \
                 url_for('posts.share', post_id=post.id, _external=True)
 
-        if share:
+        if share and share.contact_id == viewing_as.id:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
             if not post.parent:
@@ -83,21 +87,18 @@ def json_part(part):
 
 
 @blueprint.route('/<int:post_id>/share', methods=['GET'])
-def share(post_id):
+@require_logged_in_user
+def share(post_id, _user):
     """
     Form to share an existing Post with more Contacts.
     """
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
-
     post = Post.get(post_id)
     if not post:
         abort(404, 'No such post', force_status=True)
-    if not post.has_permission_to_view(user.contact):
+    if not post.has_permission_to_view(_user.contact):
         abort(403, 'Forbidden')
 
-    data = _base_create_form()
+    data = _base_create_form(_user)
 
     data.update({
         'relationship': {
@@ -114,21 +115,18 @@ def share(post_id):
 
 
 @blueprint.route('/<int:post_id>/comment', methods=['GET'])
-def comment(post_id):
+@require_logged_in_user
+def comment(post_id, _user):
     """
     Comment on (reply to) an existing Post.
     """
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
-
     post = Post.get(post_id)
     if not post:
         abort(404, 'No such post', force_status=True)
-    if not post.has_permission_to_view(user.contact):
+    if not post.has_permission_to_view(_user.contact):
         abort(403, 'Forbidden')
 
-    data = _base_create_form()
+    data = _base_create_form(_user)
 
     data.update({
         'relationship': {
@@ -138,7 +136,7 @@ def comment(post_id):
         }
     })
 
-    if post.author_id == user.contact_id:
+    if post.author_id == _user.contact_id:
         data.update({
             'default_target': {
                 'type': 'all_friends',
@@ -156,13 +154,10 @@ def comment(post_id):
     return render_response('posts_create_form.tpl', data)
 
 
-def _get_share_for_post(post_id):
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
-
+@require_logged_in_user
+def _get_share_for_post(post_id, _user):
     share = db.session.query(Share).filter(and_(
-        Share.contact == user.contact,
+        Share.contact == _user.contact,
         Share.post_id == post_id,
         not_(Share.hidden))).first()
     if not share:
@@ -243,38 +238,33 @@ def _create_form_targets(user):
     return data
 
 
-def _base_create_form(user=None):
-    if not user:
-        user = logged_in_user()
-        if not user:
-            abort(401, 'Not logged in')
-
-    return {
+def _base_create_form(user):
+    data = {
         'next': url_for('.create', _external=True),
         'targets': _create_form_targets(user),
         'use_advanced_form': False
     }
+    add_logged_in_user_to_data(data, user)
+    return data
 
 
 @blueprint.route('/create', methods=['GET'])
-def create_form():
+@require_logged_in_user
+def create_form(_user):
     """
     Start a new Post.
     """
-    data = _base_create_form()
+    data = _base_create_form(_user)
     data['use_advanced_form'] = True
     return render_response('posts_create_form.tpl', data)
 
 
 @blueprint.route('/create', methods=['POST'])
-def create():
+@require_logged_in_user
+def create(_user):
     """
     Create a new Post and Share it with the selected Contacts.
     """
-    user = logged_in_user()
-    if not user:
-        abort(401, 'Not logged in')
-
     body = post_param('body')
     relationship = {
         'type': post_param('relationship_type', optional=True),
@@ -295,12 +285,17 @@ def create():
         post = Post.get(relationship['id'])
         if not post:
             abort(404, 'No such post', force_status=True)
-        if not post.has_permission_to_view(user.contact):
+        if not post.has_permission_to_view(_user.contact):
             abort(403, 'Forbidden')
         relationship['post'] = post
 
-    post = Post(author=user.contact)
-    body_part = MimePart(type='text/plain', body=b'', text_preview=body)
+    post = Post(author=_user.contact)
+    body_part = MimePart(type='text/plain', body=body.encode('utf-8'),
+                         text_preview=None)
+
+    topics = post_param('tags', optional=True)
+    if topics:
+        post.tags = Tag.parse_line(topics, create=True)
 
     if relationship['type'] == 'comment':
         post.parent = relationship['post']
@@ -313,34 +308,47 @@ def create():
                 'post': {'id': shared.id},
                 'author': {
                     'id': shared.author_id,
-                    'name': shared.author.name,
+                    'name': shared.author.realname,
                 }
             }).encode('utf-8'),
-            text_preview="shared {}'s post".format(shared.author.name)
+            text_preview="shared {}'s post".format(shared.author.realname)
         )
         post.add_part(share_part, order=0, inline=True)
-        order = 0
+        post.add_part(body_part, order=1, inline=True)
+        order = 1
         for part in shared.parts:
             if part.mime_part.type != 'application/x-pyaspora-share':
                 order += 1
                 post.add_part(part.mime_part, inline=part.inline, order=order)
+        if not post.tags:
+            post.tags = shared.tags
     else:  # Naked post
         post.add_part(body_part, order=0, inline=True)
+        attachment = request.files.get('attachment', None)
+        if attachment:
+            check_attachment_is_safe(attachment)
+            attachment_part = MimePart(
+                type=attachment.mimetype,
+                body=attachment.stream.read(),
+                text_preview=attachment.filename
+            )
+            post.add_part(attachment_part, order=1,
+                          inline=bool(renderer_exists(attachment.mimetype)))
 
     db.session.add(post)
 
-    post.share_with([user.contact], show_on_wall=(target['type'] == 'wall'))
-    if target['type'] == 'all_contacts':
-        for friend in user.friends():
+    post.share_with([_user.contact], show_on_wall=(target['type'] == 'wall'))
+    if target['type'] == 'all_friends':
+        for friend in _user.friends():
             post.share_with([friend])
     if target['type'] == 'contact':
-        for friend in user.friends():
+        for friend in _user.friends():
             if str(friend.id) == target['id']:
                 post.share_with([friend])
     if target['type'] == 'group':
-        for group in user.groups():
+        for group in _user.groups():
             if str(group.id) == target['id']:
-                post.share_with([s.contact for s in g.subscriptions])
+                post.share_with([s.contact for s in group.subscriptions])
 
     db.session.commit()
 
