@@ -18,7 +18,7 @@ Display a contact's "wall", which varies according to who is viewing it.
     {% if actions.remove %}
         {{button_form(actions.remove, 'Subscribed', True)}}
     {% elif actions.add %}
-        {{button_form(actions.remove, 'Subscribe')}}
+        {{button_form(actions.add, 'Subscribe')}}
     {% endif %}
 
     {{button_form(subscriptions, 'Subscriptions', method='get')}}

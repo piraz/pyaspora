@@ -240,12 +240,12 @@ class Test:
         op = '<html><body><table>'
         import cgi
         for msg in u.message_queue:
-            op += '<tr><th>raw</th><td>{}</td></tr>'.format(msg.body.decode('utf-8'))
+            op += '<tr><th>raw</th><td>{0}</td></tr>'.format(msg.body.decode('utf-8'))
             try:
-                op += '<tr><th>parsed</th><td>{}</td></tr>'.format(cgi.escape(repr(dmp.decode(msg.body.decode('utf-8'), k))))
+                op += '<tr><th>parsed</th><td>{0}</td></tr>'.format(cgi.escape(repr(dmp.decode(msg.body.decode('utf-8'), k))))
             except Exception:
                 import traceback
-                op += '<tr><th>error</th><td>{}</td></tr>'.format(traceback.format_exc())
+                op += '<tr><th>error</th><td>{0}</td></tr>'.format(traceback.format_exc())
         op += '</table></body></html>'
         return op
 
