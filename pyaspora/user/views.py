@@ -179,7 +179,7 @@ def edit(_user):
                 'fields_changed': changed
             }).encode('utf-8'),
             type='application/x-pyaspora-profile-update',
-            text_preview='{} updated their profile'.format(
+            text_preview='{0} updated their profile'.format(
                 _user.contact.realname),
         )
     )
