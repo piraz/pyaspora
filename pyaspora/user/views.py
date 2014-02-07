@@ -57,9 +57,9 @@ def create():
     if user:
         abort(400, 'Already logged in')
 
-    name = post_param('name', template='create_form.tpl')
-    password = post_param('password', template='create_form.tpl')
-    email = post_param('email', template='create_form.tpl')
+    name = post_param('name', template='users_create_form.tpl')
+    password = post_param('password', template='users_create_form.tpl')
+    email = post_param('email', template='users_create_form.tpl')
 
     my_user = models.User()
     my_user.email = email
@@ -97,6 +97,7 @@ def activate(user_id, key_hash):
         abort(404, 'Not found')
 
     matched_user.activate()
+    db.session.commit()
     return render_response('users_activation_success.tpl')
 
 
