@@ -1,4 +1,7 @@
-from urllib.parse import parse_qsl, urlsplit, urlunsplit
+try:
+    from urllib.parse import parse_qsl, urlsplit, urlunsplit  # py3
+except ImportError:
+    from urlparse import parse_qsl, urlsplit, urlunsplit  # py2
 
 QUERY = 3
 
