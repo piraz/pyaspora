@@ -164,8 +164,8 @@ def edit(_user):
     tags = post_param('tags', optional=True)
     if tags is not None:
         tag_objects = Tag.parse_line(tags, create=True)
-        old_tags = {t.id for t in _user.contact.interests}
-        new_tags = {t.id for t in tag_objects}
+        old_tags = set([t.id for t in _user.contact.interests])
+        new_tags = set([t.id for t in tag_objects])
         if old_tags != new_tags:
             changed.append('tags')
             _user.contact.interests = tag_objects
