@@ -48,7 +48,7 @@ def json_post(post, viewing_as=None, share=None, children=True):
             json_post(
                 p,
                 viewing_as,
-                viewing_as and p.shared_with(viewing_as) else None
+                p.shared_with(viewing_as) if viewing_as else None
             ) for p in sorted_children
         ]
     if viewing_as:
