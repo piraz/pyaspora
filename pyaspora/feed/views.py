@@ -20,12 +20,13 @@ def view(_user):
     """
     limit = int(request.args.get('limit', 99))
     friend_ids = [f.id for f in _user.friends()]
-    feed_query = or_(
-        Post.Queries.shared_with_contact(_user.contact),
-        Post.Queries.authored_by_contacts_and_public(friend_ids),
-        Tag.Queries.public_posts_for_tags([
-            t.id for t in _user.contact.interests])
-    )
+    clauses = [Post.Queries.shared_with_contact(_user.contact)]
+    if friend_ids:
+        clauses.append(Post.Queries.authored_by_contacts_and_public(friend_ids))
+    tag_ids = [t.id for t in _user.contact.interests]
+    if tag_ids:
+        clauses.append(Tag.Queries.public_posts_for_tags(tag_ids))
+    feed_query = or_(**clauses)
     feed = db.session.query(Share).join(Post) \
         .outerjoin(PostTag).outerjoin(Tag) \
         .filter(feed_query) \
