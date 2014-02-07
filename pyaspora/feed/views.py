@@ -26,7 +26,7 @@ def view(_user):
     tag_ids = [t.id for t in _user.contact.interests]
     if tag_ids:
         clauses.append(Tag.Queries.public_posts_for_tags(tag_ids))
-    feed_query = or_(**clauses)
+    feed_query = or_(*clauses)
     feed = db.session.query(Share).join(Post) \
         .outerjoin(PostTag).outerjoin(Tag) \
         .filter(feed_query) \
