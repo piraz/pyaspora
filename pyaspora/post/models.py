@@ -138,22 +138,21 @@ class Post(db.Model):
         """
         Whether the Contact <contact> is permitted to view this post.
         """
+        if contact:
+            # Check for shares to the contact
+            share = self.shared_with(contact)
+            if share:
+                # Hidden status trumps everything else
+                return not share.hidden
+
+            # Can always view my own stuff
+            if contact.id == self.author_id:
+                return True
+
         # Is it visible to the world anywhere?
         is_public = db.session.query(Share).filter(
             and_(Share.public, Share.post == self)).first()
-        if is_public:
-            return True
-
-        if not contact:
-            return False
-
-        # Can always view my own stuff
-        if contact.id == self.author_id:
-            return True
-
-        # Check for other shares to the contact
-        share = self.shared_with(contact)
-        return share and not share.hidden
+        return bool(is_public)
 
     def viewable_children(self, contact=None):
         """
