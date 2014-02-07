@@ -143,7 +143,7 @@ def subscribe(contact_id, _user):
     p.share_with([_user.contact, contact])
 
     db.session.commit()
-    return redirect(url_for('contacts.profile', contact_id=user.contact.id))
+    return redirect(url_for('contacts.profile', contact_id=_user.contact.id))
 
 
 @blueprint.route('/contacts/<int:contact_id>/unsubscribe', methods=['POST'])
