@@ -7,7 +7,7 @@ Standard page layout.
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     {% block head %}
-    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}" />
     <title>Pyaspora</title>
     {% endblock %}
 </head>
