@@ -26,7 +26,7 @@ def json_post(post, viewing_as=None, share=None, children=True):
     child Posts of this Post will not be fetched.
     """
     sorted_parts = sorted(post.parts, key=lambda p: p.order)
-    sorted_children = sorted(post.viewable_children(),
+    sorted_children = sorted(post.viewable_children(viewing_as),
                              key=lambda p: p.created_at)
     data = {
         'id': post.id,
