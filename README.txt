@@ -63,3 +63,4 @@ PyCrypto (PSF)
 Jinja2 (BSD) GPL=yes BSD=yes
 LXML (BSD,MIT) GPL=yes BSD=yes
 SQLAlchemy
+moment.js (MIT) GPL=yes BSD=yes
