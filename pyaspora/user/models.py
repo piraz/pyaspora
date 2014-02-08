@@ -77,20 +77,16 @@ class User(db.Model):
         except (ValueError, IndexError, TypeError):
             return None
 
-    def subscribed_to(self, contact, subtype=None):
+    def subscribed_to(self, contact):
         """
         Check if the user is subscribed to <contact> and return the
-        Subscription object if so.  Can be constrained to check for only
-        subscriptions of type <subtype>; if not supplied it will return the
-        first Subscription to the contact of any type. If the user has no
-        subscriptions to Contact then None will be returned.
+        Subscription object if so. If the user has no subscriptions to Contact
+        then None will be returned.
         """
         from pyaspora.roster.models import Subscription, SubscriptionGroup
         sub = db.session.query(Subscription).join(SubscriptionGroup). \
             filter(and_(SubscriptionGroup.user_id == self.id,
                    Subscription.contact_id == contact.id))
-        if subtype:
-            sub = sub.filter(Subscription.type == subtype)
         sub = sub.first()
         return sub
 
