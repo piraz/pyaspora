@@ -54,6 +54,7 @@ Standard widgets
     {% if post.tags %}
     	-
         <span class="tags">
+        	tagged
             {% for tag in post.tags %}
                 <a href="{{tag.link}}">{{tag.name}}</a>
                 {% if not loop.last %}-{% endif %}
