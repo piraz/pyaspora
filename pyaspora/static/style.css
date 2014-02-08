@@ -1,45 +1,115 @@
-html,body { margin: 0em; padding: 0em }
-h1, h2, h3 { font-family: sans-serif }
-
-h1 { margin-top: 0em }
-
-h1 {
-    background-color: #a2caa8;
-    padding: 0.2em;
-    padding-left: 1em;
-    margin-bottom: 0.1em;
+a {
+    color: #3b573f
 }
 
-th { text-align: left; font-family: sans-serif; }
+h1 {
+    color: #3b573f;
+    margin-bottom: 0.1em;
+    margin-top: 0em;
+}
 
-#header { padding: 0.2em; font-family: sans-serif; position: absolute; top: 0em; margin-top: 0.5em; right: 1em }
+h1, h2, h3 {
+    font-family: sans-serif;
+}
 
-#header a { color: black }
+th {
+    font-family: sans-serif;
+    text-align: left;
+}
 
-a { color: #3b573f }
-
-#content { padding: 0.4em; padding-left: 2em; padding-right: 2em }
-
-:active.button.selected {
-	background-color: #c0c0c0;
+#header {
+    font-family: sans-serif;
 }
 
 .button.selected {
-	border-style: inset;
+    border-style: inset;
 }
 
-.nobullet { list-style-type: none }
+:active.button.selected {
+    background-color: #c0c0c0;
+}
 
-.errors li { list-style-type: none; background-color: #fff0f0 }
+.errors li {
+    background-color: #fff0f0;
+    list-style-type: none;
+}
 
-.buttonform { display: inline-block }
+.buttonform {
+    display: inline-block;
+}
 
-.feedpost { padding: 1em; background-color: #e0e0e0; margin: 0.2em; }
+.feedpost {
+    margin: 0.2em;
+    padding: 1em;
+}
 
-.smallContact { font-size: small; font-family: sans-serif; display: inline-block }
+.feedpost .tags {
+    font-family: sans-serif;
+    font-size: x-small;
+}
 
-.feedpost .tags { font-size: x-small; font-family: sans-serif }
+.feedpost .feedpost {
+    border-left: solid thin #808080;
+}
 
-.feedpost .smallContact img { vertical-align: text-top }
+.feedpost .postpart {
+    padding-bottom: 0.2em;
+    padding-top: 0.3em;
+}
 
-.feedpost .postpart { padding-top: 0.3em; padding-bottom: 0.2em }
+.feedpost .smallContact img {
+    vertical-align: text-top;
+}
+
+.smallContact {
+    display: inline-block;
+    font-family: sans-serif;
+    font-size: small;
+}
+
+@media screen {
+    html,body {
+        margin: 0em;
+        padding: 0em;
+    }
+
+    h1 {
+        background-color: #a2caa8;
+        color: black;
+        padding: 0.2em;
+        padding-left: 1em;
+    }
+
+    #header {
+        margin-top: 0.5em;
+        padding: 0.2em;
+        position: absolute;
+        right: 1em;
+        top: 0em;
+    }
+
+    #content {
+        padding: 0.4em;
+        padding-left: 2em;
+        padding-right: 2em;
+    }
+
+    #header a {
+        color: black;
+    }
+
+    .feedpost {
+        background-color: #e0e0e0;
+    }
+}
+
+@media print {
+    .button {
+        display: none;
+    }
+
+    .buttonform {
+        display: none;
+    }
+}
+
