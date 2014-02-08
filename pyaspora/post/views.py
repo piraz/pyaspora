@@ -84,7 +84,6 @@ def json_part(part):
         'text_preview': part.mime_part.text_preview,
         'link': url,
         'body': {
-            'raw': str(part.mime_part.body) if part.inline else None,
             'text': render(part, 'text/plain', url),
             'html': render(part, 'text/html', url),
         }

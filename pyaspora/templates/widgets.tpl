@@ -49,14 +49,18 @@ Standard widgets
         </div>
     {% endfor %}
 
+	<p class="metadata">
+		<span class="time moment" title="{{post.created_at}}">{{post.created_at}}</span>
     {% if post.tags %}
-        <p class="tags">
+    	-
+        <span class="tags">
             {% for tag in post.tags %}
                 <a href="{{tag.link}}">{{tag.name}}</a>
                 {% if not loop.last %}-{% endif %}
             {% endfor %}
-        </p>
+        </span>
     {% endif %}
+    <p>
 
     {% if post.actions.comment %}
         {{button_form(post.actions.comment,'Comment', method='get')}}
