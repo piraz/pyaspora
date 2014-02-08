@@ -128,7 +128,7 @@ def edit(_user):
     order = 0
 
     attachment = request.files.get('avatar', None)
-    if attachment and attachment.content_length:
+    if attachment and attachment.filename:
         changed.append('avatar')
         order += 1
         check_attachment_is_safe(attachment)

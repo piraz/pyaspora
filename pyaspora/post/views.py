@@ -330,7 +330,7 @@ def create(_user):
     else:  # Naked post
         post.add_part(body_part, order=0, inline=True)
         attachment = request.files.get('attachment', None)
-        if attachment:
+        if attachment and attachment.filename:
             check_attachment_is_safe(attachment)
             attachment_part = MimePart(
                 type=attachment.mimetype,
