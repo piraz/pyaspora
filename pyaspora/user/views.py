@@ -146,7 +146,7 @@ def edit(_user):
         p.add_part(attachment_part, order=order, inline=True)
         _user.contact.avatar = attachment_part
 
-    bio = post_param('bio', template='edit.tpl', optional=True)
+    bio = post_param('bio', template='users_edit.tpl', optional=True)
     if bio:
         bio = bio.encode('utf-8')
     else:

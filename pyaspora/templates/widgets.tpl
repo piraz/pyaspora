@@ -3,14 +3,14 @@ Standard widgets
 #}
 
 {% macro small_contact(contact) %}
-	{#
-	Provide a small representation of a Contact next to content from that Contact.
-	#}
-	<div class="smallContact">
-		{% if contact.avatar %}
-			<img src="{{contact.avatar}}" alt="Avatar" class="avatar" height="24" width="24" />
-		{% endif %}
-		<a href="{{contact.link}}">{{contact.name}}</a>
+    {#
+    Provide a small representation of a Contact next to content from that Contact.
+    #}
+    <div class="smallContact">
+        {% if contact.avatar %}
+            <img src="{{contact.avatar}}" alt="Avatar" class="avatar" height="24" width="24" />
+        {% endif %}
+        <a href="{{contact.link}}">{{contact.name}}</a>
     </div>
 {% endmacro %}
 
@@ -24,7 +24,7 @@ Standard widgets
 {% else %}
 <form method="{{method}}" action="{{url}}" class='buttonform'>
 {% endif %}
-	<input type='submit' value='{{text}}' class='button{% if selected %} selected{% endif %}' />
+    <input type='submit' value='{{text}}' class='button{% if selected %} selected{% endif %}' />
 </form>
 {% endmacro %}
 
@@ -32,51 +32,51 @@ Standard widgets
 {% for post in feed recursive %}
 <div class="feedpost">
 
-	{{small_contact(post.author)}}
+    {{small_contact(post.author)}}
 
-	{% for part in post.parts %}
-		<div class="postpart">
-			{% if part.body.html %}
-				{{part.body.html |safe}}
-			{% elif part.body.text %}
-				<p>
-					{{part.body.text}}
-				</p>
-			{% else %}
-				<!-- type is {{part.mime_type}} -->
-				(cannot display this part: {{part.text_preview}})
-			{% endif %}
-		</div>
-	{% endfor %}
-	
-	{% if post.tags %}
-		<p class="tags">
-			{% for tag in post.tags %}
-				<a href="{{tag.link}}">{{tag.name}}</a>
-				{% if not loop.last %}-{% endif %}
-			{% endfor %}
-		</p>
-	{% endif %}
+    {% for part in post.parts %}
+        <div class="postpart">
+            {% if part.body.html %}
+                {{part.body.html |safe}}
+            {% elif part.body.text %}
+                <p>
+                    {{part.body.text}}
+                </p>
+            {% else %}
+                <!-- type is {{part.mime_type}} -->
+                (cannot display this part: {{part.text_preview}})
+            {% endif %}
+        </div>
+    {% endfor %}
 
-	{% if post.actions.comment %}
-		{{button_form(post.actions.comment,'Comment', method='get')}}
-	{% endif %}
-	{% if post.actions.share %}
-		{{button_form(post.actions.share,'Share', method='get')}}
-	{% endif %}
-	{% if post.actions.hide %}
-		{{button_form(post.actions.hide,'Hide')}}
-	{% endif %}
-	{% if post.actions.make_public %}
-		{{button_form(post.actions.make_public,'Show on public wall')}}
-	{% endif %}
-	{% if post.actions.unmake_public %}
-		{{button_form(post.actions.unmake_public,'Shown on public wall', True)}}
-	{% endif %}
+    {% if post.tags %}
+        <p class="tags">
+            {% for tag in post.tags %}
+                <a href="{{tag.link}}">{{tag.name}}</a>
+                {% if not loop.last %}-{% endif %}
+            {% endfor %}
+        </p>
+    {% endif %}
 
-	{% if post.children %}
-		{{ loop(post.children) }}
-	{% endif %}
+    {% if post.actions.comment %}
+        {{button_form(post.actions.comment,'Comment', method='get')}}
+    {% endif %}
+    {% if post.actions.share %}
+        {{button_form(post.actions.share,'Share', method='get')}}
+    {% endif %}
+    {% if post.actions.hide %}
+        {{button_form(post.actions.hide,'Hide')}}
+    {% endif %}
+    {% if post.actions.make_public %}
+        {{button_form(post.actions.make_public,'Show on public wall')}}
+    {% endif %}
+    {% if post.actions.unmake_public %}
+        {{button_form(post.actions.unmake_public,'Shown on public wall', True)}}
+    {% endif %}
+
+    {% if post.children %}
+        {{ loop(post.children) }}
+    {% endif %}
 
 </div>
 {% endfor %}
