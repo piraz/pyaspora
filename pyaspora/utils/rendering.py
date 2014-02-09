@@ -1,5 +1,6 @@
 from flask import jsonify, make_response, render_template, request, url_for, \
     abort as flask_abort, redirect as flask_redirect
+from lxml import etree
 
 
 def _desired_format(default='html'):
@@ -89,3 +90,14 @@ def add_logged_in_user_to_data(data, user=False):
         }
 
     data['logged_in'] = base
+
+
+def send_xml(doc, content_type='text/xml'):
+    """
+    Utility function to return XML to the client. This is abstracted out
+    so that pretty-printing can be turned on and off in one place.
+    """
+    response = make_response(etree.tostring(
+        doc, xml_declaration=True, pretty_print=True, encoding="UTF-8"))
+    response.headers['Content-Type'] = content_type
+    return response

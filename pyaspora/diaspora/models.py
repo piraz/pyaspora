@@ -1,14 +1,17 @@
 from sqlalchemy import Column, ForeignKey, Integer, LargeBinary, String
+from sqlalchemy.orm import relationship
 
-from pyaspora.database import Base
+from pyaspora import db
 
-class MessageQueue(Base):
+
+class MessageQueue(db.Model):
     """
-    Messages that have been received but that cannot be actioned until the User's public key
-    has been unlocked (at which point they will be deleted).
+    Messages that have been received but that cannot be actioned until the
+    User's public key has been unlocked (at which point they will be deleted).
 
     Fields:
-        id - an integer identifier uniquely identifying the message in the queue
+        id - an integer identifier uniquely identifying the message in the
+             queue
         local_id - the User receiving/sending the message
         remote_id - the Contact the message is to/from
         format - the protocol format of the payload
@@ -23,6 +26,5 @@ class MessageQueue(Base):
     remote_id = Column(Integer, ForeignKey('contacts.id'), nullable=True)
     format = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)
-    
-    local_user = relationship('User', backref='message_queue')
 
+    local_user = relationship('User', backref='message_queue')

@@ -1,10 +1,7 @@
 import base64
-import cherrypy
-import cherrypy._cpdispatch
 import Crypto.Random
 import json
 import re
-import urllib
 import urllib.parse
 import urllib.request
 from Crypto.Cipher import AES, PKCS1_v1_5
@@ -471,3 +468,101 @@ def subscribe(self, user, group='All', subtype='friend'):
     print("Sending message to " + url)
     m.post(url, self.contact(), 'test') # FIXME
     Transport.refresh_feeds(self, contact=self.contact())
+
+    
+# diaspora_dispatcher.connect('receive', '/people/:guid',
+#                             DiasporaController(), action='json_feed')
+# 
+# 
+# from pyaspora.contact import models
+# from pyaspora.database import db
+# from pyaspora.tag.views import json_tag
+# from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
+#     redirect, render_response
+# from pyaspora.user.session import logged_in_user, require_logged_in_user
+# 
+# class DiasporaController:
+# # 
+# 
+# 
+
+# 
+# 
+#     def json_feed(self, guid):
+# 
+#     @classmethod
+#     def import_contact(cls, uri, contact):
+#         """
+#         Fetch information about a Diaspora user and import it into the Contact provided.
+#         """
+#         WEBFINGER_NS = "http://docs.oasis-open.org/ns/xri/xrd-1.0"
+#         w = WebfingerRequest(uri)
+#         webfinger = w.fetch()
+#         hcard_url = webfinger.find(".//{%s}Link[@rel='http://microformats.org/profile/hcard']" % WEBFINGER_NS).get("href")
+#         hcard = etree.parse(urllib.request.urlopen(hcard_url), etree.HTMLParser())
+#         contact.username = uri
+#         contact.realname = hcard.find(".//span[@class='fn']").text
+#         contact.engine = "diaspora"
+#         contact.engine_info = json.dumps({
+#             "guid": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/guid']" % WEBFINGER_NS).get("href"),
+#             "server": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/seed_location']" % WEBFINGER_NS).get("href")
+#         })
+#         contact.public_key = base64.b64decode(
+#             webfinger.find(".//{%s}Link[@rel='diaspora-public-key']" % WEBFINGER_NS)
+#             .get("href").encode("ascii"))
+# 
+#     def subscribe(self, user, group='All', subtype='friend'):
+#         """
+#         Local User <user> would like to subscribe to the Contact represented
+#         by this transport. The Subscription object will be returned. The
+#         Subscription will be of subscription type <subtype> (eg. "friend",
+#         "feed"), and will be added to the User's SubscriptionGroup named by
+#         <group>.
+#         """
+#         req = etree.Element("request")
+#         etree.SubElement(req, "sender_handle").text = user.contact.username
+#         etree.SubElement(req, "recipient_handle").text = \
+#             self.contact().username
+#         m = DiasporaMessageBuilder(req, user)
+#         url = self.get_server() + "receive/users/" + self.get_guid()
+#         print("Sending message to " + url)
+#         m.post(url, self.contact(), 'test')  # FIXME
+#         Transport.refresh_feeds(self, contact=self.contact())
+# 
+# 
+# 
+# class Test:
+#     @cherrypy.expose
+#     def queue(self):
+#         u = User.logged_in()
+#         k = User.get_user_key()
+#         assert(k)
+#         import pyaspora.diaspora
+#         dmp = pyaspora.diaspora.DiasporaMessageParser(model)
+#         op = '<html><body><table>'
+#         import cgi
+#         for msg in u.message_queue:
+#             op += '<tr><th>raw</th><td>{0}</td></tr>'.format(msg.body.decode('utf-8'))
+#             try:
+#                 op += '<tr><th>parsed</th><td>{0}</td></tr>'.format(cgi.escape(repr(dmp.decode(msg.body.decode('utf-8'), k))))
+#             except Exception:
+#                 import traceback
+#                 op += '<tr><th>error</th><td>{0}</td></tr>'.format(traceback.format_exc())
+#         op += '</table></body></html>'
+#         return op
+
+#     @cherrypy.expose
+#     def test(self):
+#         """
+#         temporary test of round-tripping the message builder and parser
+#         """
+#         #u = model.User.get(1)
+#         #m = DiasporaMessageBuilder('Hello, world!', u)
+#         #print(m.post('http://localhost:8080/receive/users/'+u.guid, u.contact, 'test'))
+#         #return "OK"
+#         #c = pyaspora.transport.diaspora.Transport.import_contact("lukeross@diasp.eu")
+#         #session.add(c)
+#         u = model.User.get(1)
+#         c = model.Contact.get_by_username("lukeross@diasp.eu")
+#         c.subscribe(u, "friend")
+#         return "OK"

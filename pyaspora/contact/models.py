@@ -1,3 +1,5 @@
+from flask import current_app
+from hashlib import sha512
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import and_
@@ -70,3 +72,20 @@ class Contact(db.Model):
             pass
         for sub in subs:
             db.session.delete(sub)
+
+    @property
+    def guid(self):
+        if not self.user:
+            return None
+        return "{0}-{1}".format(self._guid_base, self.id)
+
+    @classmethod
+    def _guid_base(cls):
+        return sha512(current_app.secret_key.encode('ascii')).hexdigest()
+
+    @classmethod
+    def get_by_guid(cls, guid):
+        hashed_key, contact_id = guid.split('-')
+        if hashed_key != self._guid_base:
+            return None
+        return cls.get(int(contact_id))

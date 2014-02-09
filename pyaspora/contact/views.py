@@ -4,14 +4,16 @@ can also do User actions), but they may be Contacts on other nodes using
 cached information.
 """
 
-from flask import Blueprint, make_response, request, url_for
+from flask import Blueprint, make_response, request, url_for, \
+    abort as flask_abort
+from lxml import etree
 from sqlalchemy.sql import desc, or_
 
 from pyaspora.contact import models
 from pyaspora.database import db
 from pyaspora.tag.views import json_tag
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
-    redirect, render_response
+    redirect, render_response, send_xml
 from pyaspora.user.session import logged_in_user, require_logged_in_user
 
 blueprint = Blueprint('contacts', __name__, template_folder='templates')
@@ -35,8 +37,7 @@ def avatar(contact_id):
     return response
 
 
-@blueprint.route('/<int:contact_id>/profile', methods=['GET'])
-def profile(contact_id):
+def _profile_base(contact_id):
     """
     Display the profile (possibly with feed) for the contact.
     """
@@ -68,8 +69,47 @@ def profile(contact_id):
         data['feed'] = [json_post(p, viewing_as) for p in feed]
 
     add_logged_in_user_to_data(data, viewing_as)
+    return data, contact
 
+
+@blueprint.route('/<int:contact_id>/profile', methods=['GET'])
+def profile(contact_id):
+    data, _ = _profile_base(contact_id)
     return render_response('contacts_profile.tpl', data)
+
+
+@blueprint.route('/<int:contact_id>/feed', methods=['GET'])
+def feed(contact_id):
+    data, contact = _profile_base(contact_id)
+    if not contact.user:
+        flask_abort(404, 'No such user')
+
+    ns = 'http://www.w3.org/2005/Atom'
+    doc = etree.Element("{%s}feed" % ns, nsmap={None: ns})
+    etree.SubElement(doc, "title").text = \
+        'Diaspora feed for {0}'.format(data['name'])
+    etree.SubElement(doc, "link").text = data['link']
+    etree.SubElement(doc, "updated").text = \
+        data['feed'][0]['created_at'] if data['feed'] \
+        else contact.user.activated.isoformat()
+    etree.SubElement(doc, "id").text = contact.guid
+    etree.SubElement(doc, "generator").text = 'Pyaspora'
+
+    author = etree.SubElement(doc, 'author')
+    etree.SubElement(author, "name").text = data['name']
+    etree.SubElement(author, "uri").text = data['link']
+
+    for post in data['feed']:
+        entry = etree.SubElement(doc, 'entry')
+        etree.SubElement(entry, "id").text = \
+            "{0}-{1}".format(contact.guid, post['id'])
+        etree.SubElement(entry, "title").text = \
+            post['parts'][0]['body']['text']
+        etree.SubElement(entry, "updated").text = post['created_at']
+        etree.SubElement(entry, "content").text = \
+            "\n\n".join([p['body']['text'] for p in post['parts']])
+
+    return send_xml(doc)
 
 
 def json_contact(contact, viewing_as=None):

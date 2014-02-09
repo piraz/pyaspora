@@ -4,6 +4,7 @@ from flask import Flask, url_for
 from pyaspora.database import db
 from pyaspora.content.views import blueprint as content_blueprint
 from pyaspora.contact.views import blueprint as contacts_blueprint
+from pyaspora.diaspora.views import blueprint as diaspora_blueprint
 from pyaspora.feed.views import blueprint as feed_blueprint
 from pyaspora.post.views import blueprint as posts_blueprint
 from pyaspora.roster.views import blueprint as roster_blueprint
@@ -25,6 +26,7 @@ app.register_blueprint(posts_blueprint, url_prefix='/posts')
 app.register_blueprint(roster_blueprint, url_prefix='/roster')
 app.register_blueprint(tags_blueprint, url_prefix='/tags')
 app.register_blueprint(users_blueprint, url_prefix='/users')
+app.register_blueprint(diaspora_blueprint)  # Diaspora has certain fixed URLs
 
 # Global template utility functions
 app.jinja_env.globals.update(chunk_url_params=templates.chunk_url_params)

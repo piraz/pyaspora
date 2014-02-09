@@ -22,7 +22,8 @@ def view(_user):
     friend_ids = [f.id for f in _user.friends()]
     clauses = [Post.Queries.shared_with_contact(_user.contact)]
     if friend_ids:
-        clauses.append(Post.Queries.authored_by_contacts_and_public(friend_ids))
+        clauses.append(
+            Post.Queries.authored_by_contacts_and_public(friend_ids))
     tag_ids = [t.id for t in _user.contact.interests]
     if tag_ids:
         clauses.append(Tag.Queries.public_posts_for_tags(tag_ids))
