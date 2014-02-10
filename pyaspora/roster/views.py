@@ -136,7 +136,7 @@ def subscribe(contact_id, _user):
                 'to': contact.id,
             }).encode('utf-8'),
             type='application/x-pyaspora-subscribe',
-            text_preview='subscribed to {1}'.format(contact.realname)
+            text_preview='subscribed to {0}'.format(contact.realname)
         )
     )
     p.share_with([_user.contact, contact])
