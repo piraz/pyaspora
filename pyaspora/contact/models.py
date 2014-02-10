@@ -47,7 +47,7 @@ class Contact(db.Model):
         """
         return db.session.query(cls).get(contactid)
 
-    def subscribe(self, user, group='All'):
+    def subscribe(self, user, group='Contacts'):
         """
         Subscribe User <user> _to_ this Contact, onto <user>'s group named
         <group>.
