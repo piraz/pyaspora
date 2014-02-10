@@ -29,7 +29,8 @@ app.register_blueprint(users_blueprint, url_prefix='/users')
 app.register_blueprint(diaspora_blueprint)  # Diaspora has certain fixed URLs
 
 # Global template utility functions
-app.jinja_env.globals.update(chunk_url_params=templates.chunk_url_params)
+app.add_template_filter(templates.nl2br, name='nl2br')
+app.add_template_global(templates.chunk_url_params, name='chunk_url_params')
 
 
 def init_db():

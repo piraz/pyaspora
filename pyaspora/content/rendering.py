@@ -33,7 +33,7 @@ def text_plain(part, fmt, url):
     if part.inline:
         if fmt == 'text/html':
             return render_template_string(
-                '{{text}}',
+                '{{text|nl2br}}',
                 text=codecs.utf_8_decode(part.mime_part.body)[0]
             )
         if fmt == 'text/plain':
