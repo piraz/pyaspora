@@ -350,7 +350,7 @@ def create(_user):
             if str(friend.id) == target['id']:
                 post.share_with([friend])
     if target['type'] == 'group':
-        for group in _user.groups():
+        for group in _user.groups:
             if str(group.id) == target['id']:
                 post.share_with([s.contact for s in group.subscriptions])
 
