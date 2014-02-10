@@ -76,7 +76,7 @@ class Tag(db.Model):
         if len(name) > 100:
             return False
 
-        if re.match(r'[^a-z0-9_]', name):
+        if re.search(r'[^a-z0-9_]', name):
             return False
 
         if '__' in name:
@@ -105,7 +105,7 @@ class Tag(db.Model):
     @classmethod
     def parse_line(cls, line, create=True):
         tags = []
-        for possible_tag in line.split():
+        for possible_tag in re.split('[,\s]+', line):
             tag = cls.get_by_name(possible_tag.lower(), create)
             if tag:
                 tags.append(tag)
