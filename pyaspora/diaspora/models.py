@@ -1,7 +1,18 @@
 from sqlalchemy import Column, ForeignKey, Integer, LargeBinary, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 from pyaspora import db
+
+
+class DiasporaContact(db.Model):
+    __tablename__ = 'diaspora_contacts'
+    contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
+    guid = Column(String, nullable=False)
+    username = Column(String, nullable=False)
+    server = Column(String, nullable=False)
+
+    contact = relationship('Contact', single_parent=True,
+                           backref=backref('diasp', uselist=False))
 
 
 class MessageQueue(db.Model):

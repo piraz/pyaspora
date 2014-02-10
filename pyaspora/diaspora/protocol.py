@@ -9,28 +9,30 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 
-from lxml import etree, html
-
-from pyaspora import model
+from lxml import etree
 
 # This package contains Diaspora-protocol-specific code.
 
-PROTOCOL_NS="https://joindiaspora.com/protocol"  # The namespace for the Diaspora envelope
+# The namespace for the Diaspora envelope
+PROTOCOL_NS = "https://joindiaspora.com/protocol"
 
 
 class DiasporaMessageBuilder:
     """
-    A class to take a payload message and wrap it in the outer Diaspora message format,
-    including building the envelope and performing the encryption.
+    A class to take a payload message and wrap it in the outer Diaspora
+    message format, including building the envelope and performing the
+    encryption.
 
-    Much of the terminology in the method names comes directly from the protocol documentation
-    at https://github.com/diaspora/diaspora/wiki/Federation-Protocol-Overview
+    Much of the terminology in the method names comes directly from the
+    protocol documentation at:
+    https://github.com/diaspora/diaspora/wiki/Federation-Protocol-Overview
     """
     def __init__(self, message, author):
         """
-        Build a Diaspora message and prepare to send the payload <message>, authored by Contact
-        <author>. The receipient is specified later, so that the same message can be sent to several
-        people without needing to keep re-encrypting the inner.
+        Build a Diaspora message and prepare to send the payload <message>,
+        authored by Contact <author>. The receipient is specified later, so
+        that the same message can be sent to several people without needing to
+        keep re-encrypting the inner.
         """
 
         # We need an AES key for the envelope
@@ -200,6 +202,8 @@ class DiasporaMessageParser:
         """
         Given the Slap XML, extract out the author and payload.
         """
+        from pyaspora.diaspora.actions import import_contact
+
         xml = xml.lstrip().encode("utf-8")
         #print("salmon_envelope=" + repr(xml))
         doc = etree.fromstring(xml)
@@ -397,44 +401,13 @@ class RedirectTrackingHandler(urllib.request.HTTPRedirectHandler):
         result.redirected_via.append(previous_url)
 
 
-def import_contact(addr):
-    print("in import_contact")
-    try:
-        wf = WebfingerRequest(addr).fetch()
-    except urllib.error.URLError:
-        return None
-    print("wf returned {}".format(repr(wf)))
-    if not wf:
-        return None
 
-    NS = {'XRD': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}
-
-    c = model.Contact()
-    c.username = wf.xpath('//XRD:Subject/text()', namespaces=NS)[0].split(':')[1]
-    pk = wf.xpath('//XRD:Link[@rel="diaspora-public-key"]/@href', namespaces=NS)[0]
-    c.public_key = base64.b64decode(pk).decode("ascii")
-    hcard_url = wf.xpath('//XRD:Link[@rel="http://microformats.org/profile/hcard"]/@href', namespaces=NS)[0]
-
-    hcard = html.parse(urllib.request.urlopen(hcard_url))
-    print(etree.tostring(hcard, pretty_print=True))
-    c.realname = hcard.xpath('//*[@class="fn"]')[0].text
-
-    photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')
-    if photo_url:
-        resp = urllib.request.urlopen(urllib.parse.urljoin(hcard_url, photo_url[0]))
-        mp = model.MimePart()
-        mp.type = resp.info().get('Content-Type')
-        mp.body = resp.read()
-        mp.text_preview = '(picture for {})'.format(c.realname)
-        c.avatar = mp
-
-    return c
 
 
 class DiasporaMessageProcessor:
     @classmethod
     def process(cls, message):
-        xml = xml.lstrip().encode("utf-8")
+        xml = message.lstrip().encode("utf-8")
         doc = etree.fromstring(xml)
         for xpath, handler in cls.TYPES:
             if doc.xpath(xpath):
@@ -449,88 +422,12 @@ class DiasporaMessageProcessor:
         pass
 
     TYPES = {
-        '/diaspora/post/receive', subscription_request,
-        '/diaspora/post/profile', profile_receive,
+        '/diaspora/post/receive': subscription_request,
+        '/diaspora/post/profile': profile_receive,
     }
 
-def subscribe(self, user, group='All', subtype='friend'):
-    """
-    Local User <user> would like to subscribe to the Contact represented by this
-    transport. The Subscription object will be returned. The Subscription will be
-    of subscription type <subtype> (eg. "friend", "feed"), and will be added to the
-    User's SubscriptionGroup named by <group>.
-    """
-    req = etree.Element("request")
-    etree.SubElement(req, "sender_handle").text = user.contact.username
-    etree.SubElement(req, "recipient_handle").text = self.contact().username
-    m = DiasporaMessageBuilder(req, user)
-    url = self.get_server() + "receive/users/" + self.get_guid()
-    print("Sending message to " + url)
-    m.post(url, self.contact(), 'test') # FIXME
-    Transport.refresh_feeds(self, contact=self.contact())
 
-    
-# diaspora_dispatcher.connect('receive', '/people/:guid',
-#                             DiasporaController(), action='json_feed')
-# 
-# 
-# from pyaspora.contact import models
-# from pyaspora.database import db
-# from pyaspora.tag.views import json_tag
-# from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
-#     redirect, render_response
-# from pyaspora.user.session import logged_in_user, require_logged_in_user
-# 
-# class DiasporaController:
-# # 
-# 
-# 
 
-# 
-# 
-#     def json_feed(self, guid):
-# 
-#     @classmethod
-#     def import_contact(cls, uri, contact):
-#         """
-#         Fetch information about a Diaspora user and import it into the Contact provided.
-#         """
-#         WEBFINGER_NS = "http://docs.oasis-open.org/ns/xri/xrd-1.0"
-#         w = WebfingerRequest(uri)
-#         webfinger = w.fetch()
-#         hcard_url = webfinger.find(".//{%s}Link[@rel='http://microformats.org/profile/hcard']" % WEBFINGER_NS).get("href")
-#         hcard = etree.parse(urllib.request.urlopen(hcard_url), etree.HTMLParser())
-#         contact.username = uri
-#         contact.realname = hcard.find(".//span[@class='fn']").text
-#         contact.engine = "diaspora"
-#         contact.engine_info = json.dumps({
-#             "guid": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/guid']" % WEBFINGER_NS).get("href"),
-#             "server": webfinger.find(".//{%s}Link[@rel='http://joindiaspora.com/seed_location']" % WEBFINGER_NS).get("href")
-#         })
-#         contact.public_key = base64.b64decode(
-#             webfinger.find(".//{%s}Link[@rel='diaspora-public-key']" % WEBFINGER_NS)
-#             .get("href").encode("ascii"))
-# 
-#     def subscribe(self, user, group='All', subtype='friend'):
-#         """
-#         Local User <user> would like to subscribe to the Contact represented
-#         by this transport. The Subscription object will be returned. The
-#         Subscription will be of subscription type <subtype> (eg. "friend",
-#         "feed"), and will be added to the User's SubscriptionGroup named by
-#         <group>.
-#         """
-#         req = etree.Element("request")
-#         etree.SubElement(req, "sender_handle").text = user.contact.username
-#         etree.SubElement(req, "recipient_handle").text = \
-#             self.contact().username
-#         m = DiasporaMessageBuilder(req, user)
-#         url = self.get_server() + "receive/users/" + self.get_guid()
-#         print("Sending message to " + url)
-#         m.post(url, self.contact(), 'test')  # FIXME
-#         Transport.refresh_feeds(self, contact=self.contact())
-# 
-# 
-# 
 # class Test:
 #     @cherrypy.expose
 #     def queue(self):
