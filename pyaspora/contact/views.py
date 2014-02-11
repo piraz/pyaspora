@@ -42,7 +42,7 @@ def _profile_base(contact_id):
     Display the profile (possibly with feed) for the contact.
     """
     from pyaspora.post.models import Post, Share
-    from pyaspora.post.views import json_post
+    from pyaspora.post.views import json_posts
 
     contact = models.Contact.get(contact_id)
     if not contact:
@@ -64,9 +64,9 @@ def _profile_base(contact_id):
                 contact, viewing_as)
             feed_query = or_(feed_query, shared_query)
         feed = db.session.query(Post).join(Share).filter(feed_query) \
-            .order_by(desc(Post.created_at)).limit(limit)
+            .order_by(desc(Post.created_at)).group_by(Post.id).limit(limit)
 
-        data['feed'] = [json_post(p, viewing_as) for p in feed]
+        data['feed'] = json_posts([(p, None) for p in feed], viewing_as)
 
     add_logged_in_user_to_data(data, viewing_as)
     return data, contact

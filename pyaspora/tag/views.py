@@ -23,7 +23,7 @@ def json_tag(tag):
 @require_logged_in_user
 def feed(tag_name, _user):
     from pyaspora.post.models import Post, Share
-    from pyaspora.post.views import json_post
+    from pyaspora.post.views import json_posts
 
     tag = Tag.get_by_name(tag_name, create=False)
     if not tag:
@@ -33,9 +33,9 @@ def feed(tag_name, _user):
 
     posts = db.session.query(Post).join(PostTag).join(Tag).join(Share).filter(
         Tag.Queries.public_posts_for_tags([tag.id])
-    ).order_by(desc(Post.created_at)).limit(100)
+    ).order_by(desc(Post.created_at)).group_by(Post.id).limit(100)
 
-    data['feed'] = [json_post(p) for p in posts]
+    data['feed'] = json_posts([(p, None) for p in posts])
 
     add_logged_in_user_to_data(data, _user)
 

@@ -1,6 +1,6 @@
 import re
 from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_, not_
 
 from pyaspora.database import db
@@ -37,6 +37,12 @@ class PostTag(db.Model):
     tag_id = Column(Integer, ForeignKey('tags.id'),
                     primary_key=True, index=True)
 
+    @classmethod
+    def get_tags_for_posts(cls, post_ids):
+        return db.session.query(cls). \
+            options(joinedload(cls.tag)). \
+            filter(cls.post_id.in_(post_ids))
+
 
 class Tag(db.Model):
     '''
@@ -57,6 +63,7 @@ class Tag(db.Model):
     contacts = relationship('Contact',
                             secondary='interests', backref='interests')
     posts = relationship('Post', secondary='post_tags', backref='tags')
+    post_tags = relationship('PostTag', backref='tag')
 
     class Queries:
         @classmethod

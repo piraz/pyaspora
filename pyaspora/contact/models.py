@@ -1,7 +1,7 @@
 from flask import current_app
 from hashlib import sha512
 from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_
 
 from pyaspora import db
@@ -40,12 +40,22 @@ class Contact(db.Model):
                        primaryjoin='Contact.bio_id==MimePart.id')
 
     @classmethod
-    def get(cls, contactid):
+    def get(cls, contact_id):
         """
         Get a contact by primary key ID. None is returned if the Contact
         doesn't exist.
         """
-        return db.session.query(cls).get(contactid)
+        return db.session.query(cls).get(contact_id)
+
+    @classmethod
+    def get_many(cls, contact_ids):
+        return db.session.query(cls). \
+            options(
+                joinedload(cls.avatar),
+                joinedload(cls.bio),
+                joinedload(cls.interests)
+            ). \
+            filter(cls.id.in_(contact_ids))
 
     def subscribe(self, user, group='Contacts'):
         """

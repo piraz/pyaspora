@@ -1,9 +1,10 @@
 from flask import Blueprint, request
 from sqlalchemy.sql import desc, or_
+from sqlalchemy.orm import contains_eager
 
 from pyaspora.database import db
 from pyaspora.post.models import Post, Share
-from pyaspora.post.views import json_post
+from pyaspora.post.views import json_posts
 from pyaspora.tag.models import PostTag, Tag
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import add_logged_in_user_to_data, \
@@ -28,13 +29,16 @@ def view(_user):
     if tag_ids:
         clauses.append(Tag.Queries.public_posts_for_tags(tag_ids))
     feed_query = or_(*clauses)
-    feed = db.session.query(Share).join(Post) \
-        .outerjoin(PostTag).outerjoin(Tag) \
-        .filter(feed_query) \
-        .order_by(desc(Post.created_at)).limit(limit)
+    feed = db.session.query(Share).join(Post). \
+        outerjoin(PostTag).outerjoin(Tag). \
+        filter(feed_query). \
+        order_by(desc(Post.created_at)). \
+        group_by(Post.id). \
+        options(contains_eager(Share.post)). \
+        limit(limit)
 
     data = {
-        'feed': [json_post(s.post, _user, s) for s in feed],
+        'feed': json_posts([(s.post, s) for s in feed], _user)
     }
 
     add_logged_in_user_to_data(data, _user)

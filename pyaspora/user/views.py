@@ -24,7 +24,9 @@ blueprint = Blueprint('users', __name__, template_folder='templates')
 def login():
     user = logged_in_user()
     if user:
-        abort(400, 'Already logged in')
+        data = {}
+        add_logged_in_user_to_data(data, user)
+        abort(400, 'Already logged in', data)
 
     data = {}
     add_logged_in_user_to_data(data, None)
@@ -34,7 +36,6 @@ def login():
 
 @blueprint.route('/login', methods=['POST'])
 def process_login():
-
     password = post_param('password', template='users_login_form.tpl')
     email = post_param('email', template='users_login_form.tpl')
     user = log_in_user(email, password)
@@ -55,7 +56,9 @@ def create():
     """
     user = logged_in_user()
     if user:
-        abort(400, 'Already logged in')
+        data = {}
+        add_logged_in_user_to_data(data, user)
+        abort(400, 'Already logged in', data)
 
     name = post_param('name', template='users_create_form.tpl')
     password = post_param('password', template='users_create_form.tpl')

@@ -47,7 +47,7 @@ def setup():
 def index():
     from pyaspora.user.session import logged_in_user
     from pyaspora.utils.rendering import redirect
-    if logged_in_user():
+    if logged_in_user(fetch=False):
         return redirect(url_for('feed.view'))
     else:
         return redirect(url_for('users.login'))

@@ -1,6 +1,6 @@
 from Crypto.PublicKey import RSA
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm import backref, joinedload, relationship
 from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import func
 
@@ -36,11 +36,13 @@ class User(db.Model):
                            backref=backref('user', uselist=False))
 
     @classmethod
-    def get(cls, userid):
+    def get(cls, user_id):
         """
         Get a user by primary key ID. Returns None if the user cannot be found.
         """
-        return db.session.query(cls).get(userid)
+        return db.session.query(cls). \
+            options(joinedload(cls.contact)). \
+            get(user_id)
 
     @classmethod
     def get_by_email(cls, email):
@@ -96,11 +98,13 @@ class User(db.Model):
         exist in several SubscriptionGroups, this will select one at random if
         so).
         """
-        friends = []
-        for group in self.groups:
-            for sub in group.subscriptions:
-                if sub.contact not in friends:
-                    friends.append(sub.contact)
+        from pyaspora.roster.models import Subscription, SubscriptionGroup
+        friends = db.session. \
+            query(Contact). \
+            join(Subscription). \
+            join(SubscriptionGroup). \
+            filter(SubscriptionGroup.user_id == self.id). \
+            group_by(Contact.id)
         return friends
 
     def generate_keypair(self, passphrase):

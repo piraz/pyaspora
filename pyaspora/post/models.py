@@ -1,5 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm import backref, contains_eager, relationship
 from sqlalchemy.sql import and_, not_
 from sqlalchemy.sql.expression import func
 
@@ -32,6 +32,10 @@ class Share(db.Model):
 
     contact = relationship(Contact, backref="feed", order_by='Share.shared_at')
 
+    @classmethod
+    def get_for_posts(cls, post_ids):
+        return db.session.query(cls).filter(cls.post_id.in_(post_ids))
+
 
 class PostPart(db.Model):
     """
@@ -58,6 +62,17 @@ class PostPart(db.Model):
     inline = Column(Boolean, nullable=False, default=True)
 
     mime_part = relationship(MimePart, backref='posts')
+
+    @classmethod
+    def get_parts_for_posts(cls, post_ids):
+        """
+        Fetch all the PostParts, with MimeParts pre-loaded, for the all the
+        Posts with IDs <post_ids>.
+        """
+        return db.session.query(cls). \
+            join(MimePart). \
+            filter(cls.post_id.in_(post_ids)). \
+            options(contains_eager(cls.mime_part))
 
 
 class Post(db.Model):

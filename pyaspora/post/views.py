@@ -4,34 +4,65 @@ from sqlalchemy.sql import and_, not_
 
 from pyaspora.content.models import MimePart
 from pyaspora.content.rendering import render, renderer_exists
+from pyaspora.contact.models import Contact
 from pyaspora.contact.views import json_contact
 from pyaspora.database import db
-from pyaspora.post.models import Post, Share
+from pyaspora.post.models import Post, PostPart, Share
 from pyaspora.roster.views import json_group
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
     redirect, render_response
 from pyaspora.utils.validation import check_attachment_is_safe, post_param
 from pyaspora.user.session import require_logged_in_user
-from pyaspora.tag.models import Tag
+from pyaspora.tag.models import PostTag, Tag
 from pyaspora.tag.views import json_tag
 
 blueprint = Blueprint('posts', __name__, template_folder='templates')
 
 
-def json_post(post, viewing_as=None, share=None, children=True):
+def _get_cached(cache, entry_type, entry_id):
+    if entry_id not in cache[entry_type]:
+        cache[entry_type][entry_id] = {'id': entry_id}
+    return cache[entry_type][entry_id]
+
+
+def _base_cache():
+    return {
+        'contact': {},
+        'post': {}
+    }
+
+
+def json_posts(posts_and_shares, viewing_as=None):
+    """
+    Run a list of (post, share) pairs through json_post, giving a list
+    of for-serialisation views of Posts. This call is more efficient than
+    calling json_post() repeatedly as data is cached.
+    """
+    cache = _base_cache()
+    res = [
+        json_post(p, viewing_as, s, cache=cache)
+        for p, s in posts_and_shares
+    ]
+    _fill_cache(cache)
+    return res
+
+
+def json_post(post, viewing_as=None, share=None, children=True, cache=None):
     """
     Turn a Post in sensible representation for serialisation, from the view of
     Contact 'viewing_as', or the public if not provided. If a Share is
     provided then additional actions are provided. If 'children' is False then
     child Posts of this Post will not be fetched.
     """
-    sorted_parts = sorted(post.parts, key=lambda p: p.order)
+    c = cache or _base_cache()
+
     sorted_children = sorted(post.viewable_children(viewing_as),
                              key=lambda p: p.created_at)
-    data = {
+    data = _get_cached(c, 'post', post.id)
+    data.update({
         'id': post.id,
-        'author': json_contact(post.author),
-        'parts': [json_part(p) for p in sorted_parts],
+        'author': _get_cached(c, 'contact', post.author_id),
+        'parts': [],
         'children': None,
         'created_at': post.created_at.isoformat(),
         'actions': {
@@ -41,15 +72,16 @@ def json_post(post, viewing_as=None, share=None, children=True):
             'make_public': None,
             'unmake_public': None,
         },
-        'tags': [json_tag(t) for t in post.tags],
+        'tags': [],
         'shares': None
-    }
+    })
     if children:
         data['children'] = [
             json_post(
                 p,
                 viewing_as,
-                p.shared_with(viewing_as) if viewing_as else None
+                p.shared_with(viewing_as) if viewing_as else None,
+                cache=c
             ) for p in sorted_children
         ]
     if viewing_as:
@@ -59,13 +91,10 @@ def json_post(post, viewing_as=None, share=None, children=True):
             data['actions']['share'] = \
                 url_for('posts.share', post_id=post.id, _external=True)
 
-        if share:
-            data['shares'] = [json_share(s) for s in post.shares]
-
         if share and share.contact_id == viewing_as.id:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
-            if not post.parent:
+            if not post.parent_id:
                 if share.public:
                     data['actions']['unmake_public'] = \
                         url_for('posts.set_public',
@@ -74,12 +103,38 @@ def json_post(post, viewing_as=None, share=None, children=True):
                     data['actions']['make_public'] = \
                         url_for('posts.set_public',
                                 post_id=post.id, toggle='1', _external=True)
+
+    if not cache:
+        _fill_cache(c)
+
     return data
 
 
-def json_share(share):
+def _fill_cache(c):
+    # Fill the cache in bulk, which will also fill the entries
+    post_ids = c['post'].keys()
+    for post_tag in PostTag.get_tags_for_posts(post_ids):
+        c['post'][post_tag.post_id]['tags'].append(json_tag(post_tag.tag))
+    for post_part in PostPart.get_parts_for_posts(post_ids):
+        c['post'][post_part.post_id]['parts'].append(json_part(post_part))
+    if share:
+        for post_share in Share.get_for_posts(post_ids):
+            post_id = post_share.post_id
+            if not c['post'][post_id]['shares']:
+                c['post'][post_id]['shares'] = []
+            c['post'][post_id]['shares'].append(
+                json_share(post_share, cache=c)
+            )
+    if c['contact']:
+        for contact in Contact.get_many(c['contact'].keys()):
+            c['contact'][contact.id].update(json_contact(contact))
+
+
+def json_share(share, cache=None):
+    contact_repr = _get_cached(cache, 'contact', share.contact_id) if cache \
+        else json_contact(share.contact),
     return {
-        'contact': json_contact(share.contact),
+        'contact': contact_repr,
         'shared_at': share.shared_at.isoformat(),
         'public': share.public
     }
