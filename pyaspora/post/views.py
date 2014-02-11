@@ -132,7 +132,7 @@ def _fill_cache(c):
 
 def json_share(share, cache=None):
     contact_repr = _get_cached(cache, 'contact', share.contact_id) if cache \
-        else json_contact(share.contact),
+        else json_contact(share.contact)
     return {
         'contact': contact_repr,
         'shared_at': share.shared_at.isoformat(),
