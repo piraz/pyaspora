@@ -40,7 +40,7 @@ Standard widgets
                     shared publicly
                 {%- else -%}
                     {%- for s in post.shares if s.public and not s.hidden -%}
-                        {%- if loop.first %}shown publicly by {% else %}, {% endif -%}
+                        {%- if loop.first %}shared publicly by {% else %}, {% endif -%}
                             {{s.contact.name}}
                     {%- else -%}
                         {%- for s in post.shares if s.contact.id != post.author.id -%}
