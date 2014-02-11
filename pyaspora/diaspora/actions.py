@@ -7,8 +7,21 @@ from lxml import etree, html
 from pyaspora.contact.models import Contact
 from pyaspora.content.models import MimePart
 from pyaspora.database import db
-from pyaspora.diaspora.models import DiasporaContact
+from pyaspora.diaspora.models import DiasporaContact, MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder, WebfingerRequest
+
+
+def process_incoming_queue(user, rsa_key):
+    messages = db.session.query(MessageQueue).filter(
+        and_(
+            MessageQueue.format == MessageQueue.INCOMING,
+            MessageQueue.user_id == user.id
+        )
+    )
+    for message in messages:
+        # FIXME
+        m = DiasporaMessageParser(model)
+        print(m.decode(xml, rsa_key))
 
 
 def subscribe(user, contact, private_key, password):
@@ -47,14 +60,19 @@ def import_contact(addr):
                   namespaces=NS)[0]
     c.public_key = base64.b64decode(pk).decode("ascii")
 
-    hcard_url = wf.xpath('//XRD:Link[@rel="http://microformats.org/profile/hcard"]/@href', namespaces=NS)[0]
+    hcard_url = wf.xpath(
+        '//XRD:Link[@rel="http://microformats.org/profile/hcard"]/@href',
+        namespaces=NS
+    )[0]
     hcard = html.parse(urllib.request.urlopen(hcard_url))
     print(etree.tostring(hcard, pretty_print=True))
     c.realname = hcard.xpath('//*[@class="fn"]')[0].text
 
     photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')
     if photo_url:
-        resp = urllib.request.urlopen(urllib.parse.urljoin(hcard_url, photo_url[0]))
+        resp = urllib.request.urlopen(
+            urllib.parse.urljoin(hcard_url, photo_url[0])
+        )
         mp = MimePart()
         mp.type = resp.info().get('Content-Type')
         mp.body = resp.read()
@@ -62,8 +80,14 @@ def import_contact(addr):
         c.avatar = mp
 
     username = wf.xpath('//XRD:Subject/text()', namespaces=NS)[0].split(':')[1]
-    guid = wf.xpath(".//Link[@rel='http://joindiaspora.com/guid']", namespaces=NS).get("href"),
-    server = wf.xpath(".//Link[@rel='http://joindiaspora.com/seed_location']", namespaces=NS).get("href")
+    guid = wf.xpath(
+        ".//Link[@rel='http://joindiaspora.com/guid']",
+        namespaces=NS
+    ).get("href"),
+    server = wf.xpath(
+        ".//Link[@rel='http://joindiaspora.com/seed_location']",
+        namespaces=NS
+    ).get("href")
     d = DiasporaContact(
         contact=c,
         guid=guid,

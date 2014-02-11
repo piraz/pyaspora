@@ -27,7 +27,7 @@ class DiasporaMessageBuilder:
     protocol documentation at:
     https://github.com/diaspora/diaspora/wiki/Federation-Protocol-Overview
     """
-    def __init__(self, message, author):
+    def __init__(self, message, author_username, private_key):
         """
         Build a Diaspora message and prepare to send the payload <message>,
         authored by Contact <author>. The receipient is specified later, so
@@ -38,38 +38,53 @@ class DiasporaMessageBuilder:
         # We need an AES key for the envelope
         self.inner_iv = Crypto.Random.get_random_bytes(AES.block_size)
         self.inner_key = Crypto.Random.get_random_bytes(32)
-        self.inner_encrypter = AES.new(self.inner_key, AES.MODE_CBC, self.inner_iv)
+        self.inner_encrypter = AES.new(
+            self.inner_key, AES.MODE_CBC, self.inner_iv)
 
         # ...and one for the payload message
         self.outer_iv = Crypto.Random.get_random_bytes(AES.block_size)
         self.outer_key = Crypto.Random.get_random_bytes(32)
-        self.outer_encrypter = AES.new(self.outer_key, AES.MODE_CBC, self.outer_iv)
+        self.outer_encrypter = AES.new(
+            self.outer_key, AES.MODE_CBC, self.outer_iv)
         self.message = message
-        self.author = author
+        self.author_username = author_username
+        self.private_key = private_key
 
     def xml_to_string(self, doc, xml_declaration=False):
         """
-        Utility function to turn an XML document to a string. This is abstracted out so that
-        pretty-printing can be turned on and off in one place.
+        Utility function to turn an XML document to a string. This is
+        abstracted out so that pretty-printing can be turned on and off in one
+        place.
         """
-        return etree.tostring(doc, xml_declaration=xml_declaration, pretty_print=True, encoding="UTF-8")
+        return etree.tostring(
+            doc,
+            xml_declaration=xml_declaration,
+            pretty_print=True,
+            encoding="UTF-8"
+        )
 
     def create_decrypted_header(self):
         """
-        Build the XML document for the header. The header contains the key used to encrypt the
-        message body.
+        Build the XML document for the header. The header contains the key
+        used to encrypt the message body.
         """
         decrypted_header = etree.Element("decrypted_header")
-        etree.SubElement(decrypted_header, "iv").text = base64.b64encode(self.inner_iv)
-        etree.SubElement(decrypted_header, "aes_key").text = base64.b64encode(self.inner_key)
-        etree.SubElement(decrypted_header, "author_id").text = self.author.contact.username
+        etree.SubElement(decrypted_header, "iv").text = \
+            base64.b64encode(self.inner_iv)
+        etree.SubElement(decrypted_header, "aes_key").text = \
+            base64.b64encode(self.inner_key)
+        etree.SubElement(decrypted_header, "author_id").text = \
+            self.author_username
         return self.xml_to_string(decrypted_header)
 
     def create_ciphertext(self):
         """
         Encrypt the header.
         """
-        to_encrypt = self.pkcs7_pad(self.create_decrypted_header(), AES.block_size)
+        to_encrypt = self.pkcs7_pad(
+            self.create_decrypted_header(),
+            AES.block_size
+        )
         out = self.outer_encrypter.encrypt(to_encrypt)
         return out
 
@@ -83,32 +98,38 @@ class DiasporaMessageBuilder:
         })
         return d
 
-    def create_encrypted_outer_aes_key_bundle(self, recipient):
+    def create_encrypted_outer_aes_key_bundle(self, recipient_rsa):
         """
-        The Outer AES Key Bundle is encrypted with the receipient's public key, so
-        only the receipient can decrypt the header.
+        The Outer AES Key Bundle is encrypted with the receipient's public
+        key, so only the receipient can decrypt the header.
         """
-        recipient_rsa = RSA.importKey(recipient.public_key)
         cipher = PKCS1_v1_5.new(recipient_rsa)
-        return cipher.encrypt(self.create_outer_aes_key_bundle().encode("utf-8"))
+        return cipher.encrypt(
+            self.create_outer_aes_key_bundle().encode("utf-8"))
 
-    def create_encrypted_header_json_object(self, recipient):
+    def create_encrypted_header_json_object(self, public_key):
         """
-        The actual header and the encrypted outer (header) key are put into a document together.
+        The actual header and the encrypted outer (header) key are put into a
+        document together.
         """
+        aes_key = base64.b64encode(self.create_encrypted_outer_aes_key_bundle(
+            public_key)).decode("ascii"),
+        ciphertext = base64.b64encode(self.create_ciphertext()).decode("ascii")
+
         d = json.dumps({
-            "aes_key": base64.b64encode(self.create_encrypted_outer_aes_key_bundle(recipient)).decode("ascii"),
-            "ciphertext": base64.b64encode(self.create_ciphertext()).decode("ascii")
+            "aes_key": aes_key,
+            "ciphertext": ciphertext
         })
         return d
 
-    def create_encrypted_header(self, recipient):
+    def create_encrypted_header(self, public_key):
         """
-        The "encrypted header JSON object" is dropped into some XML. I am not sure what this
-        is for, but is required to interact.
+        The "encrypted header JSON object" is dropped into some XML. I am not
+        sure what this is for, but is required to interact.
         """
         doc = etree.Element("encrypted_header")
-        doc.text = base64.b64encode(self.create_encrypted_header_json_object(recipient).encode("ascii"))
+        doc.text = base64.b64encode(self.create_encrypted_header_json_object(
+            public_key).encode("ascii"))
         return doc
 
     def create_payload(self):
@@ -131,32 +152,36 @@ class DiasporaMessageBuilder:
         to_encrypt = self.pkcs7_pad(self.create_payload(), AES.block_size)
         return self.inner_encrypter.encrypt(to_encrypt)
 
-    def create_salmon_envelope(self, recipient, password):
+    def create_salmon_envelope(self, recipient_public_key):
         """
         Build the whole message, pulling together the encrypted payload and the
-        encrypted header. Selected elements are signed by the author so that tampering
-        can be detected.
+        encrypted header. Selected elements are signed by the author so that
+        tampering can be detected.
         """
         nsmap = {
             None: PROTOCOL_NS,
             'me': 'http://salmon-protocol.org/ns/magic-env'
         }
         doc = etree.Element("{%s}diaspora" % nsmap[None], nsmap=nsmap)
-        doc.append(self.create_encrypted_header(recipient))
+        doc.append(self.create_encrypted_header(recipient_public_key))
         env = etree.SubElement(doc, "{%s}env" % nsmap["me"])
         etree.SubElement(env, "{%s}encoding" % nsmap["me"]).text = 'base64url'
         etree.SubElement(env, "{%s}alg" % nsmap["me"]).text = 'RSA-SHA256'
-        payload = base64.urlsafe_b64encode(base64.b64encode(self.create_encrypted_payload())).decode("ascii")
+        payload = base64.urlsafe_b64encode(base64.b64encode(
+            self.create_encrypted_payload())).decode("ascii")
         # Split every 6 chars
-        payload = '\n'.join([payload[start:start+60] for start in range(0, len(payload), 60)])
+        payload = '\n'.join([payload[start:start+60]
+                             for start in range(0, len(payload), 60)])
         payload = payload + "\n"
-        etree.SubElement(env, "{%s}data" % nsmap["me"], {"type":"application/xml"}).text = payload
-        sig_contents = payload + "." + base64.b64encode(b"application/xml").decode("ascii") + "." + \
-            base64.b64encode(b"base64url").decode("ascii") + "." + base64.b64encode(b"RSA-SHA256").decode("ascii")
+        etree.SubElement(env, "{%s}data" % nsmap["me"],
+                         {"type": "application/xml"}).text = payload
+        sig_contents = payload + "." + \
+            base64.b64encode(b"application/xml").decode("ascii") + "." + \
+            base64.b64encode(b"base64url").decode("ascii") + "." + \
+            base64.b64encode(b"RSA-SHA256").decode("ascii")
         print("sig_contents=" + repr(sig_contents))
         sig_hash = SHA256.new(sig_contents.encode("ascii"))
-        author_rsa = RSA.importKey(self.author.private_key, password)
-        cipher = PKCSSign.new(author_rsa)
+        cipher = PKCSSign.new(self.private_key)
         sig = base64.urlsafe_b64encode(cipher.sign(sig_hash))
         etree.SubElement(env, "{%s}sig" % nsmap["me"]).text = sig
         print(self.xml_to_string(doc))
@@ -164,8 +189,9 @@ class DiasporaMessageBuilder:
 
     def pkcs7_pad(self, inp, block_size):
         """
-        Using the PKCS#7 padding scheme, pad <inp> to be a multiple of <block_size> bytes. Ruby's
-        AES encryption pads with this scheme, but pycrypto doesn't support it.
+        Using the PKCS#7 padding scheme, pad <inp> to be a multiple of
+        <block_size> bytes. Ruby's AES encryption pads with this scheme, but
+        pycrypto doesn't support it.
         """
         val = block_size - len(inp) % block_size
         if val == 0:
@@ -173,22 +199,26 @@ class DiasporaMessageBuilder:
         else:
             return inp + (bytes([val]) * val)
 
-    def post(self, url, recipient, password):
+    def post(self, url, recipient_public_keu):
         """
         Actually send the message to an HTTP/HTTPs endpoint.
         """
-        data = urllib.parse.urlencode({'xml': urllib.parse.quote(self.create_salmon_envelope(recipient, password))})
+        xml = urllib.parse.quote(
+            self.create_salmon_envelope(recipient_public_key))
+        data = urllib.parse.urlencode({
+            'xml': xml
+        })
         return urllib.request.urlopen(url, data.encode("ascii"))
 
 
 class DiasporaMessageParser:
     """
-    After CherryPy has received a Salmon Slap, this decodes it to extract the payload,
-    validating the signature.
+    After CherryPy has received a Salmon Slap, this decodes it to extract the
+    payload, validating the signature.
     """
 
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, contact_fetcher):
+        self.contact_fetcher = contact_fetcher
 
     def decode(self, raw, key):
         """
@@ -207,18 +237,20 @@ class DiasporaMessageParser:
         xml = xml.lstrip().encode("utf-8")
         #print("salmon_envelope=" + repr(xml))
         doc = etree.fromstring(xml)
-        header = self.parse_header(doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text, key)
+        header = self.parse_header(
+            doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text,
+            key)
         sender = header.find(".//author_id").text
         inner_iv = base64.b64decode(header.find(".//iv").text.encode("ascii"))
-        inner_key = base64.b64decode(header.find(".//aes_key").text.encode("ascii"))
+        inner_key = base64.b64decode(
+            header.find(".//aes_key").text.encode("ascii"))
 
-        sending_contact = self.model.Contact.get_by_username(sender)
-        if sending_contact is None:
-            sending_contact = import_contact(sender)
+        sending_contact = self.contact_fetcher(sender)
         self.verify_signature(sending_contact, doc)
 
         decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
-        body = doc.find(".//{http://salmon-protocol.org/ns/magic-env}data").text
+        body = doc.find(
+            ".//{http://salmon-protocol.org/ns/magic-env}data").text
         body = base64.b64decode(base64.urlsafe_b64decode(body.encode("ascii")))
         body = decrypter.decrypt(body)
         body = self.pkcs7_unpad(body)
@@ -226,36 +258,44 @@ class DiasporaMessageParser:
 
     def verify_signature(self, user, message):
         """
-        Verify the signed XML elements to have confidence that the claimed author
-        did actually generate this message.
+        Verify the signed XML elements to have confidence that the claimed
+        author did actually generate this message.
         """
-        pass # FIXME
+        pass  # FIXME
 
     def parse_header(self, b64data, key):
         """
-        Extract the header and decrypt it. This requires the User's private key and hence
-        the passphrase for the key.
+        Extract the header and decrypt it. This requires the User's private
+        key and hence the passphrase for the key.
         """
         decoded_json = base64.b64decode(b64data.encode("ascii"))
         rep = json.loads(decoded_json.decode("ascii"))
-        outer_key_details = self.decrypt_outer_aes_key_bundle(rep["aes_key"], key)
-        header = self.get_decrypted_header(base64.b64decode(rep["ciphertext"].encode("ascii")),
+        outer_key_details = self.decrypt_outer_aes_key_bundle(
+            rep["aes_key"], key)
+        header = self.get_decrypted_header(
+            base64.b64decode(rep["ciphertext"].encode("ascii")),
             key=base64.b64decode(outer_key_details["key"].encode("ascii")),
-            iv=base64.b64decode(outer_key_details["iv"].encode("ascii")))
+            iv=base64.b64decode(outer_key_details["iv"].encode("ascii"))
+        )
         return header
 
     def decrypt_outer_aes_key_bundle(self, data, key):
         """
-        Decrypt the AES "outer key" credentials using the private key and passphrase.
+        Decrypt the AES "outer key" credentials using the private key and
+        passphrase.
         """
         assert(key)
         cipher = PKCS1_v1_5.new(key)
-        decoded_json = cipher.decrypt(base64.b64decode(data.encode("ascii")), sentinel=None)
+        decoded_json = cipher.decrypt(
+            base64.b64decode(data.encode("ascii")),
+            sentinel=None
+        )
         return json.loads(decoded_json.decode("ascii"))
 
     def get_decrypted_header(self, ciphertext, key, iv):
         """
-        Having extracted the AES "outer key" (envelope) information, actually decrypt the header.
+        Having extracted the AES "outer key" (envelope) information, actually
+        decrypt the header.
         """
         encrypter = AES.new(key, AES.MODE_CBC, iv)
         padded = encrypter.decrypt(ciphertext)
@@ -277,12 +317,12 @@ class WebfingerRequest(object):
 
     def __init__(self, email):
         '''
-        Create a request for information to Diaspora user with username <email> (of form
-        "user@host".
+        Create a request for information to Diaspora user with username
+        <email> (of form "user@host").
         '''
         self.request_email = email
         self.secure = True
-        self.normalise_email();
+        self.normalise_email()
 
     def fetch(self):
         """
@@ -290,16 +330,28 @@ class WebfingerRequest(object):
         """
         print("in wf fetch")
         template_url = self._get_template()
-        target_url = re.sub('\{uri\}', urllib.parse.quote_plus(self.request_email.scheme + ':' + self.request_email.path), template_url)
+        target_url = re.sub(
+            '\{uri\}',
+            urllib.parse.quote_plus(
+                self.request_email.scheme + ':' + self.request_email.path
+            ),
+            template_url
+        )
         print("about to connect to {}".format(target_url))
         return etree.parse(urllib.request.urlopen(target_url))
 
     def _get_template(self):
         """
-        Given the HostMeta, extract the template URL for the main WebFinger information.
+        Given the HostMeta, extract the template URL for the main WebFinger
+        information.
         """
         tree = self.hostmeta.fetch()
-        return (tree.xpath("//x:Link[@rel='lrdd']/@template", namespaces={'x': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}))[0]
+        return (
+            tree.xpath(
+                "//x:Link[@rel='lrdd']/@template",
+                namespaces={'x': 'http://docs.oasis-open.org/ns/xri/xrd-1.0'}
+            )
+        )[0]
 
     def normalise_email(self):
         """
@@ -342,8 +394,8 @@ class HostMeta(object):
 
     def _get_connection(self):
         """
-        Try to connect to the remote host, using HTTPS and falling back to HTTP. Track
-        whether any steps in fetching it (redirects) are insecure.
+        Try to connect to the remote host, using HTTPS and falling back to
+        HTTP. Track whether any steps in fetching it (redirects) are insecure.
         """
         try:
             res = self._open_url(self._build_url("https"))
@@ -377,7 +429,7 @@ class HostMeta(object):
         If any part of fetching the HostMeta occurs insecurely (eg. over HTTP)
         then attempt to fetch and validate the signature of the HostMeta).
         """
-        return True # FIXME - implement
+        return True  # FIXME - implement
         print(etree.tostring(tree))
 
 
@@ -388,20 +440,19 @@ class RedirectTrackingHandler(urllib.request.HTTPRedirectHandler):
     def http_error_301(self, req, fp, code, msg, headers):
         new_url = req.get_full_url()
         print(repr(headers))
-        result = urllib.request.HTTPRedirectHandler.http_error_301(self, req, fp, code, msg, headers)
+        result = urllib.request.HTTPRedirectHandler.http_error_301(
+            self, req, fp, code, msg, headers)
         if not hasattr(result, "redirected_via"):
             result.redirected_via = []
         result.redirected_via.append(new_url)
 
     def http_error_302(self, req, fp, code, msg, headers):
         previous_url = req.url
-        result = urllib.request.HTTPRedirectHandler.http_error_302(self, req, fp, code, msg, headers)
+        result = urllib.request.HTTPRedirectHandler.http_error_302(
+            self, req, fp, code, msg, headers)
         if not hasattr(result, "redirected_via"):
             result.redirected_via = []
         result.redirected_via.append(previous_url)
-
-
-
 
 
 class DiasporaMessageProcessor:
@@ -448,7 +499,7 @@ class DiasporaMessageProcessor:
 #         op += '</table></body></html>'
 #         return op
 
-#     @cherrypy.expose
+#     @cherr ypy.expose
 #     def test(self):
 #         """
 #         temporary test of round-tripping the message builder and parser

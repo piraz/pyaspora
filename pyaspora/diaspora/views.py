@@ -173,10 +173,6 @@ def receive(guid):
 
     return 'OK'
 
-#         #m = DiasporaMessageParser(model)
-#         #print(m.decode(xml, model.User.get_by_guid(guid), 'test'))
-#         #return xml
-
 
 @blueprint.route('/people/<string:guid>')
 def json_feed(guid):
