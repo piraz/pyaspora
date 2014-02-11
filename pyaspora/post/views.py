@@ -41,7 +41,8 @@ def json_post(post, viewing_as=None, share=None, children=True):
             'make_public': None,
             'unmake_public': None,
         },
-        'tags': [json_tag(t) for t in post.tags]
+        'tags': [json_tag(t) for t in post.tags],
+        'shares': None
     }
     if children:
         data['children'] = [
@@ -58,6 +59,9 @@ def json_post(post, viewing_as=None, share=None, children=True):
             data['actions']['share'] = \
                 url_for('posts.share', post_id=post.id, _external=True)
 
+        if share:
+            data['shares'] = [json_share(s) for s in post.shares]
+
         if share and share.contact_id == viewing_as.id:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
@@ -71,6 +75,14 @@ def json_post(post, viewing_as=None, share=None, children=True):
                         url_for('posts.set_public',
                                 post_id=post.id, toggle='1', _external=True)
     return data
+
+
+def json_share(share):
+    return {
+        'contact': json_contact(share.contact),
+        'shared_at': share.shared_at.isoformat(),
+        'public': share.public
+    }
 
 
 def json_part(part):

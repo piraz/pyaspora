@@ -28,11 +28,27 @@ Standard widgets
 </form>
 {% endmacro %}
 
-{% macro show_feed(feed) %}
+{% macro show_feed(feed, logged_in=None) %}
 {% for post in feed recursive %}
 <div class="feedpost">
 
-    {{small_contact(post.author)}}
+    {# I apologise for these awful loops #}
+    <div class="postauthor"{% if post.shares %}
+        title="{% for s in post.shares if s.public and s.contact.id == (logged_in.id or post.author.id) -%}
+            shared publically
+        {% else %}
+            {% for s in post.shares if s.public %}
+                {% if loop.first %}shown publically by {% else %}, {% endif %}{{s.contact.name}}
+            {% else %}
+                {% for s in post.shares if s.contact.id != post.author.id %}
+                    {% if loop.first %}shared with {% else %}, {% endif %}{{s.contact.name}}
+                {% else %}
+                    shown only to you
+                {% endfor %}
+            {% endfor %}
+        {%- endfor %}"{% endif %}>
+        {{small_contact(post.author)}}
+    </div>
 
     {% for part in post.parts %}
         <div class="postpart">
@@ -49,12 +65,12 @@ Standard widgets
         </div>
     {% endfor %}
 
-	<p class="metadata">
-		<span class="time moment" title="{{post.created_at}}">{{post.created_at}}</span>
+    <p class="metadata">
+        <span class="time moment" title="{{post.created_at}}">{{post.created_at}}</span>
     {% if post.tags %}
-    	-
+        -
         <span class="tags">
-        	tagged
+            tagged
             {% for tag in post.tags %}
                 <a href="{{tag.link}}">{{tag.name}}</a>
                 {% if not loop.last %}-{% endif %}

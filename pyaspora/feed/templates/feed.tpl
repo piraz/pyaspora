@@ -11,7 +11,7 @@ Display the user's "feed".
 {{button_form(logged_in.link, 'View/edit profile', method='get')}}
 
 {% if feed %}
-    {{show_feed(feed)}}
+    {{show_feed(feed, logged_in)}}
 {% else %}
     <p>Your feed is empty. You can change your profile tags to show posts
     on topics that interest you.</p>
