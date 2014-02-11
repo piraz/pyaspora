@@ -39,11 +39,11 @@ Standard widgets
                 {%- for s in post.shares if s.public and s.contact.id == (logged_in.id or post.author.id) and not s.hidden -%}
                     shared publicly
                 {%- else -%}
-                    {%- for s in post.shares if s.public and not s.hidden -%}
+                    {%- for s in post.shares|sort(attribute='contact.name') if s.public and not s.hidden -%}
                         {%- if loop.first %}shared publicly by {% else %}, {% endif -%}
                             {{s.contact.name}}
                     {%- else -%}
-                        {%- for s in post.shares if s.contact.id != post.author.id -%}
+                        {%- for s in post.shares|sort(attribute='contact.name') if s.contact.id != post.author.id -%}
                             {%- if loop.first %}shared with {% else %}, {% endif -%}
                                 {{s.contact.name}}
                         {%- else -%}
