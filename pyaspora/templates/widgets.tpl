@@ -33,20 +33,26 @@ Standard widgets
 <div class="feedpost">
 
     {# I apologise for these awful loops #}
-    <div class="postauthor"{% if post.shares %}
-        title="{% for s in post.shares if s.public and s.contact.id == (logged_in.id or post.author.id) -%}
-            shared publically
-        {% else %}
-            {% for s in post.shares if s.public %}
-                {% if loop.first %}shown publically by {% else %}, {% endif %}{{s.contact.name}}
-            {% else %}
-                {% for s in post.shares if s.contact.id != post.author.id %}
-                    {% if loop.first %}shared with {% else %}, {% endif %}{{s.contact.name}}
-                {% else %}
-                    shown only to you
-                {% endfor %}
-            {% endfor %}
-        {%- endfor %}"{% endif %}>
+    <div class="postauthor"
+        {% if post.shares -%}
+            title="
+                {%- for s in post.shares if s.public and s.contact.id == (logged_in.id or post.author.id) -%}
+                    shared publicly
+                {%- else -%}
+                    {%- for s in post.shares if s.public -%}
+                        {%- if loop.first %}shown publicly by {% else %}, {% endif -%}
+                            {{s.contact.name}}
+                    {%- else -%}
+                        {%- for s in post.shares if s.contact.id != post.author.id -%}
+                            {%- if loop.first %}shared with {% else %}, {% endif -%}
+                                {{s.contact.name}}
+                        {%- else -%}
+                            shown only to you
+                        {%- endfor -%}
+                    {%- endfor -%}
+                {%- endfor -%}
+            "
+        {%- endif %}>
         {{small_contact(post.author)}}
     </div>
 

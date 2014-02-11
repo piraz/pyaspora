@@ -3,8 +3,7 @@
 Standard page layout.
 #}
 {%from 'widgets.tpl' import button_form%}
-<html lang="en">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
     {% block head %}
     <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}" />

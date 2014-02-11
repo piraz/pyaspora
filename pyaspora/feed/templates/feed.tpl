@@ -1,7 +1,7 @@
 {#
 Display the user's "feed".
 #}
-{% extends "layout.tpl" %}
+{%- extends "layout.tpl" %}
 {% from 'widgets.tpl' import button_form, show_feed %}
 
 {% block content %}
