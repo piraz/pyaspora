@@ -36,10 +36,10 @@ Standard widgets
     <div class="postauthor"
         {% if post.shares -%}
             title="
-                {%- for s in post.shares if s.public and s.contact.id == (logged_in.id or post.author.id) -%}
+                {%- for s in post.shares if s.public and s.contact.id == (logged_in.id or post.author.id) and not s.hidden -%}
                     shared publicly
                 {%- else -%}
-                    {%- for s in post.shares if s.public -%}
+                    {%- for s in post.shares if s.public and not s.hidden -%}
                         {%- if loop.first %}shown publicly by {% else %}, {% endif -%}
                             {{s.contact.name}}
                     {%- else -%}
