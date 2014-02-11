@@ -96,7 +96,7 @@ class Post(db.Model):
     author_id = Column(Integer, ForeignKey('contacts.id'),
                        nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True,
-                       default=None)
+                       default=None, index=True)
     created_at = Column(DateTime, nullable=False, default=func.now())
 
     author = relationship(Contact, backref='posts')
