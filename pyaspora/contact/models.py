@@ -87,7 +87,7 @@ class Contact(db.Model):
     def guid(self):
         if not self.user:
             return None
-        return "{0}-{1}".format(self._guid_base, self.id)
+        return "{0}-{1}".format(self._guid_base(), self.id)
 
     @classmethod
     def _guid_base(cls):
@@ -96,6 +96,6 @@ class Contact(db.Model):
     @classmethod
     def get_by_guid(cls, guid):
         hashed_key, contact_id = guid.split('-')
-        if hashed_key != self._guid_base:
+        if hashed_key != cls._guid_base():
             return None
         return cls.get(int(contact_id))
