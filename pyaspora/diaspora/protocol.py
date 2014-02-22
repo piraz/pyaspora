@@ -6,12 +6,9 @@ import urllib.parse
 import urllib.request
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.Hash import SHA256
-from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 
 from lxml import etree
-
-# This package contains Diaspora-protocol-specific code.
 
 # The namespace for the Diaspora envelope
 PROTOCOL_NS = "https://joindiaspora.com/protocol"
@@ -199,7 +196,7 @@ class DiasporaMessageBuilder:
         else:
             return inp + (bytes([val]) * val)
 
-    def post(self, url, recipient_public_keu):
+    def post(self, url, recipient_public_key):
         """
         Actually send the message to an HTTP/HTTPs endpoint.
         """
@@ -224,7 +221,7 @@ class DiasporaMessageParser:
         """
         Extract the envelope XML from its wrapping.
         """
-        # It has already been URL-decoded once by cherrypy
+        # It has already been URL-decoded once by Flask
         xml = urllib.parse.unquote_plus(raw)
         return self.process_salmon_envelope(xml, key)
 
@@ -232,8 +229,6 @@ class DiasporaMessageParser:
         """
         Given the Slap XML, extract out the author and payload.
         """
-        from pyaspora.diaspora.actions import import_contact
-
         xml = xml.lstrip().encode("utf-8")
         #print("salmon_envelope=" + repr(xml))
         doc = etree.fromstring(xml)
@@ -254,7 +249,7 @@ class DiasporaMessageParser:
         body = base64.b64decode(base64.urlsafe_b64decode(body.encode("ascii")))
         body = decrypter.decrypt(body)
         body = self.pkcs7_unpad(body)
-        return body
+        return body, sending_contact
 
     def verify_signature(self, user, message):
         """
@@ -453,64 +448,3 @@ class RedirectTrackingHandler(urllib.request.HTTPRedirectHandler):
         if not hasattr(result, "redirected_via"):
             result.redirected_via = []
         result.redirected_via.append(previous_url)
-
-
-class DiasporaMessageProcessor:
-    @classmethod
-    def process(cls, message):
-        xml = message.lstrip().encode("utf-8")
-        doc = etree.fromstring(xml)
-        for xpath, handler in cls.TYPES:
-            if doc.xpath(xpath):
-                return handler(cls, doc)
-
-    @classmethod
-    def subscription_request(cls, doc):
-        pass
-
-    @classmethod
-    def profile_receive(cls, doc):
-        pass
-
-    TYPES = {
-        '/diaspora/post/receive': subscription_request,
-        '/diaspora/post/profile': profile_receive,
-    }
-
-
-
-# class Test:
-#     @cherrypy.expose
-#     def queue(self):
-#         u = User.logged_in()
-#         k = User.get_user_key()
-#         assert(k)
-#         import pyaspora.diaspora
-#         dmp = pyaspora.diaspora.DiasporaMessageParser(model)
-#         op = '<html><body><table>'
-#         import cgi
-#         for msg in u.message_queue:
-#             op += '<tr><th>raw</th><td>{0}</td></tr>'.format(msg.body.decode('utf-8'))
-#             try:
-#                 op += '<tr><th>parsed</th><td>{0}</td></tr>'.format(cgi.escape(repr(dmp.decode(msg.body.decode('utf-8'), k))))
-#             except Exception:
-#                 import traceback
-#                 op += '<tr><th>error</th><td>{0}</td></tr>'.format(traceback.format_exc())
-#         op += '</table></body></html>'
-#         return op
-
-#     @cherr ypy.expose
-#     def test(self):
-#         """
-#         temporary test of round-tripping the message builder and parser
-#         """
-#         #u = model.User.get(1)
-#         #m = DiasporaMessageBuilder('Hello, world!', u)
-#         #print(m.post('http://localhost:8080/receive/users/'+u.guid, u.contact, 'test'))
-#         #return "OK"
-#         #c = pyaspora.transport.diaspora.Transport.import_contact("lukeross@diasp.eu")
-#         #session.add(c)
-#         u = model.User.get(1)
-#         c = model.Contact.get_by_username("lukeross@diasp.eu")
-#         c.subscribe(u, "friend")
-#         return "OK"

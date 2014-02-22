@@ -9,14 +9,17 @@ import json
 from flask import abort, Blueprint, request, url_for
 from lxml import etree
 
+from pyaspora import db
 from pyaspora.contact.models import Contact
 from pyaspora.diaspora.models import MessageQueue
+from pyaspora.diaspora.utils import process_incoming_queue
+from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import send_xml
 
 blueprint = Blueprint('diaspora', __name__, template_folder='templates')
 
 
-@blueprint.route('/.well-known/host-meta')
+@blueprint.route('/.well-known/host-meta', methods=['GET'])
 def host_meta():
     """
     Return a WebFinder host-meta, which points the client to the end-point
@@ -27,13 +30,17 @@ def host_meta():
     etree.SubElement(
         doc, "Link",
         rel='lrdd',
-        template=url_for('.webfinger', guid='') + '{uri}',
+        template=url_for(
+            '.webfinger',
+            contact_addr='',
+            _external=True
+        ) + '{uri}',
         type='application/xrd+xml'
     )
     return send_xml(doc)
 
 
-@blueprint.route('/diaspora/webfinger/<string:contact_addr>')
+@blueprint.route('/diaspora/webfinger/<string:contact_addr>', methods=['GET'])
 def webfinger(contact_addr):
     """
     Returns the Webfinger profile for a contact called <contact> (in
@@ -46,7 +53,7 @@ def webfinger(contact_addr):
 
     ns = 'http://docs.oasis-open.org/ns/xri/xrd-1.0'
     doc = etree.Element("{%s}XRD" % ns, nsmap={None: ns})
-    etree.SubElement(doc, "Subject").text = "acct:%s" % c.id
+    etree.SubElement(doc, "Subject").text = "acct:%s" % contact_addr
     etree.SubElement(doc, "Alias").text = \
         '"{0}"'.format(url_for('index', _external=True))
     etree.SubElement(
@@ -59,7 +66,7 @@ def webfinger(contact_addr):
         doc, "Link",
         rel='http://joindiaspora.com/seed_location',
         type='text/html',
-        href=url_for('index')
+        href=url_for('index', _external=True)
     )
     etree.SubElement(
         doc, "Link",
@@ -89,7 +96,7 @@ def webfinger(contact_addr):
     return send_xml(doc)
 
 
-@blueprint.route('/diaspora/hcard/<string:guid>')
+@blueprint.route('/diaspora/hcard/<string:guid>', methods=['GET'])
 def hcard(guid):
     """
     Returns the hCard for the User with GUID <guid>. I would have
@@ -154,7 +161,7 @@ def hcard(guid):
     return send_xml(doc, content_type='text/html')
 
 
-@blueprint.route('/receive/users/<string:guid>')
+@blueprint.route('/receive/users/<string:guid>/', methods=['POST'])
 def receive(guid):
     """
     Receive a Salmon Slap and save it for when the user logs in.
@@ -164,17 +171,17 @@ def receive(guid):
         abort(404, 'No such contact')
 
     queue_item = MessageQueue()
-    queue_item.local = c.user
+    queue_item.local_user = c.user
     queue_item.remote = None
     queue_item.format = MessageQueue.INCOMING
-    queue_item.body = request.data
+    queue_item.body = request.form['xml'].encode('ascii')
     db.session.add(queue_item)
     db.session.commit()
 
     return 'OK'
 
 
-@blueprint.route('/people/<string:guid>')
+@blueprint.route('/people/<string:guid>', methods=['GET'])
 def json_feed(guid):
     """
     Look up the User identified by GUID and return the User's public feed
@@ -182,3 +189,10 @@ def json_feed(guid):
     """
     # FIXME - stub implementation
     return json.dumps([])
+
+
+@blueprint.route('/diaspora/run_queue', methods=['GET'])
+@require_logged_in_user
+def run_queue(_user):
+    process_incoming_queue(_user)
+    return 'OK'
