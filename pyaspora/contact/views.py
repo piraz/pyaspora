@@ -146,7 +146,7 @@ def json_contact(contact, viewing_as=None):
     if viewing_as:
         if viewing_as.id == contact.id:
             resp['actions']['edit'] = url_for('users.info', _external=True)
-        if viewing_as.subscribed_to(contact):
+        if viewing_as.contact.subscribed_to(contact):
             resp['actions']['remove'] = url_for('roster.unsubscribe',
                                                 contact_id=contact.id,
                                                 _external=True)

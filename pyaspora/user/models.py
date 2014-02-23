@@ -1,7 +1,6 @@
 from Crypto.PublicKey import RSA
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import backref, joinedload, relationship
-from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import func
 
 from pyaspora.contact.models import Contact
@@ -78,34 +77,6 @@ class User(db.Model):
             return RSA.importKey(self.private_key, passphrase=password)
         except (ValueError, IndexError, TypeError):
             return None
-
-    def subscribed_to(self, contact):
-        """
-        Check if the user is subscribed to <contact> and return the
-        Subscription object if so. If the user has no subscriptions to Contact
-        then None will be returned.
-        """
-        from pyaspora.roster.models import Subscription, SubscriptionGroup
-        sub = db.session.query(Subscription).join(SubscriptionGroup). \
-            filter(and_(SubscriptionGroup.user_id == self.id,
-                   Subscription.contact_id == contact.id))
-        sub = sub.first()
-        return sub
-
-    def friends(self):
-        """
-        Returns a list of Subscriptions de-duped by Contact (a Contact may
-        exist in several SubscriptionGroups, this will select one at random if
-        so).
-        """
-        from pyaspora.roster.models import Subscription, SubscriptionGroup
-        friends = db.session. \
-            query(Contact). \
-            join(Subscription). \
-            join(SubscriptionGroup). \
-            filter(SubscriptionGroup.user_id == self.id). \
-            group_by(Contact.id)
-        return friends
 
     def generate_keypair(self, passphrase):
         """

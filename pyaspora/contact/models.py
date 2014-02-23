@@ -1,3 +1,4 @@
+import json
 from flask import current_app
 from hashlib import sha512
 from sqlalchemy import Column, ForeignKey, Integer, String
@@ -5,6 +6,7 @@ from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_
 
 from pyaspora import db
+from pyaspora.content.models import MimePart
 
 
 class Contact(db.Model):
@@ -57,27 +59,27 @@ class Contact(db.Model):
             ). \
             filter(cls.id.in_(contact_ids))
 
-    def subscribe(self, user, group='Contacts'):
+    def subscribe(self, contact, group=None):
         """
-        Subscribe User <user> _to_ this Contact, onto <user>'s group named
+        Subscribe self to contact, onto self's group named
         <group>.
         """
         from pyaspora.roster.models import Subscription
-        sub = Subscription.create(user, self, group=group)
+        assert(self.user or contact.user)
+        sub = Subscription.create(self, contact, group)
         db.session.add(sub)
-        if not self.user:
-            # FIXME send req via diasp
-            pass
+        self.notify_subscribe(contact)
 
-    def unsubscribe(self, user):
+    def unsubscribe(self, contact):
         """
         Remove this Contact from User <user>'s list of subscriptions.
         """
-        from pyaspora.roster.models import Subscription, SubscriptionGroup
-        subs = db.session.query(Subscription).join(SubscriptionGroup). \
-            filter(and_(SubscriptionGroup.user_id == user.id,
-                        Subscription.contact_id == self.id))
-        if not self.user:
+        from pyaspora.roster.models import Subscription
+        subs = db.session.query(Subscription).filter(and_(
+            Subscription.from_contact == self,
+            Subscription.to_contact == contact
+        ))
+        if not contact.user:
             # FIXME send req via diasp
             pass
         for sub in subs:
@@ -99,3 +101,53 @@ class Contact(db.Model):
         if hashed_key != cls._guid_base():
             return None
         return cls.get(int(contact_id))
+
+    def notify_subscribe(self, contact):
+        """
+        Contact <self> has subscribed to contact <contact>
+        """
+        from pyaspora.post.models import Post
+
+        assert(self.user or contact.user)
+        p = Post(author=self)
+        db.session.add(p)
+
+        p.add_part(
+            order=0,
+            inline=True,
+            mime_part=MimePart(
+                body=json.dumps({
+                    'from': self.id,
+                    'to': contact.id,
+                }).encode('utf-8'),
+                type='application/x-pyaspora-subscribe',
+                text_preview='subscribed to {0}'.format(contact.realname)
+            )
+        )
+        p.share_with([self, contact])
+        p.thread_modified()
+
+    def subscribed_to(self, contact):
+        """
+        Check if the user is subscribed to <contact> and return the
+        Subscription object if so. If the user has no subscriptions to Contact
+        then None will be returned.
+        """
+        from pyaspora.roster.models import Subscription
+        return db.session.query(Subscription). \
+            filter(and_(
+                Subscription.from_contact == self,
+                Subscription.to_contact == contact,
+            )).first()
+
+    def friends(self):
+        """
+        Returns a list of Subscriptions de-duped by Contact (a Contact may
+        exist in several SubscriptionGroups, this will select one at random if
+        so).
+        """
+        from pyaspora.roster.models import Subscription
+        friends = db.session.query(Contact).join(Subscription.to_contact). \
+            filter(Subscription.from_contact == self). \
+            group_by(Contact.id)
+        return friends

@@ -33,7 +33,14 @@ def process_incoming_queue(user):
     dmp = DiasporaMessageParser(fetch_contact)
     for qi in queue_items:
         ret, c_from = dmp.decode(qi.body.decode('ascii'), user._unlocked_key)
-        process_incoming_message(ret, c_from, user)
+        try:
+            process_incoming_message(ret, c_from, user)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+        else:
+            db.session.delete(qi)
+    db.session.commit()
 
 
 def fetch_contact(addr):

@@ -19,31 +19,43 @@ class Subscription(db.Model):
     """
 
     __tablename__ = "subscriptions"
+    from_id = Column(Integer, ForeignKey('contacts.id'),
+                     primary_key=True)
+    from_contact = relationship("Contact", backref="subscriptions",
+                                foreign_keys=[from_id])
+    to_id = Column(Integer, ForeignKey('contacts.id'),
+                   primary_key=True)
+    to_contact = relationship("Contact", backref="subscribers",
+                              foreign_keys=[to_id])
+
     group_id = Column(Integer, ForeignKey('subscription_groups.id'),
-                      primary_key=True)
-    contact_id = Column(Integer, ForeignKey('contacts.id'),
-                        primary_key=True, index=True)
-    contact = relationship("Contact", backref="subscriptions")
+                      nullable=True)
 
     class Queries:
         @classmethod
-        def user_shares_for_contacts(cls, user, contact_ids):
+        def user_subs_for_contacts(cls, user, contact_ids):
             return and_(
-                Subscription.contact_id.in_(contact_ids),
-                SubscriptionGroup.user_id == user.id
+                Subscription.to_id.in_(contact_ids),
+                Subscription.from_id == user.contact.id
             )
 
     @classmethod
-    def create(cls, user, contact, group):
+    def create(cls, from_contact, to_contact, group=None):
         """
         Create a new subscription, where <user> subscribes to <contact> with
         type <subtype>.  The group name <group> will be used, and the group
         will be created if it doesn't already exist. A privacy level of
         <private> will be assigned to the Subscription.
         """
-        dbgroup = SubscriptionGroup.get_by_name(user=user, group=group,
-                                                create=True)
-        sub = cls(group=dbgroup, contact_id=contact.id)
+        dbgroup = SubscriptionGroup.get_by_name(user=from_contact.user,
+                                                group=group, create=True) \
+            if group is not None \
+            else None
+        sub = cls(
+            group=dbgroup,
+            from_contact=from_contact,
+            to_contact=to_contact
+        )
         db.session.add(sub)
         return sub
 

@@ -1,9 +1,7 @@
-import json
 from flask import Blueprint, request, url_for
 
 from pyaspora.contact.models import Contact
 from pyaspora.contact.views import json_contact
-from pyaspora.content.models import MimePart
 from pyaspora.database import db
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.user.views import json_user
@@ -116,33 +114,14 @@ def delete_group(group_id, _user):
 @blueprint.route('/contacts/<int:contact_id>/subscribe', methods=['POST'])
 @require_logged_in_user
 def subscribe(contact_id, _user):
-    from pyaspora.post.models import Post
-
     contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
 
-    contact.subscribe(_user)
-
-    p = Post(author=_user.contact)
-    db.session.add(p)
-
-    p.add_part(
-        order=0,
-        inline=True,
-        mime_part=MimePart(
-            body=json.dumps({
-                'from': _user.contact.id,
-                'to': contact.id,
-            }).encode('utf-8'),
-            type='application/x-pyaspora-subscribe',
-            text_preview='subscribed to {0}'.format(contact.realname)
-        )
-    )
-    p.share_with([_user.contact, contact])
+    _user.contact.subscribe(contact)
 
     db.session.commit()
-    return redirect(url_for('contacts.profile', contact_id=_user.contact.id))
+    return redirect(url_for('contacts.profile', contact_id=contact.id))
 
 
 @blueprint.route('/contacts/<int:contact_id>/unsubscribe', methods=['POST'])
@@ -155,9 +134,9 @@ def unsubscribe(contact_id, _user):
     if not _user.subscribed_to(contact):
         abort(400, 'Not subscribed')
 
-    contact.unsubscribe(_user)
+    _user.contact.unsubscribe(contact)
     db.session.commit()
-    return redirect(url_for('contacts.profile', contact_id=_user.contact.id))
+    return redirect(url_for('contacts.profile', contact_id=contact.id))
 
 
 @blueprint.route('/contacts/move', methods=['POST'])

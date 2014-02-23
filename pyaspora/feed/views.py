@@ -20,7 +20,7 @@ def view(_user):
     Show the logged-in user their own feed.
     """
     limit = int(request.args.get('limit', 99))
-    friend_ids = [f.id for f in _user.friends()]
+    friend_ids = [f.id for f in _user.contact.friends()]
     clauses = [Post.Queries.shared_with_contact(_user.contact)]
     if friend_ids:
         clauses.append(
