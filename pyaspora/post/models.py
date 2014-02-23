@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import backref, contains_eager, relationship
 from sqlalchemy.sql import and_, not_
@@ -98,6 +99,7 @@ class Post(db.Model):
     parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True,
                        default=None, index=True)
     created_at = Column(DateTime, nullable=False, default=func.now())
+    thread_modified_at = Column(DateTime, nullable=True)
 
     author = relationship(Contact, backref='posts')
     parts = relationship(PostPart, backref='post', order_by=PostPart.order)
@@ -214,3 +216,11 @@ class Post(db.Model):
             and_(Share.contact == contact,
                  Share.post == self)).first()
         return share
+
+    def thread_modified(self):
+        post = self
+        while post.parent:
+            post = post.parent
+        post.thread_modified_at = datetime.now()
+        if post.id != self.id:
+            db.session.add(post)

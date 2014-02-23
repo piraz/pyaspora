@@ -32,7 +32,7 @@ def view(_user):
     feed = db.session.query(Share).join(Post). \
         outerjoin(PostTag).outerjoin(Tag). \
         filter(feed_query). \
-        order_by(desc(Post.created_at)). \
+        order_by(desc(Post.thread_modified_at)). \
         group_by(Post.id). \
         options(contains_eager(Share.post)). \
         limit(limit)

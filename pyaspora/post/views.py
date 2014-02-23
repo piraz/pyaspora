@@ -406,6 +406,8 @@ def create(_user):
             post.add_part(attachment_part, order=1,
                           inline=bool(renderer_exists(attachment.mimetype)))
 
+    post.thread_modified()
+
     db.session.add(post)
 
     post.share_with([_user.contact], show_on_wall=(target['type'] == 'wall'))

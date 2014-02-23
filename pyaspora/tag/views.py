@@ -33,7 +33,7 @@ def feed(tag_name, _user):
 
     posts = db.session.query(Post).join(PostTag).join(Tag).join(Share).filter(
         Tag.Queries.public_posts_for_tags([tag.id])
-    ).order_by(desc(Post.created_at)).group_by(Post.id).limit(100)
+    ).order_by(desc(Post.thread_modified_at)).group_by(Post.id).limit(100)
 
     data['feed'] = json_posts([(p, None) for p in posts])
 

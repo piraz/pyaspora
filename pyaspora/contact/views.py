@@ -63,8 +63,9 @@ def _profile_base(contact_id):
             shared_query = Post.Queries.author_shared_with(
                 contact, viewing_as)
             feed_query = or_(feed_query, shared_query)
-        feed = db.session.query(Post).join(Share).filter(feed_query) \
-            .order_by(desc(Post.created_at)).group_by(Post.id).limit(limit)
+        feed = db.session.query(Post).join(Share).filter(feed_query). \
+            order_by(desc(Post.thread_modified_at)). \
+            group_by(Post.id).limit(limit)
 
         data['feed'] = json_posts([(p, None) for p in feed], viewing_as)
 
