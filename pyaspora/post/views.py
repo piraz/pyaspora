@@ -105,19 +105,21 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
                                 post_id=post.id, toggle='1', _external=True)
 
     if not cache:
-        _fill_cache(c)
+        _fill_cache(c, bool(share))
 
     return data
 
 
-def _fill_cache(c):
+def _fill_cache(c, show_shares=False):
     # Fill the cache in bulk, which will also fill the entries
     post_ids = c['post'].keys()
     for post_tag in PostTag.get_tags_for_posts(post_ids):
         c['post'][post_tag.post_id]['tags'].append(json_tag(post_tag.tag))
-    for post_part in PostPart.get_parts_for_posts(post_ids):
+    post_parts = PostPart.get_parts_for_posts(post_ids). \
+        order_by(PostPart.order)
+    for post_part in post_parts:
         c['post'][post_part.post_id]['parts'].append(json_part(post_part))
-    if share:
+    if show_shares:
         for post_share in Share.get_for_posts(post_ids):
             post_id = post_share.post_id
             if not c['post'][post_id]['shares']:
