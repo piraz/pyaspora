@@ -16,7 +16,7 @@ from pyaspora.diaspora.protocol import DiasporaMessageParser, WebfingerRequest
 def addr_for_user(user):
     return "{0}@{1}".format(
         user.id,
-        urllib.parse.urlsplit(request.url)['netloc']
+        urllib.parse.urlsplit(request.url)[1]
     )
 
 
