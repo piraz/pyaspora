@@ -64,11 +64,14 @@ class Contact(db.Model):
         Subscribe self to contact, onto self's group named
         <group>.
         """
+        from pyaspora.diaspora.actions import Subscribe
         from pyaspora.roster.models import Subscription
         assert(self.user or contact.user)
         sub = Subscription.create(self, contact, group)
         db.session.add(sub)
         self.notify_subscribe(contact)
+        if not contact.user:
+            Subscribe.send(self.user, contact)
 
     def unsubscribe(self, contact):
         """
@@ -124,7 +127,10 @@ class Contact(db.Model):
                 text_preview='subscribed to {0}'.format(contact.realname)
             )
         )
-        p.share_with([self, contact])
+        if self.user:
+            p.share_with([self])
+        if contact.user:
+            p.share_with([contact])
         p.thread_modified()
 
     def subscribed_to(self, contact):
