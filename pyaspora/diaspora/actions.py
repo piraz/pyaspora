@@ -112,3 +112,28 @@ class PostMessage(MessageHandlerBase):
         p.share_with([u_to.contact])
         p.thread_modified()
         db.session.commit()
+
+@diaspora_message_handler('/XML/post/conversation')
+class PrivateMessage(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        from_addr = xml.xpath('//diaspora_handle')[0].text
+        assert(from_addr == c_from.diasp.username)
+        body = xml.xpath('//text')[0].text
+        subject = xml.xpath('//subject')[0].text
+        created = xml.xpath('//created_at')[0].text
+        created = datetime.strptime(created, '%Y-%m-%d %H:%M:%S %Z')
+        p = Post(author=c_from, created_at=created)
+        if subject:
+            p.add_part(MimePart(
+                type='text/plain',
+                body=subject.encode('utf-8'),
+            ), order=0, inline=True)
+        if body:
+            p.add_part(MimePart(
+                type='text/plain',
+                body=body.encode('utf-8'),
+            ), order=1 if subject else 0, inline=True)
+        p.share_with([u_to.contact])
+        p.thread_modified()
+        db.session.commit()
