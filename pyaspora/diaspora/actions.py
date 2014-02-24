@@ -1,8 +1,13 @@
+from Crypto.PublicKey import RSA
+from datetime import datetime
 from lxml import etree
 
+from pyaspora import db
+from pyaspora.content.models import MimePart
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder, \
     DiasporaMessageParser
 from pyaspora.diaspora.utils import addr_for_user
+from pyaspora.post.models import Post
 
 HANDLERS = {}
 
@@ -30,9 +35,10 @@ class MessageHandlerBase:
         u_addr = addr_for_user(u_from)
         xml = cls.generate(u_from, c_to)
         m = DiasporaMessageBuilder(xml, u_addr, u_from._unlocked_key)
-        url = "http://{0}/receive/users/{1}".format(
+        url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
-        m.post(url, c_to.public_key)
+        resp = m.post(url, RSA.importKey(c_to.public_key))
+        return resp
 
 
 @diaspora_message_handler('/XML/post/request')
@@ -84,9 +90,25 @@ class Profile(MessageHandlerBase):
 class Unsubscribe(MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        """
-        Contact c_from has subcribed to u_to
-        """
         from_addr = xml.xpath('//diaspora_handle')[0].text
         assert(from_addr == c_from.diasp.username)
         c_from.unsubscribe(u_to.contact)
+
+
+@diaspora_message_handler('/XML/post/status_message')
+class PostMessage(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        from_addr = xml.xpath('//diaspora_handle')[0].text
+        assert(from_addr == c_from.diasp.username)
+        body = xml.xpath('//raw_message')[0].text
+        created = xml.xpath('//created_at')[0].text
+        created = datetime.strptime(created, '%Y-%m-%d %H:%M:%S %Z')
+        p = Post(author=c_from, created_at=created)
+        p.add_part(MimePart(
+            type='text/plain',
+            body=body.encode('utf-8'),
+        ), order=0, inline=True)
+        p.share_with([u_to.contact])
+        p.thread_modified()
+        db.session.commit()
