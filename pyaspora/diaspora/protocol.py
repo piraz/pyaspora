@@ -110,7 +110,7 @@ class DiasporaMessageBuilder:
         document together.
         """
         aes_key = base64.b64encode(self.create_encrypted_outer_aes_key_bundle(
-            public_key)).decode("ascii"),
+            public_key)).decode("ascii")
         ciphertext = base64.b64encode(self.create_ciphertext()).decode("ascii")
 
         d = json.dumps({
