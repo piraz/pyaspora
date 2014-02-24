@@ -131,7 +131,7 @@ def unsubscribe(contact_id, _user):
     if not contact:
         abort(404, 'No such contact', force_status=True)
 
-    if not _user.subscribed_to(contact):
+    if not _user.contact.subscribed_to(contact):
         abort(400, 'Not subscribed')
 
     _user.contact.unsubscribe(contact)
