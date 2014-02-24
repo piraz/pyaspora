@@ -74,6 +74,9 @@ class Profile(MessageHandlerBase):
         last_name = xml.xpath('//last_name')[0].text
         image_url = xml.xpath('//image_url')[0].text
         tags = xml.xpath('//tag_string')[0].text
+        body = {e.tag: e.text for e in xml.xpath('//profile')[0]}
+        c_from.realname = " ".join(first_name, last_name)
+        # FIXME import picture
         assert(False)
 
 
