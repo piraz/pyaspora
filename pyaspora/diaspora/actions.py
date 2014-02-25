@@ -8,6 +8,7 @@ from pyaspora.diaspora.protocol import DiasporaMessageBuilder, \
     DiasporaMessageParser
 from pyaspora.diaspora.utils import addr_for_user
 from pyaspora.post.models import Post
+from pyaspora.utils.guid import guid
 
 HANDLERS = {}
 
@@ -31,9 +32,9 @@ def process_incoming_message(payload, c_from, u_to):
 
 class MessageHandlerBase:
     @classmethod
-    def send(cls, u_from, c_to):
+    def send(cls, u_from, c_to, **kwargs):
         u_addr = addr_for_user(u_from)
-        xml = cls.generate(u_from, c_to)
+        xml = cls.generate(u_from, c_to, **kwargs)
         m = DiasporaMessageBuilder(xml, u_addr, u_from._unlocked_key)
         url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
@@ -113,6 +114,18 @@ class PostMessage(MessageHandlerBase):
         p.thread_modified()
         db.session.commit()
 
+    @classmethod
+    def generate(cls, u_from, c_to, post, text, public):
+        u_addr = addr_for_user(u_from)
+        req = etree.Element("status_message")
+        etree.SubElement(req, "raw_message").text = text
+        etree.SubElement(req, "guid").text = guid('post', post.id)
+        etree.SubElement(req, "diaspora_handle").text = u_addr
+        etree.SubElement(req, "public").text = 'true' if public else 'false'
+        etree.SubElement(req, "created_at").text = post.created_at.isoformat()
+        return req
+
+
 @diaspora_message_handler('/XML/post/conversation')
 class PrivateMessage(MessageHandlerBase):
     @classmethod
@@ -137,3 +150,12 @@ class PrivateMessage(MessageHandlerBase):
         p.share_with([u_to.contact])
         p.thread_modified()
         db.session.commit()
+
+    @classmethod
+    def generate(cls, u_from, c_to, post, text):
+        assert(False)
+        u_addr = addr_for_user(u_from)
+        req = etree.Element("request")
+        etree.SubElement(req, "sender_handle").text = u_addr
+        etree.SubElement(req, "recipient_handle").text = c_to.diasp.username
+        return req

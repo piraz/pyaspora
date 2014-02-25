@@ -139,7 +139,6 @@ class DiasporaMessageBuilder:
             inner.text = self.message
         else:
             inner.append(self.message)
-        print("payload=" + repr(self.xml_to_string(doc)))
         return self.xml_to_string(doc)
 
     def create_encrypted_payload(self):
@@ -176,12 +175,10 @@ class DiasporaMessageBuilder:
             base64.b64encode(b"application/xml").decode("ascii") + "." + \
             base64.b64encode(b"base64url").decode("ascii") + "." + \
             base64.b64encode(b"RSA-SHA256").decode("ascii")
-        print("sig_contents=" + repr(sig_contents))
         sig_hash = SHA256.new(sig_contents.encode("ascii"))
         cipher = PKCSSign.new(self.private_key)
         sig = base64.urlsafe_b64encode(cipher.sign(sig_hash))
         etree.SubElement(env, "{%s}sig" % nsmap["me"]).text = sig
-        print(self.xml_to_string(doc))
         return self.xml_to_string(doc)
 
     def pkcs7_pad(self, inp, block_size):
@@ -230,7 +227,6 @@ class DiasporaMessageParser:
         Given the Slap XML, extract out the author and payload.
         """
         xml = xml.lstrip().encode("utf-8")
-        #print("salmon_envelope=" + repr(xml))
         doc = etree.fromstring(xml)
         header = self.parse_header(
             doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text,

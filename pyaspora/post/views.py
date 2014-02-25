@@ -277,7 +277,7 @@ def _create_form_targets(user):
             'targets': None
         }
     ]
-    user_list = [json_contact(c) for c in user.friends()]
+    user_list = [json_contact(c) for c in user.contact.friends()]
     if user_list:
         data.append({
             'name': 'contact',
@@ -338,6 +338,8 @@ def create(_user):
     """
     Create a new Post and Share it with the selected Contacts.
     """
+    from pyaspora.diaspora.utils import send_post
+
     body = post_param('body')
     relationship = {
         'type': post_param('relationship_type', optional=True),
@@ -414,10 +416,10 @@ def create(_user):
 
     post.share_with([_user.contact], show_on_wall=(target['type'] == 'wall'))
     if target['type'] == 'all_friends':
-        for friend in _user.friends():
+        for friend in _user.contact.friends():
             post.share_with([friend])
     if target['type'] == 'contact':
-        for friend in _user.friends():
+        for friend in _user.contact.friends():
             if str(friend.id) == target['id']:
                 post.share_with([friend])
     if target['type'] == 'group':
@@ -426,6 +428,8 @@ def create(_user):
                 post.share_with([s.contact for s in group.subscriptions])
 
     db.session.commit()
+
+    send_post(post, target['type'] != 'contact')
 
     data = json_post(post)
     return redirect(url_for('feed.view', _external=True), data_structure=data)

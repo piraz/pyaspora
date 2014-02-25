@@ -11,6 +11,8 @@ from pyaspora.content.models import MimePart
 from pyaspora.database import db
 from pyaspora.diaspora.models import DiasporaContact, MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser, WebfingerRequest
+from pyaspora.post.views import json_post
+from pyaspora.roster.models import Subscription
 
 
 def addr_for_user(user):
@@ -112,3 +114,32 @@ def import_contact(addr):
     db.session.add(c)
 
     return c
+
+
+def send_post(post, private):
+    from pyaspora.diaspora.actions import PostMessage, PrivateMessage
+
+    assert(post.author.user)
+
+    self_share = [s for s in post.shares if post.author == s.contact][0]
+    assert(self_share)
+
+    # All people interested in the author
+    targets = db.session.query(Subscription).filter(
+        Subscription.to_contact == post.author
+    )
+    targets = [s.from_contact for s in targets if s.from_contact.diasp]
+    if not self_share.public:
+        shares = set([s.contact_id or s.contact.id for s in post.shares])
+        targets = [c for c in targets if c.id in shares]
+
+    json = json_post(post, children=False)
+    text = "\n\n".join([p['body']['text'] for p in json['parts']])
+
+    for target in targets:
+        if private and not self_share.public:
+            PostMessage.send(post.author.user, target,
+                             post=post, text=text, public=self_share.public)
+        else:
+            PostMessage.send(post.author.user, target,
+                             post=post, text=text, public=self_share.public)
