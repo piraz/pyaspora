@@ -1,10 +1,15 @@
 import base64
-import urllib.error
-import urllib.parse
-import urllib.request
 from flask import request
 from lxml import etree, html
 from sqlalchemy.sql import and_
+try:
+    from urllib.error import URLError
+    from urllib.parse import urljoin, urlsplit
+    from urllib.request import urlopen
+except:
+    from urllib import urlopen
+    from urllib2 import URLError
+    from urlparse import urljoin, urlsplit
 
 from pyaspora.contact.models import Contact
 from pyaspora.content.models import MimePart
@@ -18,7 +23,7 @@ from pyaspora.roster.models import Subscription
 def addr_for_user(user):
     return "{0}@{1}".format(
         user.id,
-        urllib.parse.urlsplit(request.url)[1]
+        urlsplit(request.url)[1]
     )
 
 
@@ -63,7 +68,7 @@ def import_contact(addr):
     """
     try:
         wf = WebfingerRequest(addr).fetch()
-    except urllib.error.URLError:
+    except URLError:
         return None
     if not wf:
         return None
@@ -80,15 +85,13 @@ def import_contact(addr):
         '//XRD:Link[@rel="http://microformats.org/profile/hcard"]/@href',
         namespaces=NS
     )[0]
-    hcard = html.parse(urllib.request.urlopen(hcard_url))
+    hcard = html.parse(urlopen(hcard_url))
     print(etree.tostring(hcard, pretty_print=True))
     c.realname = hcard.xpath('//*[@class="fn"]')[0].text
 
     photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')
     if photo_url:
-        resp = urllib.request.urlopen(
-            urllib.parse.urljoin(hcard_url, photo_url[0])
-        )
+        resp = urlopen(urljoin(hcard_url, photo_url[0]))
         mp = MimePart()
         mp.type = resp.info().get('Content-Type')
         mp.body = resp.read()

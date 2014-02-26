@@ -2,11 +2,16 @@ import base64
 import Crypto.Random
 import json
 import re
-import urllib.parse
-import urllib.request
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.Hash import SHA256
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
+try:
+    from urllib.parse import quote as url_quote, quote_plus, unquote_plus, urlencode, urlparse
+    from urllib.request import build_opener, HTTPRedirectHandler, Request, urlopen
+except:
+    from urllib import quote as url_quote, quote_plus, unquote_plus, urlencode, urlopen
+    from urllib2 import build_opener, HTTPRedirectHandler, Request
+    from urlparse import urlparse
 
 from lxml import etree
 
@@ -197,12 +202,12 @@ class DiasporaMessageBuilder:
         """
         Actually send the message to an HTTP/HTTPs endpoint.
         """
-        xml = urllib.parse.quote(
+        xml = url_quote(
             self.create_salmon_envelope(recipient_public_key))
-        data = urllib.parse.urlencode({
+        data = urlencode({
             'xml': xml
         })
-        return urllib.request.urlopen(url, data.encode("ascii"))
+        return urlopen(url, data.encode("ascii"))
 
 
 class DiasporaMessageParser:
@@ -219,7 +224,7 @@ class DiasporaMessageParser:
         Extract the envelope XML from its wrapping.
         """
         # It has already been URL-decoded once by Flask
-        xml = urllib.parse.unquote_plus(raw)
+        xml = unquote_plus(raw)
         return self.process_salmon_envelope(xml, key)
 
     def process_salmon_envelope(self, xml, key):
@@ -323,13 +328,13 @@ class WebfingerRequest(object):
         template_url = self._get_template()
         target_url = re.sub(
             '\{uri\}',
-            urllib.parse.quote_plus(
+            quote_plus(
                 self.request_email.scheme + ':' + self.request_email.path
             ),
             template_url
         )
         print("about to connect to {}".format(target_url))
-        return etree.parse(urllib.request.urlopen(target_url))
+        return etree.parse(urlopen(target_url))
 
     def _get_template(self):
         """
@@ -348,7 +353,7 @@ class WebfingerRequest(object):
         """
         Normalise the email address provides into an account URL
         """
-        url = urllib.parse.urlparse(self.request_email, "acct")
+        url = urlparse(self.request_email, "acct")
         if url.scheme != "acct":
             raise TypeError()
         self.request_email = url
@@ -379,8 +384,8 @@ class HostMeta(object):
         Create the connection to the remote host.
         """
         print("hostmeta connection to {}".format(url))
-        request = urllib.request.Request(url)
-        opener = urllib.request.build_opener(RedirectTrackingHandler())
+        request = Request(url)
+        opener = build_opener(RedirectTrackingHandler())
         return opener.open(request, timeout=5)
 
     def _get_connection(self):
@@ -397,7 +402,7 @@ class HostMeta(object):
         if self.secure and hasattr(res, "redirected_via"):
             # Check redirections
             for u in res.redirected_via:
-                up = urllib.parse.urlparse(u)
+                up = urlparse(u)
                 if up.scheme != "https":
                     self.secure = False
                     break
@@ -424,14 +429,14 @@ class HostMeta(object):
         print(etree.tostring(tree))
 
 
-class RedirectTrackingHandler(urllib.request.HTTPRedirectHandler):
+class RedirectTrackingHandler(HTTPRedirectHandler):
     """
     Utility class that spots if we are redirected via a non-HTTPS site.
     """
     def http_error_301(self, req, fp, code, msg, headers):
         new_url = req.get_full_url()
         print(repr(headers))
-        result = urllib.request.HTTPRedirectHandler.http_error_301(
+        result = HTTPRedirectHandler.http_error_301(
             self, req, fp, code, msg, headers)
         if not hasattr(result, "redirected_via"):
             result.redirected_via = []
@@ -439,7 +444,7 @@ class RedirectTrackingHandler(urllib.request.HTTPRedirectHandler):
 
     def http_error_302(self, req, fp, code, msg, headers):
         previous_url = req.url
-        result = urllib.request.HTTPRedirectHandler.http_error_302(
+        result = HTTPRedirectHandler.http_error_302(
             self, req, fp, code, msg, headers)
         if not hasattr(result, "redirected_via"):
             result.redirected_via = []
