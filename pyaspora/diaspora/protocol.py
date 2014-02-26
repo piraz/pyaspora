@@ -6,10 +6,13 @@ from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.Hash import SHA256
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 try:
-    from urllib.parse import quote as url_quote, quote_plus, unquote_plus, urlencode, urlparse
-    from urllib.request import build_opener, HTTPRedirectHandler, Request, urlopen
+    from urllib.parse import quote as url_quote, quote_plus, unquote_plus, \
+        urlencode, urlparse
+    from urllib.request import build_opener, HTTPRedirectHandler, Request, \
+        urlopen
 except:
-    from urllib import quote as url_quote, quote_plus, unquote_plus, urlencode, urlopen
+    from urllib import quote as url_quote, quote_plus, unquote_plus, \
+        urlencode, urlopen
     from urllib2 import build_opener, HTTPRedirectHandler, Request
     from urlparse import urlparse
 

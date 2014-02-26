@@ -137,3 +137,35 @@ def render(part, fmt, url=None):
         return defaults[fmt][display_inline](part)
 
     return None
+
+
+@renderer(['application/x-pyaspora-diaspora-profile'])
+def diaspora_profile(part, fmt, url):
+    payload = json.loads(part.mime_part.body.decode('utf-8'))
+    if fmt != 'text/html' or not part.inline:
+        return
+
+    templ = """
+    {{bio}}
+    <table>
+        {% if gender %}
+        <tr>
+            <th>Gender</th>
+            <td>{{gender}}</td>
+        </tr>
+        {% endif %}
+        {% if birthday %}
+        <tr>
+            <th>Birthday</th>
+            <td>{{birthday}}</td>
+        </tr>
+        {% endif %}
+        {% if location %}
+        <tr>
+            <th>Location</th>
+            <td>{{location}}</td>
+        </tr>
+        {% endif %}
+    </table>
+    """
+    return render_template_string(templ, **payload)

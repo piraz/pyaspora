@@ -64,7 +64,7 @@ class Contact(db.Model):
         Subscribe self to contact, onto self's group named
         <group>.
         """
-        from pyaspora.diaspora.actions import Subscribe
+        from pyaspora.diaspora.actions import Subscribe, Profile
         from pyaspora.roster.models import Subscription
         assert(self.user or contact.user)
         sub = Subscription.create(self, contact, group)
@@ -72,21 +72,22 @@ class Contact(db.Model):
         self.notify_subscribe(contact)
         if not contact.user:
             Subscribe.send(self.user, contact)
+            Profile.send(self.user, contact)
 
     def unsubscribe(self, contact):
         """
         Remove this Contact from User <user>'s list of subscriptions.
         """
+        from pyaspora.diaspora.actions import Unsubscribe
         from pyaspora.roster.models import Subscription
         subs = db.session.query(Subscription).filter(and_(
             Subscription.from_contact == self,
             Subscription.to_contact == contact
         ))
-        if not contact.user:
-            # FIXME send req via diasp
-            pass
         for sub in subs:
             db.session.delete(sub)
+        if not contact.user:
+            Unsubscribe.send(self.user, contact)
 
     @property
     def guid(self):

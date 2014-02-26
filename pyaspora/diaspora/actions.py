@@ -1,4 +1,6 @@
+import json
 from Crypto.PublicKey import RSA
+from flask import url_for
 from datetime import datetime
 from lxml import etree
 
@@ -8,6 +10,7 @@ from pyaspora.diaspora.protocol import DiasporaMessageBuilder, \
     DiasporaMessageParser
 from pyaspora.diaspora.utils import addr_for_user
 from pyaspora.post.models import Post
+from pyaspora.tag.models import Tag
 from pyaspora.utils.guid import guid
 
 HANDLERS = {}
@@ -38,6 +41,7 @@ class MessageHandlerBase:
         m = DiasporaMessageBuilder(xml, u_addr, u_from._unlocked_key)
         url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
+        print("posting {0} to {1}".format(etree.tostring(xml), url))
         resp = m.post(url, RSA.importKey(c_to.public_key))
         return resp
 
@@ -64,15 +68,6 @@ class Subscribe(MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/profile')
 class Profile(MessageHandlerBase):
-    # <XML>\n          <post><profile>\n  <diaspora_handle>luke@diaspora-devel.lukeross.name</diaspora_handle>\n  
-    # <first_name>fn</first_name>\n  <last_name/>\n  <image_url>/assets/user/default.png</image_url>\n 
-    # <gender/>\n  <bio/>\n  <location/>\n  <searchable>false</searchable>\n  
-    # <nsfw>false</nsfw>\n  <tag_string>#programming </tag_string>\n</profile></post>\n          </XML>
-    
-    # <XML>\n          <post><profile>\n  <diaspora_handle>luke@diaspora-devel.lukeross.name</diaspora_handle>\n
-    # <first_name>fn</first_name>\n  <last_name>ln</last_name>\n  <image_url>/assets/user/default.png</image_url>\n
-    # <birthday>2000-01-01</birthday>\n  <gender>gen</gender>\n  <bio>Bio</bio>\n  <location>Loc</location>\n  
-    # <searchable>false</searchable>\n  <nsfw>true</nsfw>\n  <tag_string>#programming</tag_string>\n</profile></post>
     @classmethod
     def receive(cls, xml, c_from, u_to):
         from_addr = xml.xpath('//diaspora_handle')[0].text
@@ -82,9 +77,47 @@ class Profile(MessageHandlerBase):
         image_url = xml.xpath('//image_url')[0].text
         tags = xml.xpath('//tag_string')[0].text
         body = {e.tag: e.text for e in xml.xpath('//profile')[0]}
-        c_from.realname = " ".join(first_name, last_name)
-        # FIXME import picture
-        assert(False)
+        c_from.realname = " ".join([first_name or '', last_name or ''])
+        c_from.bio = MimePart(
+            text_preview=xml.xpath('//bio')[0].text,
+            body=json.dumps(body).encode('utf-8'),
+            type='application/x-pyaspora-diaspora-profile'
+        )
+        if image_url:
+            c_from.avatar = MimePart(
+                text_preview='Image:{0}'.format(image_url),
+                body=image_url.encode('ascii'),
+                type='application/x-pyaspora-link-image'
+            )
+        else:
+            c_from.avatar = None
+
+        tags = ' '.join(tags.split('#'))
+        c_from.interests = Tag.parse_line(tags)
+
+        db.session.add(c_from)
+        db.session.commit()
+
+    @classmethod
+    def generate(cls, u_from, c_to):
+        u_addr = addr_for_user(u_from)
+        req = etree.Element("profile")
+        name_parts = u_from.contact.realname.split(maxsplit=2)
+        if len(name_parts) == 1:
+            name_parts.append('')
+        etree.SubElement(req, "diaspora_handle").text = u_addr
+        etree.SubElement(req, "first_name").text = name_parts[0]
+        etree.SubElement(req, "last_name").text = name_parts[1]
+        etree.SubElement(req, "image_url").text = \
+            url_for('contacts.avatar', contact_id=u_from.contact.id)
+        etree.SubElement(req, "birthday")
+        etree.SubElement(req, 'gender')
+        etree.SubElement(req, 'location')
+        etree.SubElement(req, 'searchable').text = 'true'
+        etree.SubElement(req, 'nsfw').text = 'false'
+        etree.SubElement(req, 'tag_string').text = \
+            ' '.join(['#' + t.name for t in u_from.contact.interests])
+        return req
 
 
 @diaspora_message_handler('/XML/post/retraction/type[text()="Person"]')
@@ -94,6 +127,15 @@ class Unsubscribe(MessageHandlerBase):
         from_addr = xml.xpath('//diaspora_handle')[0].text
         assert(from_addr == c_from.diasp.username)
         c_from.unsubscribe(u_to.contact)
+
+    @classmethod
+    def generate(cls, u_from, c_to):
+        u_addr = addr_for_user(u_from)
+        req = etree.Element("retraction")
+        etree.SubElement(req, "post_guid")
+        etree.SubElement(req, "diaspora_handle").text = u_addr
+        etree.SubElement(req, "type").text = 'Person'
+        return req
 
 
 @diaspora_message_handler('/XML/post/status_message')
@@ -159,3 +201,12 @@ class PrivateMessage(MessageHandlerBase):
         etree.SubElement(req, "sender_handle").text = u_addr
         etree.SubElement(req, "recipient_handle").text = c_to.diasp.username
         return req
+
+
+@diaspora_message_handler('/XML/post/participation/target_type[text()="Post"]')
+class PostParticipation(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        # Not sure what these do, but they don't seem to be necessary, so do
+        # nothing
+        pass
