@@ -13,20 +13,23 @@ List the friends of the logged-in User
     <li>
         {{small_contact(sub)}}
         {{button_form(sub.actions.remove,'Subscribed',True)}}
-        {% for tag in sub.tags %}
-            {{tag}}
+        {% for group in groups %}
+            {{button_form(sub.actions.toggle_group,group.name,group.name in sub.tags)}}
         {% endfor %}
     </li>
 {% endfor %}
 </ul>
 
-<h3>Create a new group</h3>
+<h2>Groups</h2>
 
 <form method="post" action="{{actions.create_group}}">
-    <p>
-        <input type="text" name="name" />
-        <input type="submit" value="Create" class="button" />
-    </p>
+<p>
+    {% for group in groups %}
+        <a href="{{group.link}}">{{group.name}}</a> - 
+    {% endfor %}
+    <input type="text" name="name" />
+    <input type="submit" value="Create Group" class="button" />
+</p>
 </form>
 
 {% endblock %}

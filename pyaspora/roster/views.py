@@ -29,6 +29,12 @@ def view(_user):
         friends.append(result)
     data['subscriptions'] = friends
 
+    data['groups'] = [json_group(g, _user) for g in _user.groups]
+    if 'actions' not in data:
+        data['actions'] = {}
+    data['actions']['create_group'] = \
+        url_for('roster.create_group', _external=True)
+
     add_logged_in_user_to_data(data, _user)
 
     return render_response('roster_view.tpl', data)
@@ -38,14 +44,13 @@ def json_group(g, user):
     data = {
         'id': g.id,
         'name': g.name,
-        'actions': {
-            'edit': url_for('roster.edit_group_form',
+        'link': url_for('roster.view_group',
                             group_id=g.id, _external=True),
+        'actions': {
             'delete': None,
             'rename': url_for('roster.rename_group',
                               group_id=g.id, _external=True)
         },
-        'contacts': [json_contact(s.contact, user) for s in g.subscriptions]
     }
     if not g.subscriptions:
         data['actions']['delete'] = url_for(
@@ -63,6 +68,10 @@ def create_group(_user):
 
     return redirect(url_for('roster.view', _external=True))
 
+@blueprint.route('/groups/<int:group_id>', methods=['GET'])
+@require_logged_in_user
+def view_group(group_id, _user):
+    pass
 
 @blueprint.route('/groups/<int:group_id>/edit', methods=['GET'])
 @require_logged_in_user
