@@ -37,7 +37,7 @@ def avatar(contact_id):
     return response
 
 
-def _profile_base(contact_id):
+def _profile_base(contact_id, public=False):
     """
     Display the profile (possibly with feed) for the contact.
     """
@@ -48,8 +48,7 @@ def _profile_base(contact_id):
     if not contact:
         abort(404, 'No such contact', force_status=True)
 
-    viewing_as = None if request.args.get('public', False) \
-        else logged_in_user()
+    viewing_as = None if public else logged_in_user()
 
     data = json_contact(contact, viewing_as)
     limit = int(request.args.get('limit', 99))
@@ -75,13 +74,13 @@ def _profile_base(contact_id):
 
 @blueprint.route('/<int:contact_id>/profile', methods=['GET'])
 def profile(contact_id):
-    data, _ = _profile_base(contact_id)
+    data, _ = _profile_base(contact_id, request.args.get('public', False))
     return render_response('contacts_profile.tpl', data)
 
 
 @blueprint.route('/<int:contact_id>/feed', methods=['GET'])
 def feed(contact_id):
-    data, contact = _profile_base(contact_id)
+    data, contact = _profile_base(contact_id, public=True)
     if not contact.user:
         flask_abort(404, 'No such user')
 
@@ -150,10 +149,10 @@ def json_contact(contact, viewing_as=None):
             resp['actions']['remove'] = url_for('roster.unsubscribe',
                                                 contact_id=contact.id,
                                                 _external=True)
-        else:
             resp['actions']['post'] = url_for('posts.create',
-                                              target='contact',
+                                              target_type='contact',
                                               target_id=contact.id)
+        else:
             if viewing_as.id != contact.id:
                 resp['actions']['add'] = url_for('roster.subscribe',
                                                  contact_id=contact.id,
@@ -178,7 +177,7 @@ def subscriptions(contact_id, _user):
 
     data = json_contact(contact, _user)
     data['subscriptions'] = [json_contact(c, _user)
-                             for c in contact.user.friends()]
+                             for c in contact.friends()]
 
     add_logged_in_user_to_data(data, _user)
 

@@ -97,7 +97,10 @@ class Contact(db.Model):
 
     @classmethod
     def _guid_base(cls):
-        return sha512(current_app.secret_key.encode('ascii')).hexdigest()
+        secret = current_app.secret_key
+        if isinstance(secret, str):
+            secret = secret.encode('ascii')
+        return sha512(secret).hexdigest()
 
     @classmethod
     def get_by_guid(cls, guid):

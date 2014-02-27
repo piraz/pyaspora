@@ -256,7 +256,7 @@ def hide(post_id):
 @blueprint.route('/<int:post_id>/set_public/<int:toggle>', methods=['POST'])
 def set_public(post_id, toggle):
     """
-    Make the Post appear-on/disappear-from the User's publiv wall. If toggle
+    Make the Post appear-on/disappear-from the User's public wall. If toggle
     is True then the post will appear.
     """
     share = _get_share_for_post(post_id)
@@ -264,6 +264,10 @@ def set_public(post_id, toggle):
     if share.public != toggle:
         share.public = toggle
         db.session.add(share)
+        if toggle:
+            # If it's going public, it'll be visible to more people
+            share.post.thread_modified()
+            db.session.add(share.post)
         db.session.commit()
 
     return redirect(url_for('feed.view', _external=True))
@@ -329,6 +333,11 @@ def create_form(_user):
     """
     data = _base_create_form(_user)
     data['use_advanced_form'] = True
+    if request.args.get('target_type') and request.args.get('target_id'):
+        data['default_target'] = {
+            'type': request.args['target_type'],
+            'id': request.args['target_id'],
+        }
     return render_response('posts_create_form.tpl', data)
 
 
