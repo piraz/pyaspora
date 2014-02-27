@@ -141,8 +141,8 @@ def send_post(post, private):
 
     for target in targets:
         if private and not self_share.public:
-            PostMessage.send(post.author.user, target,
-                             post=post, text=text, public=self_share.public)
+            PrivateMessage.send(post.author.user, target,
+                                post=post, text=text)
         else:
             PostMessage.send(post.author.user, target,
                              post=post, text=text, public=self_share.public)

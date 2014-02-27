@@ -39,3 +39,12 @@ class MessageQueue(db.Model):
     body = Column(LargeBinary, nullable=False)
 
     local_user = relationship('User', backref='message_queue')
+
+
+class DiasporaPost(db.Model):
+    __tablename__ = 'diaspora_posts'
+    post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
+    guid = Column(String, nullable=False)
+
+    post = relationship('Post', single_parent=True,
+                        backref=backref('diasp', uselist=False))

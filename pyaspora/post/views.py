@@ -438,7 +438,7 @@ def create(_user):
 
     db.session.commit()
 
-    send_post(post, target['type'] != 'contact')
+    send_post(post, target['type'] == 'contact')
 
     data = json_post(post)
     return redirect(url_for('feed.view', _external=True), data_structure=data)

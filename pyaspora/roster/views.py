@@ -45,7 +45,7 @@ def json_group(g, user):
         'id': g.id,
         'name': g.name,
         'link': url_for('roster.view_group',
-                            group_id=g.id, _external=True),
+                        group_id=g.id, _external=True),
         'actions': {
             'delete': None,
             'rename': url_for('roster.rename_group',
@@ -68,10 +68,12 @@ def create_group(_user):
 
     return redirect(url_for('roster.view', _external=True))
 
+
 @blueprint.route('/groups/<int:group_id>', methods=['GET'])
 @require_logged_in_user
 def view_group(group_id, _user):
     pass
+
 
 @blueprint.route('/groups/<int:group_id>/edit', methods=['GET'])
 @require_logged_in_user
