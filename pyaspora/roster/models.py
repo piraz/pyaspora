@@ -60,6 +60,16 @@ class Subscription(db.Model):
         return sub
 
 
+class SubscriptionTag(db.Model):
+    __tablename__ = "subscription_tags"
+    subscription_id = Column(Integer, ForeignKey('subscriptions.from_id'),
+                             primary_key=True)
+    subscription = relationship("Subscription")
+    group_id = Column(Integer, ForeignKey('subscription_groups.id'),
+                      primary_key=True)
+    group = relationship("SubscriptionGroup")
+
+
 class SubscriptionGroup(db.Model):
     """
     A group of subscriptions ("friendships") by category, rather like
@@ -81,7 +91,11 @@ class SubscriptionGroup(db.Model):
     __table_args__ = (
         UniqueConstraint(user_id, name),
     )
-    subscriptions = relationship('Subscription', backref='group')
+    subscriptions = relationship(
+        'Subscription',
+        secondary='subscription_tags',
+        backref='groups'
+    )
     user = relationship('User', backref='groups')
 
     @classmethod

@@ -18,9 +18,16 @@ blueprint = Blueprint('roster', __name__, template_folder='templates')
 def view(_user):
     data = json_user(_user)
 
-    data['actions']['create_group'] = url_for(
-        'roster.create_group', _external=True)
-    data['groups'] = [json_group(g, _user) for g in _user.groups]
+    friends = []
+    subs = db.session.query(Subscription). \
+        filter(Subscription.from_contact == _user.contact)
+    for sub in subs:
+        result = json_contact(sub.to_contact, _user)
+        groups = sub.groups
+        if groups:
+            result['groups'] = [g.name for g in groups]
+        friends.append(result)
+    data['subscriptions'] = friends
 
     add_logged_in_user_to_data(data, _user)
 

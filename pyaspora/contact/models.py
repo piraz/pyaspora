@@ -158,6 +158,5 @@ class Contact(db.Model):
         """
         from pyaspora.roster.models import Subscription
         friends = db.session.query(Contact).join(Subscription.to_contact). \
-            filter(Subscription.from_contact == self). \
-            group_by(Contact.id)
+            filter(Subscription.from_contact == self)
         return friends
