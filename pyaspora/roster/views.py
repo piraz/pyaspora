@@ -46,8 +46,12 @@ def json_group(g, contact=None):
         },
     }
     if contact:
-        data['actions']['remove_contact'] = url_for('roster.remove_contact',
-                              group_id=g.id, contact_id=contact.id, _external=True)
+        data['actions']['remove_contact'] = url_for(
+            'roster.remove_contact',
+            group_id=g.id,
+            contact_id=contact.id,
+            _external=True
+        )
     return data
 
 
@@ -59,7 +63,10 @@ def view_group(group_id, _user):
         abort(404, 'No such group')
 
     data = {
-        'subscriptions': [json_contact_with_groups(s, _user) for s in group.subscriptions],
+        'subscriptions': [
+            json_contact_with_groups(s, _user)
+            for s in group.subscriptions
+        ],
         'group': json_group(group, _user)
     }
 
@@ -80,7 +87,11 @@ def edit_contact_groups_form(contact_id, _user):
 
     data = {
         'actions': {
-            'save_groups': url_for('.save_contact_groups', contact_id=contact.id, _external=True)
+            'save_groups': url_for(
+                '.save_contact_groups',
+                contact_id=contact.id,
+                _external=True
+            )
         },
         'subscription': json_contact_with_groups(sub, _user)
     }
@@ -104,14 +115,20 @@ def rename_group(group_id, _user):
     return redirect(url_for('.view', _external=True))
 
 
-@blueprint.route('/groups/<int:group_id>/remove_contact/<int:contact_id>', methods=['POST'])
+@blueprint.route(
+    '/groups/<int:group_id>/remove_contact/<int:contact_id>',
+    methods=['POST']
+)
 @require_logged_in_user
 def remove_contact(group_id, contact_id, _user):
     group = SubscriptionGroup.get(group_id)
     if not(group) or group.user_id != _user.id:
         abort(404, 'No such group')
 
-    new_list = [s for s in group.subscriptions if s.to_contact.id != contact_id]
+    new_list = [
+        s for s in group.subscriptions
+        if s.to_contact.id != contact_id
+    ]
     group.subscriptions = new_list
     db.session.commit()
 

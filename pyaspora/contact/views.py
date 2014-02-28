@@ -154,9 +154,11 @@ def json_contact(contact, viewing_as=None):
                                               target_type='contact',
                                               target_id=contact.id,
                                               _external=True)
-            resp['actions']['edit_groups'] = url_for('roster.edit_contact_groups_form',
-                                                     contact_id=contact.id,
-                                                     _external=True)
+            resp['actions']['edit_groups'] = url_for(
+                'roster.edit_contact_groups_form',
+                contact_id=contact.id,
+                _external=True
+            )
         else:
             if viewing_as.id != contact.id:
                 resp['actions']['add'] = url_for('roster.subscribe',

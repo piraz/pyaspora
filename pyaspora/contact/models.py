@@ -1,6 +1,4 @@
 import json
-from flask import current_app
-from hashlib import sha512
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_
@@ -88,26 +86,6 @@ class Contact(db.Model):
             db.session.delete(sub)
         if not contact.user:
             Unsubscribe.send(self.user, contact)
-
-    @property
-    def guid(self):
-        if not self.user:
-            return None
-        return "{0}-{1}".format(self._guid_base(), self.id)
-
-    @classmethod
-    def _guid_base(cls):
-        secret = current_app.secret_key
-        if isinstance(secret, str):
-            secret = secret.encode('ascii')
-        return sha512(secret).hexdigest()
-
-    @classmethod
-    def get_by_guid(cls, guid):
-        hashed_key, contact_id = guid.split('-')
-        if hashed_key != cls._guid_base():
-            return None
-        return cls.get(int(contact_id))
 
     def notify_subscribe(self, contact):
         """

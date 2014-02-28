@@ -11,7 +11,7 @@ from lxml import etree
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
-from pyaspora.diaspora.models import MessageQueue
+from pyaspora.diaspora.models import DiasporaContact, MessageQueue
 from pyaspora.diaspora.utils import process_incoming_queue
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import send_xml
@@ -50,17 +50,18 @@ def webfinger(contact_addr):
     c = Contact.get(int(contact_id))
     if c is None or not c.user:
         abort(404, 'No such contact')
+    diasp = DiasporaContact.get_for_contact(c)
 
     ns = 'http://docs.oasis-open.org/ns/xri/xrd-1.0'
     doc = etree.Element("{%s}XRD" % ns, nsmap={None: ns})
-    etree.SubElement(doc, "Subject").text = "acct:%s" % contact_addr
+    etree.SubElement(doc, "Subject").text = "acct:%s" % diasp.username
     etree.SubElement(doc, "Alias").text = \
         '"{0}"'.format(url_for('index', _external=True))
     etree.SubElement(
         doc, "Link",
         rel='http://microformats.org/profile/hcard',
         type='text/html',
-        href=url_for('.hcard', guid=c.guid, _external=True)
+        href=url_for('.hcard', guid=diasp.guid, _external=True)
     )
     etree.SubElement(
         doc, "Link",
@@ -72,7 +73,7 @@ def webfinger(contact_addr):
         doc, "Link",
         rel='http://joindiaspora.com/guid',
         type='text/html',
-        href=c.guid
+        href=diasp.guid
     )
     etree.SubElement(
         doc, "Link",
@@ -103,9 +104,11 @@ def hcard(guid):
     preferred to use the primary key, but the protocol insists on
     fetch-by-GUID.
     """
-    c = Contact.get_by_guid(guid)
-    if c is None or not c.user:
+    diasp = DiasporaContact.get_by_guid(guid)
+    print("diasp={}".format(diasp))
+    if diasp is None or not diasp.contact.user:
         abort(404, 'No such contact')
+    c = diasp.contact
 
     ns = 'http://www.w3.org/1999/xhtml'
     doc = etree.Element("{%s}div" % ns, nsmap={None: ns}, id="content")
