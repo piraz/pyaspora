@@ -61,6 +61,7 @@ Flask-SQLAlchemy (BSD) GPL=yes BSD=yes
 Python (PSF LICENSE AGREEMENT) GPL=yes BSD=?
 PyCrypto (PSF)
 Jinja2 (BSD) GPL=yes BSD=yes
+Markdown (BSD)
 LXML (BSD,MIT) GPL=yes BSD=yes
 SQLAlchemy
 moment.js (MIT) GPL=yes BSD=yes
