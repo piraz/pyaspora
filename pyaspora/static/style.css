@@ -52,6 +52,12 @@ th {
     border-left: solid thin #808080;
 }
 
+.feedpost .feedpost.unrolled {
+    border-left: none;
+    margin-left: 0em;
+    padding-left: 0em;
+}
+
 .feedpost .postpart {
     padding-bottom: 0.2em;
     padding-top: 0.3em;

@@ -30,7 +30,8 @@ Standard widgets
 
 {% macro show_feed(feed, logged_in=None) %}
 {% for post in feed recursive %}
-<div class="feedpost">
+<div class="feedpost{% if loop.index == 1 and loop.revindex == 1 %} unrolled{% endif %}">
+    {% if post.children and post.children|length > 1 %}{% set unrolled = False %}{% endif %}
 
     {# I apologise for these awful loops #}
     <div class="postauthor"
