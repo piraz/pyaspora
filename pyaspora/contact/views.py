@@ -25,7 +25,9 @@ def avatar(contact_id):
     Display the photo (or other media) that represents a Contact.
     """
     contact = models.Contact.get(contact_id)
-    if not contact or not contact.user:
+    if not contact:
+        abort(404, 'No such contact', force_status=True)
+    if not contact.user and not logged_in_user():
         abort(404, 'No such contact', force_status=True)
 
     part = contact.avatar
@@ -74,7 +76,12 @@ def _profile_base(contact_id, public=False):
 
 @blueprint.route('/<int:contact_id>/profile', methods=['GET'])
 def profile(contact_id):
-    data, _ = _profile_base(contact_id, request.args.get('public', False))
+    data, contact = _profile_base(
+        contact_id,
+        request.args.get('public', False)
+    )
+    if not contact.user and not logged_in_user():
+        abort(404, 'No such contact', force_status=True)
     return render_response('contacts_profile.tpl', data)
 
 

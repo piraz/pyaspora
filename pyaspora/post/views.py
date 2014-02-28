@@ -374,7 +374,7 @@ def create(_user):
         relationship['post'] = post
 
     post = Post(author=_user.contact)
-    body_part = MimePart(type='text/plain', body=body.encode('utf-8'),
+    body_part = MimePart(type='text/x-markdown', body=body.encode('utf-8'),
                          text_preview=None)
 
     topics = post_param('tags', optional=True)

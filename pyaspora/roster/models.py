@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import and_
 
 from pyaspora.database import db
+from pyaspora.utils.models import TagParseMixin
 
 
 class Subscription(db.Model):
@@ -40,19 +41,14 @@ class Subscription(db.Model):
             )
 
     @classmethod
-    def create(cls, from_contact, to_contact, group=None):
+    def create(cls, from_contact, to_contact):
         """
         Create a new subscription, where <user> subscribes to <contact> with
         type <subtype>.  The group name <group> will be used, and the group
         will be created if it doesn't already exist. A privacy level of
         <private> will be assigned to the Subscription.
         """
-        dbgroup = SubscriptionGroup.get_by_name(user=from_contact.user,
-                                                group=group, create=True) \
-            if group is not None \
-            else None
         sub = cls(
-            group=dbgroup,
             from_contact=from_contact,
             to_contact=to_contact
         )
@@ -70,7 +66,7 @@ class SubscriptionTag(db.Model):
     group = relationship("SubscriptionGroup")
 
 
-class SubscriptionGroup(db.Model):
+class SubscriptionGroup(TagParseMixin, db.Model):
     """
     A group of subscriptions ("friendships") by category, rather like
     "Circles" in G+.
@@ -106,20 +102,6 @@ class SubscriptionGroup(db.Model):
         """
         return db.session.query(cls).get(groupid)
 
-    @classmethod
-    def get_by_name(cls, user, group, create=False):
-        """
-        Returns the group named <group> owned by User <user>. If the group
-        does not exist and <create> is False, None will be returned. If
-        <create> is True, a new SubscriptionGroup will be created and returned.
-        """
-        dbgroup = db.session.query(cls).filter(
-            and_(cls.name == group, cls.user_id == user.id)).first()
-        if create and not dbgroup:
-            dbgroup = cls(user=user, name=group)
-            db.session.add(dbgroup)
-        return dbgroup
-
     def has_contact(self, contact):
         for sub in self.subscriptions:
             if sub.contact_id == contact.id:
@@ -131,3 +113,23 @@ class SubscriptionGroup(db.Model):
             return
         sub = Subscription(contact=contact, group=self, type=subtype)
         db.session.add(sub)
+
+    @classmethod
+    def get_by_name(cls, name, user, create=True):
+        """
+        Returns the group named <group> owned by User <user>. If the group
+        does not exist and <create> is False, None will be returned. If
+        <create> is True, a new SubscriptionGroup will be created and returned.
+        """
+        if not cls.name_is_valid(name):
+            return
+
+        group = db.session.query(cls).filter(and_(
+            cls.name == name,
+            cls.user == user
+        )).first()
+        if create and not group and cls.name_is_valid(name):
+            tag = cls(name=name, user=user)
+            db.session.add(tag)
+
+        return group

@@ -57,7 +57,7 @@ class Contact(db.Model):
             ). \
             filter(cls.id.in_(contact_ids))
 
-    def subscribe(self, contact, group=None):
+    def subscribe(self, contact):
         """
         Subscribe self to contact, onto self's group named
         <group>.
@@ -65,7 +65,7 @@ class Contact(db.Model):
         from pyaspora.diaspora.actions import Subscribe, Profile
         from pyaspora.roster.models import Subscription
         assert(self.user or contact.user)
-        sub = Subscription.create(self, contact, group)
+        sub = Subscription.create(self, contact)
         db.session.add(sub)
         self.notify_subscribe(contact)
         if not contact.user:

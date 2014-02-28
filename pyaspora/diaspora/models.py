@@ -56,10 +56,10 @@ class DiasporaContact(db.Model):
         dcontact = db.session.query(DiasporaContact).filter(
             cls.username == addr).first()
         if dcontact:
-            return dcontact.contact
+            return dcontact
 
         if import_contact:
-            contact = import_contact(addr)
+            contact = cls.import_contact(addr)
             if commit:
                 db.session.commit()
         return contact
@@ -92,9 +92,12 @@ class DiasporaContact(db.Model):
         hcard = html.parse(urlopen(hcard_url))
         c.realname = hcard.xpath('//*[@class="fn"]')[0].text
 
-        photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')
+        pod_loc = hcard.xpath('//*[@id="pod_location"]')[0].text
+        photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')[0]
+        print(pod_loc, photo_url)
         if photo_url:
-            resp = urlopen(urljoin(hcard_url, photo_url[0]))
+            photo_url = urljoin(pod_loc, photo_url)
+            resp = urlopen(photo_url)
             mp = MimePart()
             mp.type = resp.info().get('Content-Type')
             mp.body = resp.read()
@@ -122,7 +125,7 @@ class DiasporaContact(db.Model):
         db.session.add(d)
         db.session.add(c)
 
-        return c
+        return d
 
 
 class MessageQueue(db.Model):

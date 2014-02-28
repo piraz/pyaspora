@@ -244,7 +244,7 @@ class DiasporaMessageParser:
         inner_key = base64.b64decode(
             header.find(".//aes_key").text.encode("ascii"))
 
-        sending_contact = self.contact_fetcher(sender)
+        sending_contact = self.contact_fetcher(sender).contact
         self.verify_signature(sending_contact, doc)
 
         decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)

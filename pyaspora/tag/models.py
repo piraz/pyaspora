@@ -1,9 +1,9 @@
-import re
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_, not_
 
 from pyaspora.database import db
+from pyaspora.utils.models import TagParseMixin
 
 
 class Interest(db.Model):
@@ -44,7 +44,7 @@ class PostTag(db.Model):
             filter(cls.post_id.in_(post_ids))
 
 
-class Tag(db.Model):
+class Tag(TagParseMixin, db.Model):
     '''
     A topic that can be attached to a Post, or to a Contact (as an
     'interest'), for categorising and filtering content.
@@ -76,28 +76,6 @@ class Tag(db.Model):
             )
 
     @classmethod
-    def name_is_valid(cls, name):
-        if not name:
-            return False
-
-        if len(name) > 100:
-            return False
-
-        if re.search(r'[^a-z0-9_]', name):
-            return False
-
-        if '__' in name:
-            return False
-
-        if name.startswith('_'):
-            return False
-
-        if name.endswith('_'):
-            return False
-
-        return True
-
-    @classmethod
     def get_by_name(cls, name, create=True):
         if not cls.name_is_valid(name):
             return
@@ -108,12 +86,3 @@ class Tag(db.Model):
             db.session.add(tag)
 
         return tag
-
-    @classmethod
-    def parse_line(cls, line, create=True):
-        tags = []
-        for possible_tag in re.split('[,\s]+', line):
-            tag = cls.get_by_name(possible_tag.lower(), create)
-            if tag:
-                tags.append(tag)
-        return tags

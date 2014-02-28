@@ -14,7 +14,7 @@ from pyaspora.contact.models import Contact
 from pyaspora.diaspora.models import DiasporaContact, MessageQueue
 from pyaspora.diaspora.utils import process_incoming_queue
 from pyaspora.user.session import require_logged_in_user
-from pyaspora.utils.rendering import send_xml
+from pyaspora.utils.rendering import redirect, send_xml
 
 blueprint = Blueprint('diaspora', __name__, template_folder='templates')
 
@@ -169,12 +169,15 @@ def receive(guid):
     """
     Receive a Salmon Slap and save it for when the user logs in.
     """
-    c = Contact.get_by_guid(guid)
-    if c is None or not c.user:
+    if guid == 'public':
+        assert(False)
+
+    diasp = DiasporaContact.get_by_guid(guid)
+    if diasp is None or not diasp.contact.user:
         abort(404, 'No such contact')
 
     queue_item = MessageQueue()
-    queue_item.local_user = c.user
+    queue_item.local_user = diasp.contact.user
     queue_item.remote = None
     queue_item.format = MessageQueue.INCOMING
     queue_item.body = request.form['xml'].encode('ascii')
@@ -199,3 +202,16 @@ def json_feed(guid):
 def run_queue(_user):
     process_incoming_queue(_user)
     return 'OK'
+
+
+@blueprint.route('/diaspora/contacts/<string:addr>', methods=['GET'])
+@require_logged_in_user
+def external_contact(addr, _user):
+    diasp = DiasporaContact.get_by_username(addr)
+    if not diasp:
+        abort(404, 'Could not find contact with this address')
+    return redirect(url_for(
+        'contacts.profile',
+        contact_id=diasp.contact.id,
+        _external=True
+    ))

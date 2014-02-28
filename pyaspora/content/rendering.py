@@ -1,6 +1,7 @@
 import codecs
 import json
 from flask import render_template_string, url_for
+from markdown import markdown
 
 renderers = {}
 
@@ -48,6 +49,26 @@ def text_html(part, fmt, url):
     """
     if part.inline and fmt == 'text/html':
         return codecs.utf_8_decode(part.mime_part.body)[0]
+    return None
+
+
+@renderer(['text/x-markdown'])
+def text_markdown(part, fmt, url):
+    """
+    Renderer for text/x-markdown (MarkDown).
+    """
+    if part.inline:
+        md = codecs.utf_8_decode(part.mime_part.body)[0]
+        if fmt == 'text/html':
+            return markdown(
+                md,
+                output_format='xhtml',
+                safe_mode='replace',
+                html_replacement_text='(could not show this)',
+                lazy_ol=False
+            )
+        if fmt == 'text/plain':
+            return md
     return None
 
 

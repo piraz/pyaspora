@@ -6,13 +6,10 @@ from lxml import etree
 
 from pyaspora import db
 from pyaspora.content.models import MimePart
-from pyaspora.diaspora.models import DiasporaPost
-from pyaspora.diaspora.protocol import DiasporaMessageBuilder, \
-    DiasporaMessageParser
-from pyaspora.diaspora.utils import addr_for_user
+from pyaspora.diaspora.models import DiasporaContact, DiasporaPost
+from pyaspora.diaspora.protocol import DiasporaMessageBuilder
 from pyaspora.post.models import Post
 from pyaspora.tag.models import Tag
-from pyaspora.utils.guid import make_guid, parse_guid
 
 HANDLERS = {}
 
@@ -37,9 +34,9 @@ def process_incoming_message(payload, c_from, u_to):
 class MessageHandlerBase:
     @classmethod
     def send(cls, u_from, c_to, **kwargs):
-        u_addr = addr_for_user(u_from)
+        diasp = DiasporaContact.get_for_contact(u_from.contact)
         xml = cls.generate(u_from, c_to, **kwargs)
-        m = DiasporaMessageBuilder(xml, u_addr, u_from._unlocked_key)
+        m = DiasporaMessageBuilder(xml, diasp.username, u_from._unlocked_key)
         url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
         print("posting {0} to {1}".format(etree.tostring(xml), url))
@@ -60,9 +57,9 @@ class Subscribe(MessageHandlerBase):
 
     @classmethod
     def generate(cls, u_from, c_to):
-        u_addr = addr_for_user(u_from)
         req = etree.Element("request")
-        etree.SubElement(req, "sender_handle").text = u_addr
+        etree.SubElement(req, "sender_handle").text = \
+            u_from.contact.diasp.username
         etree.SubElement(req, "recipient_handle").text = c_to.diasp.username
         return req
 
@@ -73,14 +70,17 @@ class Profile(MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         from_addr = xml.xpath('//diaspora_handle')[0].text
         assert(from_addr == c_from.diasp.username)
-        first_name = xml.xpath('//first_name')[0].text
-        last_name = xml.xpath('//last_name')[0].text
+        first_name = xml.xpath('//first_name')
+        first_name = first_name[0].text if first_name else None
+        last_name = xml.xpath('//last_name')
+        last_name = last_name[0].text if last_name else None
         image_url = xml.xpath('//image_url')[0].text
-        tags = xml.xpath('//tag_string')[0].text
+        tags = xml.xpath('//tag_string')[0].text or ''
         body = {e.tag: e.text for e in xml.xpath('//profile')[0]}
         c_from.realname = " ".join([first_name or '', last_name or ''])
+        bio = xml.xpath('//bio')
         c_from.bio = MimePart(
-            text_preview=xml.xpath('//bio')[0].text,
+            text_preview=bio[0].text if bio else '(bio)',
             body=json.dumps(body).encode('utf-8'),
             type='application/x-pyaspora-diaspora-profile'
         )
@@ -101,12 +101,12 @@ class Profile(MessageHandlerBase):
 
     @classmethod
     def generate(cls, u_from, c_to):
-        u_addr = addr_for_user(u_from)
         req = etree.Element("profile")
         name_parts = u_from.contact.realname.split(maxsplit=2)
         if len(name_parts) == 1:
             name_parts.append('')
-        etree.SubElement(req, "diaspora_handle").text = u_addr
+        etree.SubElement(req, "diaspora_handle").text = \
+            u_from.contact.diasp.username
         etree.SubElement(req, "first_name").text = name_parts[0]
         etree.SubElement(req, "last_name").text = name_parts[1]
         etree.SubElement(req, "image_url").text = \
@@ -131,10 +131,10 @@ class Unsubscribe(MessageHandlerBase):
 
     @classmethod
     def generate(cls, u_from, c_to):
-        u_addr = addr_for_user(u_from)
         req = etree.Element("retraction")
         etree.SubElement(req, "post_guid")
-        etree.SubElement(req, "diaspora_handle").text = u_addr
+        etree.SubElement(req, "diaspora_handle").text = \
+            u_from.contact.diasp.username
         etree.SubElement(req, "type").text = 'Person'
         return req
 
@@ -150,7 +150,7 @@ class PostMessage(MessageHandlerBase):
         created = datetime.strptime(created, '%Y-%m-%d %H:%M:%S %Z')
         p = Post(author=c_from, created_at=created)
         p.add_part(MimePart(
-            type='text/plain',
+            type='text/x-markdown',
             body=body.encode('utf-8'),
         ), order=0, inline=True)
         p.share_with([c_from, u_to.contact])
@@ -162,11 +162,12 @@ class PostMessage(MessageHandlerBase):
 
     @classmethod
     def generate(cls, u_from, c_to, post, text, public):
-        u_addr = addr_for_user(u_from)
+        diasp = DiasporaPost.get_for_post(post)
         req = etree.Element("status_message")
         etree.SubElement(req, "raw_message").text = text
-        etree.SubElement(req, "guid").text = make_guid('post', post.id)
-        etree.SubElement(req, "diaspora_handle").text = u_addr
+        etree.SubElement(req, "guid").text = diasp.guid
+        etree.SubElement(req, "diaspora_handle").text = \
+            u_from.contact.diasp.username
         etree.SubElement(req, "public").text = 'true' if public else 'false'
         etree.SubElement(req, "created_at").text = post.created_at.isoformat()
         return req
@@ -203,23 +204,24 @@ class PrivateMessage(MessageHandlerBase):
 
     @classmethod
     def generate(cls, u_from, c_to, post, text):
-        u_addr = addr_for_user(u_from)
         req = etree.Element("conversation")
-        etree.SubElement(req, "guid").text = make_guid('post', post.id)
+        diasp = DiasporaPost.get_for_post(post)
+        etree.SubElement(req, "guid").text = diasp.guid
         etree.SubElement(req, "subject").text = '(no subject)'
         etree.SubElement(req, "created_at").text = post.created_at.isoformat()
         msg = etree.SubElement(req, "message")
-        etree.SubElement(msg, "guid").text = make_guid('message', post.id)
+        etree.SubElement(msg, "guid").text = diasp.guid + '-1'
         etree.SubElement(msg, "parent_guid")
         etree.SubElement(msg, "parent_author_signature")
         etree.SubElement(msg, "author_signature")
         etree.SubElement(msg, "text").text = text
         etree.SubElement(msg, "created_at").text = post.created_at.isoformat()
         etree.SubElement(msg, "conversation_guid").text = \
-            make_guid('post', post.id)
-        etree.SubElement(req, "diaspora_handle").text = u_addr
+            diasp.guid
+        etree.SubElement(req, "diaspora_handle").text = \
+            u_from.contact.diasp.username
         etree.SubElement(req, "participant_handles").text = \
-            ';'.join([c_to.diasp.username, u_addr])
+            ';'.join([c_to.diasp.username, u_from.contact.diasp.username])
         return req
 
 
@@ -254,13 +256,7 @@ class SubPost(MessageHandlerBase):
         assert(from_addr == c_from.diasp.username)
         body = xml.xpath('//text')[0].text
         parent_guid = xml.xpath('//parent_guid')[0].text
-        parent_id = parse_guid(parent_guid, 'post')
-        if parent_id:
-            parent = Post.get(parent_id)
-        else:
-            parent = db.session.query(DiasporaPost).filter(
-                DiasporaPost.guid == parent_guid
-            ).first().post
+        parent = DiasporaPost.get_by_guid(parent_guid).post
         assert(parent)
         assert(parent.shared_with(c_from))
         assert(parent.shared_with(u_to))
