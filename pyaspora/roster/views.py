@@ -1,4 +1,5 @@
 from flask import Blueprint, request, url_for
+from sqlalchemy.sql import and_
 
 from pyaspora.contact.models import Contact
 from pyaspora.contact.views import json_contact
@@ -13,86 +14,76 @@ from pyaspora.roster.models import Subscription, SubscriptionGroup
 blueprint = Blueprint('roster', __name__, template_folder='templates')
 
 
+def json_contact_with_groups(sub, user):
+    result = json_contact(sub.to_contact, user)
+    result['groups'] = [json_group(g, sub.to_contact) for g in sub.groups]
+    return result
+
+
 @blueprint.route('/edit', methods=['GET'])
 @require_logged_in_user
 def view(_user):
-    data = json_user(_user)
-
-    friends = []
     subs = db.session.query(Subscription). \
         filter(Subscription.from_contact == _user.contact)
-    for sub in subs:
-        result = json_contact(sub.to_contact, _user)
-        groups = sub.groups
-        if groups:
-            result['groups'] = [g.name for g in groups]
-        friends.append(result)
-    data['subscriptions'] = friends
-
-    data['groups'] = [json_group(g, _user) for g in _user.groups]
-    if 'actions' not in data:
-        data['actions'] = {}
-    data['actions']['create_group'] = \
-        url_for('roster.create_group', _external=True)
+    data = {
+        'subscriptions': [json_contact_with_groups(s, _user) for s in subs]
+    }
 
     add_logged_in_user_to_data(data, _user)
 
     return render_response('roster_view.tpl', data)
 
 
-def json_group(g, user):
+def json_group(g, contact=None):
     data = {
         'id': g.id,
         'name': g.name,
         'link': url_for('roster.view_group',
                         group_id=g.id, _external=True),
         'actions': {
-            'delete': None,
             'rename': url_for('roster.rename_group',
                               group_id=g.id, _external=True)
         },
     }
-    if not g.subscriptions:
-        data['actions']['delete'] = url_for(
-            'roster.delete_group', group_id=g.id, _external=True)
+    if contact:
+        data['actions']['remove_contact'] = url_for('roster.remove_contact',
+                              group_id=g.id, contact_id=contact.id, _external=True)
     return data
-
-
-@blueprint.route('/groups/create', methods=['POST'])
-@require_logged_in_user
-def create_group(_user):
-    name = post_param('name')
-
-    db.session.add(SubscriptionGroup(user=_user, name=name))
-    db.session.commit()
-
-    return redirect(url_for('roster.view', _external=True))
 
 
 @blueprint.route('/groups/<int:group_id>', methods=['GET'])
 @require_logged_in_user
 def view_group(group_id, _user):
-    pass
-
-
-@blueprint.route('/groups/<int:group_id>/edit', methods=['GET'])
-@require_logged_in_user
-def edit_group_form(group_id, _user):
     group = SubscriptionGroup.get(group_id)
     if not(group) or group.user_id != _user.id:
         abort(404, 'No such group')
 
-    data = json_user(_user)
+    data = {
+        'subscriptions': [json_contact_with_groups(s, _user) for s in group.subscriptions],
+        'group': json_group(group, _user)
+    }
 
-    data['actions'].update({
-        'create_group': url_for('roster.create_group', _external=True),
-        'move_contacts': url_for('roster.move_contacts', _external=True)
-    })
-    data.update({
-        'group': json_group(group, _user),
-        'other_groups': [json_group(g, _user)
-                         for g in _user.groups if g.id != group.id]
-    })
+    add_logged_in_user_to_data(data, _user)
+
+    return render_response('roster_view.tpl', data)
+
+
+@blueprint.route('/contacts/<int:contact_id>/edit', methods=['GET'])
+@require_logged_in_user
+def edit_contact_groups_form(contact_id, _user):
+    contact = Contact.get(contact_id)
+    if not contact:
+        abort(404, 'No such contact')
+    sub = _user.contact.subscribed_to(contact)
+    if not sub:
+        abort(404, 'No such contact')
+
+    data = {
+        'actions': {
+            'save_groups': url_for('.save_contact_groups', contact_id=contact.id, _external=True)
+        },
+        'subscription': json_contact_with_groups(sub, _user)
+    }
 
     add_logged_in_user_to_data(data, _user)
 
@@ -113,18 +104,20 @@ def rename_group(group_id, _user):
     return redirect(url_for('.view', _external=True))
 
 
-@blueprint.route('/groups/<int:group_id>/delete', methods=['POST'])
+@blueprint.route('/groups/<int:group_id>/remove_contact/<int:contact_id>', methods=['POST'])
 @require_logged_in_user
-def delete_group(group_id, _user):
+def remove_contact(group_id, contact_id, _user):
     group = SubscriptionGroup.get(group_id)
     if not(group) or group.user_id != _user.id:
         abort(404, 'No such group')
 
-    if group.subscriptions:
-        abort(400, 'Only empty groups can be deleted')
-
-    db.session.delete(group)
+    new_list = [s for s in group.subscriptions if s.to_contact.id != contact_id]
+    group.subscriptions = new_list
     db.session.commit()
+
+    if not new_list:
+        db.session.delete(group)
+        db.session.commit()
 
     return redirect(url_for('.view', _external=True))
 
@@ -157,9 +150,9 @@ def unsubscribe(contact_id, _user):
     return redirect(url_for('contacts.profile', contact_id=contact.id))
 
 
-@blueprint.route('/contacts/move', methods=['POST'])
+@blueprint.route('/contacts/<int:contact_id>/edit', methods=['POST'])
 @require_logged_in_user
-def move_contacts(_user):
+def save_contact_groups(_user):
     destination = post_param('destination')
     destination = SubscriptionGroup.get(destination)
     if not destination or destination.user_id != _user.id:

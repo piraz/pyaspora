@@ -130,7 +130,8 @@ def json_contact(contact, viewing_as=None):
             'add': None,
             'remove': None,
             'post': None,
-            'edit': None
+            'edit': None,
+            'edit_groups': None
         },
         'feed': None,
         'tags': [json_tag(t) for t in contact.interests]
@@ -151,7 +152,11 @@ def json_contact(contact, viewing_as=None):
                                                 _external=True)
             resp['actions']['post'] = url_for('posts.create',
                                               target_type='contact',
-                                              target_id=contact.id)
+                                              target_id=contact.id,
+                                              _external=True)
+            resp['actions']['edit_groups'] = url_for('roster.edit_contact_groups_form',
+                                                     contact_id=contact.id,
+                                                     _external=True)
         else:
             if viewing_as.id != contact.id:
                 resp['actions']['add'] = url_for('roster.subscribe',
