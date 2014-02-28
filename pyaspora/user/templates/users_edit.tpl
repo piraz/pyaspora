@@ -6,7 +6,12 @@ Sign-up form for creating a new account on the local server.
 {% block content %}
 <h2>Edit profile</h2>
 
-<form method="post" action="{{ url_for('.edit') }}" enctype="multipart/form-data">
+<form method="post" action="{{url_for('.edit')}}" enctype="multipart/form-data">
+
+<h3>Name</h3>
+<p>
+    <input name="name" value="{{name}}" />
+</p>
 
 <h3>Bio</h3>
 <p>

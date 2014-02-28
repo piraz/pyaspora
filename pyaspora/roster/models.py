@@ -128,8 +128,8 @@ class SubscriptionGroup(TagParseMixin, db.Model):
             cls.name == name,
             cls.user == user
         )).first()
-        if create and not group and cls.name_is_valid(name):
-            tag = cls(name=name, user=user)
-            db.session.add(tag)
+        if create and not group:
+            group = cls(name=name, user=user)
+            db.session.add(group)
 
         return group

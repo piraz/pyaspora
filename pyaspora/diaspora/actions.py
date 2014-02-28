@@ -3,6 +3,14 @@ from Crypto.PublicKey import RSA
 from flask import url_for
 from datetime import datetime
 from lxml import etree
+try:
+    from urllib.error import URLError
+    from urllib.parse import urljoin
+    from urllib.request import urlopen
+except:
+    from urllib import urlopen
+    from urllib2 import URLError
+    from urlparse import urljoin
 
 from pyaspora import db
 from pyaspora.content.models import MimePart
@@ -234,19 +242,6 @@ class PostParticipation(MessageHandlerBase):
         pass
 
 
-# b'<XML>\n          <post><comment>\n  <guid>e6a7766c2602f2a2</guid>\n  <parent_guid>5daaa7b3e027bfdf</parent_guid>\n
-#   <parent_author_signature>F5OHCg6cU3rCLmFvjaBaiuS3RYIjRkkj/oqRB0HK1zjbXYQaNf+83KmouviTl3QtSvGwvtGY6hftka7X0xtiHSeQpEL9vJBlVA4f0Omega9/2zkQtWD
-# Ng515G1A6E8L7P37T4N4TOVWUmyaA5sHrk4du4VHO9Pu6x6gwhL+MB9qfNw2DgX0GxEgB/og7qGxuTW4NCVNCIl4fq3XpYDDbgTF5EtQtOg0tyBUVy1/ZyjJODqPop0y25dF+jMwaIps0ZL
-# Sx9vzgECoeSQeT5y+ccXeJ8+jaXC4gYZyIpse+uaiywkkXqotToJ9s8CWjJAagupzW8E+MgAo43Fd6REfkLHmz9D3/jwcKSAaLbiDqOamDqbks/OIXnzSgzvnIeucjrwDT84qy4yE4MJo5
-# FijtWQqEtT54JSpG6nf7+7hy3dHL+drhu8WU4Aq+hKKJ9He9hrAUch/TshWJhvcyvUo2r4Y/RclOhBRx878aJhtSSR+zt7wEekPQReo0CvKXiFOcC1FfdAB6oOtPZo1GNoGqzhzQiIU+WK
-# FM9cciIGlw6hSTPV7AXOEtx5XculI7Hb2d08FjLiGi86X5NDOzPIi0m6l1T5DcmRMWizyP01RBKwj9cyTH+o3sbJAMAhxy5nmGGJBRocQYG9XgTMASiYiA8njicInDKXMINhDSuPaKgbA=
-# </parent_author_signature>\n  <author_signature>F5OHCg6cU3rCLmFvjaBaiuS3RYIjRkkj/oqRB0HK1zjbXYQaNf+83KmouviTl3QtSvGwvtGY6hftka7X0xtiHSeQpEL9vJBlV
-# A4f0Omega9/2zkQtWDNg515G1A6E8L7P37T4N4TOVWUmyaA5sHrk4du4VHO9Pu6x6gwhL+MB9qfNw2DgX0GxEgB/og7qGxuTW4NCVNCIl4fq3XpYDDbgTF5EtQtOg0tyBUVy1/ZyjJODqPo
-# p0y25dF+jMwaIps0ZLSx9vzgECoeSQeT5y+ccXeJ8+jaXC4gYZyIpse+uaiywkkXqotToJ9s8CWjJAagupzW8E+MgAo43Fd6REfkLHmz9D3/jwcKSAaLbiDqOamDqbks/OIXnzSgzvnIeucj
-# rwDT84qy4yE4MJo5FijtWQqEtT54JSpG6nf7+7hy3dHL+drhu8WU4Aq+hKKJ9He9hrAUch/TshWJhvcyvUo2r4Y/RclOhBRx878aJhtSSR+zt7wEekPQReo0CvKXiFOcC1FfdAB6oOtPZo1G
-# NoGqzhzQiIU+WKFM9cciIGlw6hSTPV7AXOEtx5XculI7Hb2d08FjLiGi86X5NDOzPIi0m6l1T5DcmRMWizyP01RBKwj9cyTH+o3sbJAMAhxy5nmGGJBRocQYG9XgTMASiYiA8njicInDKXMI
-# NhDSuPaKgbA=</author_signature>\n
-# <text>Sub-post!</text>\n  <diaspora_handle>luke@diaspora-devel.lukeross.name</diaspora_handle>\n</comment></post>\n          </XML>\n'
 @diaspora_message_handler('/XML/post/message')
 @diaspora_message_handler('/XML/post/comment')
 class SubPost(MessageHandlerBase):
@@ -271,4 +266,47 @@ class SubPost(MessageHandlerBase):
 
         guid = xml.xpath('//guid')[0].text
         p.diasp = DiasporaPost(guid=guid)
+        db.session.commit()
+
+
+@diaspora_message_handler('/XML/post/like')
+class Like(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        # Pyaspora does not support likes
+        pass
+
+
+@diaspora_message_handler('/XML/post/relayable_retraction')
+@diaspora_message_handler('/XML/post/signed_retraction')
+class Retraction(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        # Pyaspora does not support deleting posts/PMs
+        pass
+
+
+@diaspora_message_handler('/XML/post/photo')
+class Photo(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        from_addr = xml.xpath('//diaspora_handle')[0].text
+        assert(from_addr == c_from.diasp.username)
+        parent_guid = xml.xpath('//guid')[0].text
+        parent = DiasporaPost.get_by_guid(parent_guid).post
+        assert(parent)
+        assert(parent.shared_with(c_from))
+        assert(parent.shared_with(u_to))
+        directory = xml.xpath('//remote_photo_path')[0].text
+        file = xml.xpath('//remote_photo_name')[0].text
+        photo_url = urljoin(directory, file)
+        resp = urlopen(photo_url)
+        mime = resp.info().get('Content-Type')
+        parent.add_part(MimePart(
+            type=resp.info().get('Content-Type'),
+            body=resp.read(),
+            text_preview='(picture)'
+        ), order=0, inline=bool(mime.startswith('image/')))
+        parent.thread_modified()
+        db.session.add(parent)
         db.session.commit()

@@ -149,6 +149,11 @@ def edit(_user):
         p.add_part(attachment_part, order=order, inline=True)
         _user.contact.avatar = attachment_part
 
+    name = post_param('name', template='users_edit.tpl', optional=True)
+    if name and name != _user.contact.realname:
+        _user.contact.realname = name
+        changed.append('name')
+
     bio = post_param('bio', template='users_edit.tpl', optional=True)
     if bio:
         bio = bio.encode('utf-8')
@@ -190,6 +195,7 @@ def edit(_user):
         db.session.add(p)
         db.session.add(_user.contact)
         p.share_with([_user.contact])
+        p.thread_modified()
         db.session.commit()
 
     return redirect(url_for('contacts.profile', contact_id=_user.contact.id))

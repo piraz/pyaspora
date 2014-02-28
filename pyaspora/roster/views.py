@@ -67,12 +67,12 @@ def view_group(group_id, _user):
             json_contact_with_groups(s, _user)
             for s in group.subscriptions
         ],
-        'group': json_group(group, _user)
+        'group': json_group(group)
     }
 
     add_logged_in_user_to_data(data, _user)
 
-    return render_response('roster_view.tpl', data)
+    return render_response('roster_view_group.tpl', data)
 
 
 @blueprint.route('/contacts/<int:contact_id>/edit', methods=['GET'])
@@ -109,8 +109,9 @@ def rename_group(group_id, _user):
         abort(404, 'No such group')
 
     group.name = post_param('name')
-    db.session.add(group)
-    db.session.commit()
+    if group.name_is_valid(group.name):
+        db.session.add(group)
+        db.session.commit()
 
     return redirect(url_for('.view', _external=True))
 
@@ -169,27 +170,36 @@ def unsubscribe(contact_id, _user):
 
 @blueprint.route('/contacts/<int:contact_id>/edit', methods=['POST'])
 @require_logged_in_user
-def save_contact_groups(_user):
-    destination = post_param('destination')
-    destination = SubscriptionGroup.get(destination)
-    if not destination or destination.user_id != _user.id:
-        abort(404, 'Destination not found')
+def save_contact_groups(contact_id, _user):
+    contact = Contact.get(contact_id)
+    if not contact:
+        abort(404, 'No such contact', force_status=True)
 
-    contacts = request.form.getlist('contact')
-    if not contacts:
-        abort(400, 'No contacts to move')
+    sub = _user.contact.subscribed_to(contact)
+    if not sub:
+        abort(400, 'Not subscribed')
 
-    contacts = [int(c) for c in contacts]
+    groups = post_param(
+        'groups',
+        template='roster_edit_group.tpl',
+        optional=True
+    ) or ''
+    new_groups = {
+        g.name: g for g in
+        SubscriptionGroup.parse_line(groups, create=True, user=_user)i
+    }
+    old_groups = {g.name: g for g in sub.groups}
 
-    subs = db.session.query(Subscription).join(SubscriptionGroup). \
-        filter(Subscription.Queries.user_shares_for_contacts(
-            _user, contacts))
-
-    # Sigh - a direct update fails (on sqlite)
-    for sub in subs:
-        sub.group = destination
-        db.session.add(sub)
-
+    for group_name, group in old_groups.items():
+        if group_name not in new_groups:
+            other_members = [
+                s for s in group.subscriptions
+                if s.to_id != contact.id
+            ]
+            if not other_members:
+                db.session.delete(group)
+    sub.groups = list(new_groups.values())
+    db.session.add(sub)
     db.session.commit()
 
     return redirect(url_for('.view', _external=True))
