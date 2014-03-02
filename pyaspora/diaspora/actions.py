@@ -62,7 +62,7 @@ class MessageHandlerBase:
     @classmethod
     def as_dict(cls, xml):
         node = xml[0][0]
-        data = {e.tag: e.text for e in node}
+        return {e.tag: e.text for e in node}
 
 
 class SignableMixin:
@@ -136,7 +136,8 @@ class Profile(MessageHandlerBase):
         else:
             c_from.avatar = None
 
-        tags = ' '.join(data.get('tag_string', '').split('#'))
+        tags = data.get('tag_string', None) or ''
+        tags = ' '.join(tags.split('#'))
         c_from.interests = Tag.parse_line(tags)
 
         db.session.add(c_from)
@@ -173,13 +174,14 @@ class Unsubscribe(SignableMixin, MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
         assert(data['diaspora_handle'] == c_from.diasp.username)
+        assert(data['post_guid'] == c_from.diasp.guid)
         c_from.unsubscribe(u_to.contact)
 
     @classmethod
     def generate(cls, u_from, c_to):
         req = etree.Element("retraction")
         cls.struct_to_xml(req, {
-            'post_guid': None,
+            'post_guid': u_from.contact.diasp.guid,
             'type': 'Person',
             'diaspora_handle': u_from.contact.diasp.username
         })
@@ -257,7 +259,7 @@ class PrivateMessage(MessageHandlerBase):
         cls.struct_to_xml(msg, {
             'guid': diasp.guid + '-1',
             'parent_guid': None,
-            'text': text.
+            'text': text,
             'created_at': post.created_at.isoformat(),
             'conversation_guid': diasp.guid
         })
