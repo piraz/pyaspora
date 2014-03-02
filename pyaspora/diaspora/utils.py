@@ -31,7 +31,7 @@ def process_incoming_queue(user):
 
 
 def send_post(post, private):
-    from pyaspora.diaspora.actions import PostMessage, PrivateMessage
+    from pyaspora.diaspora.actions import PostMessage, PrivateMessage, SubPost
 
     assert(post.author.user)
 
@@ -50,10 +50,20 @@ def send_post(post, private):
     json = json_post(post, children=False)
     text = "\n\n".join([p['body']['text'] for p in json['parts']])
 
+    senders = {
+        'private': {
+            'parent': (PrivateMessage,),
+            'child': (SubPost, {'msg_type': 'message'})
+        },
+        'public': {
+            'parent': (PostMessage, {'public': self_share.public}),
+            'child': (SubPost, {'msg_type': 'comment'})
+        }
+    }
+
     for target in targets:
-        if private and not self_share.public:
-            PrivateMessage.send(post.author.user, target,
-                                post=post, text=text)
-        else:
-            PostMessage.send(post.author.user, target,
-                             post=post, text=text, public=self_share.public)
+        sender = senders['private' if private else 'public']
+        sender, extras = sender['child' if post.parent else 'parent']
+        if not extras:
+            extras = {}
+        sender.send(post.author.user, target, post=post, text=text, **extras)

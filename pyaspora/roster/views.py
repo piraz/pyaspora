@@ -186,7 +186,7 @@ def save_contact_groups(contact_id, _user):
     ) or ''
     new_groups = {
         g.name: g for g in
-        SubscriptionGroup.parse_line(groups, create=True, user=_user)i
+        SubscriptionGroup.parse_line(groups, create=True, user=_user)
     }
     old_groups = {g.name: g for g in sub.groups}
 

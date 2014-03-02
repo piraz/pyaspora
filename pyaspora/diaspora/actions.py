@@ -1,5 +1,8 @@
 import json
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
+from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 from flask import url_for
 from datetime import datetime
 from lxml import etree
@@ -51,6 +54,43 @@ class MessageHandlerBase:
         resp = m.post(url, RSA.importKey(c_to.public_key))
         return resp
 
+    @classmethod
+    def struct_to_xml(cls, node, struct):
+        for k, v in struct.items():
+            etree.SubElement(node, k).text = v
+
+    @classmethod
+    def as_dict(cls, xml):
+        node = xml[0][0]
+        data = {e.tag: e.text for e in node}
+
+
+class SignableMixin:
+    @classmethod
+    def generate_signature(cls, u_from, node):
+        sig_contents = ';'.join([
+            e.text for e in node
+            if e.text is not None
+            and not e.tag.endswith('_signature')
+        ])
+        print("sig_contents", sig_contents)
+        sig_hash = SHA256.new(sig_contents.encode("utf-8"))
+        cipher = PKCSSign.new(u_from._unlocked_key)
+        return urlsafe_b64encode(cipher.sign(sig_hash))
+
+    @classmethod
+    def valid_signature(cls, contact, signature, node):
+        signature = urlsafe_b64decode(signature)
+        sig_contents = ';'.join([
+            e.text for e in node
+            if e.text is not None
+            and not e.tag.endswith('_signature')
+        ])
+        print("sig_contents", sig_contents)
+        sig_hash = SHA256.new(sig_contents.encode("utf-8"))
+        cipher = PKCSSign.new(RSA.importKey(contact.public_key))
+        return cipher.verify(sig_hash, signature)
+
 
 @diaspora_message_handler('/XML/post/request')
 class Subscribe(MessageHandlerBase):
@@ -59,16 +99,17 @@ class Subscribe(MessageHandlerBase):
         """
         Contact c_from has subcribed to u_to
         """
-        from_addr = xml.xpath('//sender_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
+        data = cls.as_dict(xml)
+        assert(data['sender_handle'] == c_from.diasp.username)
         c_from.subscribe(u_to.contact)
 
     @classmethod
     def generate(cls, u_from, c_to):
         req = etree.Element("request")
-        etree.SubElement(req, "sender_handle").text = \
-            u_from.contact.diasp.username
-        etree.SubElement(req, "recipient_handle").text = c_to.diasp.username
+        cls.struct_to_xml(req, {
+            'sender_handle': u_from.contact.diasp.username,
+            'recipient_handle': c_to.diasp.username
+        })
         return req
 
 
@@ -76,32 +117,26 @@ class Subscribe(MessageHandlerBase):
 class Profile(MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        from_addr = xml.xpath('//diaspora_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
-        first_name = xml.xpath('//first_name')
-        first_name = first_name[0].text if first_name else None
-        last_name = xml.xpath('//last_name')
-        last_name = last_name[0].text if last_name else None
-        image_url = xml.xpath('//image_url')[0].text
-        tags = xml.xpath('//tag_string')[0].text or ''
-        body = {e.tag: e.text for e in xml.xpath('//profile')[0]}
-        c_from.realname = " ".join([first_name or '', last_name or ''])
-        bio = xml.xpath('//bio')
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
+        c_from.realname = " ".join(
+            data.get(k, '') for k in ('first_name', 'last_name')
+        )
         c_from.bio = MimePart(
-            text_preview=bio[0].text if bio else '(bio)',
-            body=json.dumps(body).encode('utf-8'),
+            text_preview=data.get('bio', '(bio)'),
+            body=json.dumps(data).encode('utf-8'),
             type='application/x-pyaspora-diaspora-profile'
         )
-        if image_url:
+        if 'image_url' in data:
             c_from.avatar = MimePart(
-                text_preview='Image:{0}'.format(image_url),
-                body=image_url.encode('ascii'),
+                text_preview='Image:{0}'.format(data['image_url']),
+                body=data['image_url'].encode('ascii'),
                 type='application/x-pyaspora-link-image'
             )
         else:
             c_from.avatar = None
 
-        tags = ' '.join(tags.split('#'))
+        tags = ' '.join(data.get('tag_string', '').split('#'))
         c_from.interests = Tag.parse_line(tags)
 
         db.session.add(c_from)
@@ -113,37 +148,41 @@ class Profile(MessageHandlerBase):
         name_parts = u_from.contact.realname.split(maxsplit=2)
         if len(name_parts) == 1:
             name_parts.append('')
-        etree.SubElement(req, "diaspora_handle").text = \
-            u_from.contact.diasp.username
-        etree.SubElement(req, "first_name").text = name_parts[0]
-        etree.SubElement(req, "last_name").text = name_parts[1]
-        etree.SubElement(req, "image_url").text = \
-            url_for('contacts.avatar', contact_id=u_from.contact.id)
-        etree.SubElement(req, "birthday")
-        etree.SubElement(req, 'gender')
-        etree.SubElement(req, 'location')
-        etree.SubElement(req, 'searchable').text = 'true'
-        etree.SubElement(req, 'nsfw').text = 'false'
-        etree.SubElement(req, 'tag_string').text = \
-            ' '.join(['#' + t.name for t in u_from.contact.interests])
+        cls.struct_to_xml(req, {
+            'diaspora_handle': u_from.contact.diasp.username,
+            'first_name': name_parts[0],
+            'last_name': name_parts[1],
+            'image_url': url_for(
+                'contacts.avatar', contact_id=u_from.contact.id, _external=True
+            ),
+            'birthday': None,
+            'gender': None,
+            'location': None,
+            'searchable': 'true',
+            'nsfw': 'false',
+            'tag_string': ' '.join(
+                '#' + t.name for t in u_from.contact.interests
+            )
+        })
         return req
 
 
 @diaspora_message_handler('/XML/post/retraction/type[text()="Person"]')
-class Unsubscribe(MessageHandlerBase):
+class Unsubscribe(SignableMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        from_addr = xml.xpath('//diaspora_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
         c_from.unsubscribe(u_to.contact)
 
     @classmethod
     def generate(cls, u_from, c_to):
         req = etree.Element("retraction")
-        etree.SubElement(req, "post_guid")
-        etree.SubElement(req, "diaspora_handle").text = \
-            u_from.contact.diasp.username
-        etree.SubElement(req, "type").text = 'Person'
+        cls.struct_to_xml(req, {
+            'post_guid': None,
+            'type': 'Person',
+            'diaspora_handle': u_from.contact.diasp.username
+        })
         return req
 
 
@@ -151,33 +190,31 @@ class Unsubscribe(MessageHandlerBase):
 class PostMessage(MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        from_addr = xml.xpath('//diaspora_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
-        body = xml.xpath('//raw_message')[0].text
-        created = xml.xpath('//created_at')[0].text
-        created = datetime.strptime(created, '%Y-%m-%d %H:%M:%S %Z')
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
+        created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         p = Post(author=c_from, created_at=created)
         p.add_part(MimePart(
             type='text/x-markdown',
-            body=body.encode('utf-8'),
+            body=data['raw_message'].encode('utf-8'),
         ), order=0, inline=True)
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
 
-        guid = xml.xpath('//guid')[0].text
-        p.diasp = DiasporaPost(guid=guid)
+        p.diasp = DiasporaPost(guid=data['guid'])
         db.session.commit()
 
     @classmethod
     def generate(cls, u_from, c_to, post, text, public):
         diasp = DiasporaPost.get_for_post(post)
         req = etree.Element("status_message")
-        etree.SubElement(req, "raw_message").text = text
-        etree.SubElement(req, "guid").text = diasp.guid
-        etree.SubElement(req, "diaspora_handle").text = \
-            u_from.contact.diasp.username
-        etree.SubElement(req, "public").text = 'true' if public else 'false'
-        etree.SubElement(req, "created_at").text = post.created_at.isoformat()
+        cls.struct_to_xml(req, {
+            'raw_message': text,
+            'guid': diasp.guid,
+            'diaspora_handle': u_from.contact.diasp.username,
+            'public': 'true' if public else 'false',
+            'created_at': post.created_at.isoformat()
+        })
         return req
 
 
@@ -185,51 +222,49 @@ class PostMessage(MessageHandlerBase):
 class PrivateMessage(MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        from_addr = xml.xpath('//diaspora_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
-        body = xml.xpath('//text')[0].text
-        subject = xml.xpath('//subject')[0].text
-        created = xml.xpath('//created_at')[0].text
-        created = datetime.strptime(created, '%Y-%m-%d %H:%M:%S %Z')
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
+        created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
+
         p = Post(author=c_from, created_at=created)
-        if subject:
+        part_tags = [t for t in ('subject', 'text') if t in data]
+        for order, tag in part_tags:
             p.add_part(MimePart(
                 type='text/plain',
-                body=subject.encode('utf-8'),
-            ), order=0, inline=True)
-        if body:
-            p.add_part(MimePart(
-                type='text/plain',
-                body=body.encode('utf-8'),
-            ), order=1 if subject else 0, inline=True)
+                body=data[tag].encode('utf-8'),
+            ), order=order, inline=True)
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
         db.session.commit()
 
-        guid = xml.xpath('//guid')[0].text
-        p.diasp = DiasporaPost(guid=guid)
+        p.diasp = DiasporaPost(guid=data['guid'])
         db.session.commit()
 
     @classmethod
     def generate(cls, u_from, c_to, post, text):
         req = etree.Element("conversation")
         diasp = DiasporaPost.get_for_post(post)
-        etree.SubElement(req, "guid").text = diasp.guid
-        etree.SubElement(req, "subject").text = '(no subject)'
-        etree.SubElement(req, "created_at").text = post.created_at.isoformat()
+        cls.struct_to_xml(req, {
+            'guid': diasp.guid,
+            'subject': '(no subject)',
+            'created_at': post.created_at.isoformat(),
+            'diaspora_handle': u_from.contact.diasp.username,
+            'participant_handles': ';'.join(
+                c.diasp.username for c in post.shares if c.diasp
+            )
+        })
         msg = etree.SubElement(req, "message")
-        etree.SubElement(msg, "guid").text = diasp.guid + '-1'
-        etree.SubElement(msg, "parent_guid")
-        etree.SubElement(msg, "parent_author_signature")
-        etree.SubElement(msg, "author_signature")
-        etree.SubElement(msg, "text").text = text
-        etree.SubElement(msg, "created_at").text = post.created_at.isoformat()
-        etree.SubElement(msg, "conversation_guid").text = \
-            diasp.guid
-        etree.SubElement(req, "diaspora_handle").text = \
-            u_from.contact.diasp.username
-        etree.SubElement(req, "participant_handles").text = \
-            ';'.join([c_to.diasp.username, u_from.contact.diasp.username])
+        cls.struct_to_xml(msg, {
+            'guid': diasp.guid + '-1',
+            'parent_guid': None,
+            'text': text.
+            'created_at': post.created_at.isoformat(),
+            'conversation_guid': diasp.guid
+        })
+        #etree.SubElement(msg, "parent_author_signature")
+        etree.SubElement(msg, "author_signature").text = \
+            cls.generate_signature(u_from, req)
+
         return req
 
 
@@ -238,23 +273,30 @@ class PostParticipation(MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         # Not sure what these do, but they don't seem to be necessary, so do
-        # nothing
+        # nothing - like Shares?
         pass
 
 
 @diaspora_message_handler('/XML/post/message')
 @diaspora_message_handler('/XML/post/comment')
-class SubPost(MessageHandlerBase):
+class SubPost(SignableMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        from_addr = xml.xpath('//diaspora_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
-        body = xml.xpath('//text')[0].text
-        parent_guid = xml.xpath('//parent_guid')[0].text
-        parent = DiasporaPost.get_by_guid(parent_guid).post
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
+        body = data['text']
+        parent = DiasporaPost.get_by_guid(data['parent_guid']).post
         assert(parent)
         assert(parent.shared_with(c_from))
         assert(parent.shared_with(u_to))
+        assert(cls.valid_signature(c_from, data['author_signature'], node))
+        if 'parent_author_signature' in data:
+            assert(
+                cls.valid_signature(
+                    c_from, data['parent_author_signature'], node
+                )
+            )
+
         p = Post(author=c_from)
         p.parent = parent
         p.add_part(MimePart(
@@ -264,9 +306,27 @@ class SubPost(MessageHandlerBase):
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
 
-        guid = xml.xpath('//guid')[0].text
-        p.diasp = DiasporaPost(guid=guid)
+        p.diasp = DiasporaPost(guid=data['guid'])
         db.session.commit()
+
+    @classmethod
+    def generate(cls, u_from, c_to, post, text, msg_type='comment'):
+        req = etree.Element(msg_type)
+        diasp = DiasporaPost.get_for_post(post)
+        p_diasp = DiasporaPost.get_for_post(post.parent)
+
+        cls.struct_to_xml(req, {
+            'guid': diasp.guid,
+            'parent_guid': p_diasp.guid,
+            'text': text,
+            'diaspora_handle': u_from.contact.diasp.username
+        })
+        etree.SubElement(req, "author_signature").text = \
+            cls.generate_signature(u_from, req)
+        if post.parent.author_id == u_from.id:
+            etree.SubElement(req, "parent_author_signature").text = \
+                cls.generate_signature(u_from, req)
+        return req
 
 
 @diaspora_message_handler('/XML/post/like')
@@ -290,16 +350,15 @@ class Retraction(MessageHandlerBase):
 class Photo(MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
-        from_addr = xml.xpath('//diaspora_handle')[0].text
-        assert(from_addr == c_from.diasp.username)
-        parent_guid = xml.xpath('//guid')[0].text
-        parent = DiasporaPost.get_by_guid(parent_guid).post
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
+        parent = DiasporaPost.get_by_guid(data['guid']).post
         assert(parent)
         assert(parent.shared_with(c_from))
         assert(parent.shared_with(u_to))
-        directory = xml.xpath('//remote_photo_path')[0].text
-        file = xml.xpath('//remote_photo_name')[0].text
-        photo_url = urljoin(directory, file)
+        photo_url = urljoin(
+            data['remote_photo_path'], data['remote_photo_name']
+        )
         resp = urlopen(photo_url)
         mime = resp.info().get('Content-Type')
         parent.add_part(MimePart(
