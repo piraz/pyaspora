@@ -217,10 +217,14 @@ class Post(db.Model):
                  Share.post == self)).first()
         return share
 
-    def thread_modified(self):
+    def root(self):
         post = self
         while post.parent:
             post = post.parent
+        return post
+
+    def thread_modified(self):
+        post = self.root()
         post.thread_modified_at = datetime.now()
         if post.id != self.id:
             db.session.add(post)
