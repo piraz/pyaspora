@@ -19,6 +19,7 @@ from pyaspora import db
 from pyaspora.content.models import MimePart
 from pyaspora.diaspora.models import DiasporaContact, DiasporaPost
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder
+from pyaspora.diaspora.utils import import_url_as_mimepart
 from pyaspora.post.models import Post
 from pyaspora.tag.models import Tag
 
@@ -120,7 +121,7 @@ class Profile(MessageHandlerBase):
         data = cls.as_dict(xml)
         assert(data['diaspora_handle'] == c_from.diasp.username)
         c_from.realname = " ".join(
-            data.get(k, '') for k in ('first_name', 'last_name')
+            data.get(k, '') or '' for k in ('first_name', 'last_name')
         )
         c_from.bio = MimePart(
             text_preview=data.get('bio', '(bio)'),
@@ -128,11 +129,9 @@ class Profile(MessageHandlerBase):
             type='application/x-pyaspora-diaspora-profile'
         )
         if 'image_url' in data:
-            c_from.avatar = MimePart(
-                text_preview='Image:{0}'.format(data['image_url']),
-                body=data['image_url'].encode('ascii'),
-                type='application/x-pyaspora-link-image'
-            )
+            mp = import_url_as_mimepart(urljoin(c_from.diasp.server, data['image_url']))
+            mp.text_preview = '(picture for {})'.format(c_from.realname)
+            c_from.avatar = mp
         else:
             c_from.avatar = None
 

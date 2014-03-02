@@ -1,5 +1,10 @@
 from sqlalchemy.sql import and_
+try:
+    from urllib.request import urlopen
+except:
+    from urllib import urlopen
 
+from pyaspora.content.models import MimePart
 from pyaspora.database import db
 from pyaspora.diaspora.models import DiasporaContact, MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser
@@ -67,3 +72,10 @@ def send_post(post, private):
         if not extras:
             extras = {}
         sender.send(post.author.user, target, post=post, text=text, **extras)
+
+def import_url_as_mimepart(url):
+    resp = urlopen(url)
+    mp = MimePart()
+    mp.type = resp.info().get('Content-Type')
+    mp.body = resp.read()
+    return mp

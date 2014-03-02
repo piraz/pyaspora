@@ -6,16 +6,15 @@ from sqlalchemy.orm import backref, relationship
 from uuid import uuid4
 try:
     from urllib.error import URLError
-    from urllib.parse import urljoin, urlsplit
+    from urllib.parse import urljoin, urlsplit, urlunsplit
     from urllib.request import urlopen
 except:
     from urllib import urlopen
     from urllib2 import URLError
-    from urlparse import urljoin, urlsplit
+    from urlparse import urljoin, urlsplit, urlunsplit
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
-from pyaspora.content.models import MimePart
 from pyaspora.diaspora.protocol import WebfingerRequest
 
 
@@ -34,7 +33,7 @@ class DiasporaContact(db.Model):
         if contact.diasp:
             return contact.diasp
         assert(contact.user)
-        server = urlsplit(request.url)[1]
+        server = urlunsplit(list(urlsplit(request.url)[0:2]) + ['/','',''])
         diasp = cls(
             server=server,
             guid=str(uuid4()),
@@ -70,6 +69,7 @@ class DiasporaContact(db.Model):
         Fetch information about a Diaspora user and import it into the Contact
         provided.
         """
+        from pyaspora.diaspora.utils import import_url_as_mimepart
         try:
             wf = WebfingerRequest(addr).fetch()
         except URLError:
@@ -94,13 +94,8 @@ class DiasporaContact(db.Model):
 
         pod_loc = hcard.xpath('//*[@id="pod_location"]')[0].text
         photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')[0]
-        print(pod_loc, photo_url)
         if photo_url:
-            photo_url = urljoin(pod_loc, photo_url)
-            resp = urlopen(photo_url)
-            mp = MimePart()
-            mp.type = resp.info().get('Content-Type')
-            mp.body = resp.read()
+            mp = import_url_as_mimepart(urljoin(pod_loc, photo_url))
             mp.text_preview = '(picture for {})'.format(c.realname)
             c.avatar = mp
 
