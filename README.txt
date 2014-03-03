@@ -56,6 +56,7 @@ Dependencies
 (I'm trying to track licenses to ensure I eventually release it under
 a suitable license).
 
+dateutil (BSD)
 Flask (BSD) GPL=yes BSD=yes
 Flask-SQLAlchemy (BSD) GPL=yes BSD=yes
 Python (PSF LICENSE AGREEMENT) GPL=yes BSD=?
