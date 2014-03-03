@@ -5,6 +5,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 from flask import url_for
 from datetime import datetime
+from dateutil.tz import tzlocal, tzutc
 from lxml import etree
 try:
     from urllib.error import URLError
@@ -65,6 +66,12 @@ class MessageHandlerBase:
     def as_dict(cls, xml):
         node = xml[0][0]
         return {e.tag: e.text for e in node}
+
+    @classmethod
+    def format_dt(cls, dt):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tzlocal())
+        return dt.astimezone(tzutc()).strftime('%Y-%m-%d %H:%M:%S %Z')
 
 
 class SignableMixin:
@@ -130,7 +137,10 @@ class Profile(MessageHandlerBase):
             type='application/x-pyaspora-diaspora-profile'
         )
         if 'image_url' in data:
-            mp = import_url_as_mimepart(urljoin(c_from.diasp.server, data['image_url']))
+            mp = import_url_as_mimepart(urljoin(
+                c_from.diasp.server,
+                data['image_url']
+            ))
             mp.text_preview = '(picture for {})'.format(c_from.realname)
             c_from.avatar = mp
         else:
@@ -215,25 +225,34 @@ class PostMessage(MessageHandlerBase):
             {'guid': diasp.guid},
             {'diaspora_handle': u_from.contact.diasp.username},
             {'public': 'true' if public else 'false'},
-            {'created_at': post.created_at.isoformat()}
+            {'created_at': cls.format_dt(post.created_at)}
         ])
         return req
 
 
 @diaspora_message_handler('/XML/post/conversation')
-class PrivateMessage(MessageHandlerBase):
+class PrivateMessage(SignableMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
+        node = xml.xpath('//message')[0]
+        msg = {e.tag: e.text for e in node}
         assert(data['diaspora_handle'] == c_from.diasp.username)
-        created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
+        assert(msg['diaspora_handle'] == c_from.diasp.username)
+        assert(cls.valid_signature(c_from, msg['author_signature'], node))
+        assert(cls.valid_signature(
+            c_from, msg['parent_author_signature'], node
+        ))
+        assert(data['guid'] == msg['parent_guid'])
+        assert(data['guid'] == msg['conversation_guid'])
 
+        created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         p = Post(author=c_from, created_at=created)
-        part_tags = [t for t in ('subject', 'text') if t in data]
-        for order, tag in part_tags:
+        part_tags = [t for t in ('subject', 'text') if t in data or t in msg]
+        for order, tag in enumerate(part_tags):
             p.add_part(MimePart(
-                type='text/plain',
-                body=data[tag].encode('utf-8'),
+                type='text/x-markdown' if tag == 'text' else 'text/plain',
+                body=(data.get(tag, None) or msg[tag]).encode('utf-8'),
             ), order=order, inline=True)
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
@@ -249,23 +268,28 @@ class PrivateMessage(MessageHandlerBase):
         cls.struct_to_xml(req, [
             {'guid': diasp.guid},
             {'subject': '(no subject)'},
-            {'created_at': post.created_at.isoformat()},
-            {'diaspora_handle': u_from.contact.diasp.username},
-            {'participant_handles': ';'.join(
-                c.diasp.username for c in post.shares if c.diasp
-            )}
+            {'created_at': cls.format_dt(post.created_at)}
         ])
         msg = etree.SubElement(req, "message")
         cls.struct_to_xml(msg, [
             {'guid': diasp.guid + '-1'},
-            {'parent_guid': None},
+            {'parent_guid': diasp.guid},
             {'text': text},
-            {'created_at': post.created_at.isoformat()},
+            {'created_at': cls.format_dt(post.created_at)},
+            {'diaspora_handle': u_from.contact.diasp.username},
             {'conversation_guid': diasp.guid}
         ])
-        #etree.SubElement(msg, "parent_author_signature")
+        etree.SubElement(msg, "parent_author_signature").text = \
+            cls.generate_signature(u_from, msg)
         etree.SubElement(msg, "author_signature").text = \
-            cls.generate_signature(u_from, req)
+            cls.generate_signature(u_from, msg)
+        cls.struct_to_xml(req, [
+            {'diaspora_handle': u_from.contact.diasp.username},
+            {'participant_handles': ';'.join(
+                s.contact.diasp.username for s in post.shares
+                if s.contact.diasp
+            )}
+        ])
 
         return req
 
@@ -279,7 +303,6 @@ class PostParticipation(MessageHandlerBase):
         pass
 
 
-@diaspora_message_handler('/XML/post/message')
 @diaspora_message_handler('/XML/post/comment')
 class SubPost(SignableMixin, MessageHandlerBase):
     @classmethod
@@ -312,8 +335,8 @@ class SubPost(SignableMixin, MessageHandlerBase):
         db.session.commit()
 
     @classmethod
-    def generate(cls, u_from, c_to, post, text, msg_type='comment'):
-        req = etree.Element(msg_type)
+    def generate(cls, u_from, c_to, post, text):
+        req = etree.Element('comment')
         diasp = DiasporaPost.get_for_post(post)
         p_diasp = DiasporaPost.get_for_post(post.root())
 
@@ -325,7 +348,59 @@ class SubPost(SignableMixin, MessageHandlerBase):
         ])
         etree.SubElement(req, "author_signature").text = \
             cls.generate_signature(u_from, req)
-        if post.parent.author_id == u_from.id:
+        if p_diasp.post.author_id == u_from.id:
+            etree.SubElement(req, "parent_author_signature").text = \
+                cls.generate_signature(u_from, req)
+        return req
+
+
+@diaspora_message_handler('/XML/post/message')
+class SubPM(SignableMixin, MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        data = cls.as_dict(xml)
+        assert(data['diaspora_handle'] == c_from.diasp.username)
+        parent = DiasporaPost.get_by_guid(data['parent_guid']).post
+        assert(parent)
+        assert(parent.shared_with(c_from))
+        assert(parent.shared_with(u_to))
+        node = xml[0][0]
+        assert(cls.valid_signature(c_from, data['author_signature'], node))
+        if 'parent_author_signature' in data:
+            assert(cls.valid_signature(
+                c_from, data['parent_author_signature'], node
+            ))
+
+        created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
+        p = Post(author=c_from, created_at=created)
+        p.parent = parent
+        p.add_part(MimePart(
+            type='text/x-markdown',
+            body=data['text'].encode('utf-8'),
+        ), order=0, inline=True)
+        p.share_with([c_from, u_to.contact])
+        p.thread_modified()
+
+        p.diasp = DiasporaPost(guid=data['guid'])
+        db.session.commit()
+
+    @classmethod
+    def generate(cls, u_from, c_to, post, text):
+        req = etree.Element('message')
+        diasp = DiasporaPost.get_for_post(post)
+        p_diasp = DiasporaPost.get_for_post(post.root())
+
+        cls.struct_to_xml(req, [
+            {'guid': diasp.guid},
+            {'parent_guid': p_diasp.guid},
+            {'text': text},
+            {'created_at': cls.format_dt(post.created_at)},
+            {'diaspora_handle': u_from.contact.diasp.username},
+            {'conversation_guid': p_diasp.guid}
+        ])
+        etree.SubElement(req, "author_signature").text = \
+            cls.generate_signature(u_from, req)
+        if p_diasp.post.author_id == u_from.id:
             etree.SubElement(req, "parent_author_signature").text = \
                 cls.generate_signature(u_from, req)
         return req

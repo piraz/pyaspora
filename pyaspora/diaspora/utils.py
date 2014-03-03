@@ -36,7 +36,8 @@ def process_incoming_queue(user):
 
 
 def send_post(post, private):
-    from pyaspora.diaspora.actions import PostMessage, PrivateMessage, SubPost
+    from pyaspora.diaspora.actions import PostMessage, PrivateMessage, \
+        SubPost, SubPM
 
     assert(post.author.user)
 
@@ -57,21 +58,20 @@ def send_post(post, private):
 
     senders = {
         'private': {
-            'parent': (PrivateMessage,),
-            'child': (SubPost, {'msg_type': 'message'})
+            'parent': PrivateMessage,
+            'child': SubPM,
         },
         'public': {
-            'parent': (PostMessage, {'public': self_share.public}),
-            'child': (SubPost, {'msg_type': 'comment'})
+            'parent': PostMessage,
+            'child': SubPost,
         }
     }
 
     for target in targets:
         sender = senders['private' if private else 'public']
-        sender, extras = sender['child' if post.parent else 'parent']
-        if not extras:
-            extras = {}
-        sender.send(post.author.user, target, post=post, text=text, **extras)
+        sender = sender['child' if post.parent else 'parent']
+        sender.send(post.author.user, target, post=post, text=text)
+
 
 def import_url_as_mimepart(url):
     resp = urlopen(url)

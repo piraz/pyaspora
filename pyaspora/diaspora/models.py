@@ -33,7 +33,7 @@ class DiasporaContact(db.Model):
         if contact.diasp:
             return contact.diasp
         assert(contact.user)
-        server = urlunsplit(list(urlsplit(request.url)[0:2]) + ['/','',''])
+        server = urlunsplit(list(urlsplit(request.url)[0:2]) + ['/', '', ''])
         diasp = cls(
             server=server,
             guid=str(uuid4()),

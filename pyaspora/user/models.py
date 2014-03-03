@@ -30,7 +30,7 @@ class User(db.Model):
     email = Column(String, unique=True, nullable=False)
     private_key = Column(String, nullable=False)
     contact_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
-    activated = Column(DateTime, nullable=True, default=None)
+    activated = Column(DateTime(timezone=True), nullable=True, default=None)
     contact = relationship(Contact, single_parent=True,
                            backref=backref('user', uselist=False))
 

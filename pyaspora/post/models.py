@@ -29,7 +29,8 @@ class Share(db.Model):
                      primary_key=True, index=True)
     public = Column(Boolean, nullable=False)
     hidden = Column(Boolean, nullable=False, default=False)
-    shared_at = Column(DateTime, nullable=False, default=func.now())
+    shared_at = Column(DateTime(timezone=True),
+                       nullable=False, default=func.now())
 
     contact = relationship(Contact, backref="feed", order_by='Share.shared_at')
 
@@ -98,8 +99,9 @@ class Post(db.Model):
                        nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey('posts.id'), nullable=True,
                        default=None, index=True)
-    created_at = Column(DateTime, nullable=False, default=func.now())
-    thread_modified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True),
+                        nullable=False, default=func.now())
+    thread_modified_at = Column(DateTime(timezone=True), nullable=True)
 
     author = relationship(Contact, backref='posts')
     parts = relationship(PostPart, backref='post', order_by=PostPart.order)
