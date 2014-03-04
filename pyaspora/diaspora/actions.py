@@ -5,7 +5,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 from flask import url_for
 from datetime import datetime
+from dateutil.tz import tzutc
 from lxml import etree
+from re import compile as re_compile
 try:
     from urllib.error import URLError
     from urllib.parse import urljoin
@@ -69,7 +71,9 @@ class MessageHandlerBase:
 
     @classmethod
     def format_dt(cls, dt):
-        return ensure_timezone(dt).astimezone(tzutc()).strftime('%Y-%m-%d %H:%M:%S %Z')
+        return ensure_timezone(dt).astimezone(tzutc()).strftime(
+            '%Y-%m-%d %H:%M:%S %Z'
+        )
 
 
 class SignableMixin:
@@ -97,6 +101,15 @@ class SignableMixin:
         sig_hash = SHA256.new(sig_contents.encode("utf-8"))
         cipher = PKCSSign.new(RSA.importKey(contact.public_key))
         return cipher.verify(sig_hash, signature)
+
+
+class TagMixin:
+    tag_re = re_compile('#[a-zA-z0-9_]+')
+
+    @classmethod
+    def find_tags(cls, text):
+        tl = ' '.join(m.group(0)[1:] for m in cls.tag_re.finditer(text))
+        return Tag.parse_line(tl, create=True)
 
 
 @diaspora_message_handler('/XML/post/request')
@@ -197,9 +210,9 @@ class Unsubscribe(SignableMixin, MessageHandlerBase):
 
 
 @diaspora_message_handler('/XML/post/status_message')
-class PostMessage(MessageHandlerBase):
+class PostMessage(TagMixin, MessageHandlerBase):
     @classmethod
-    def receive(cls, xml, c_from, u_to):
+    def receive(cls, xml, c_from, u_to, public=False):
         data = cls.as_dict(xml)
         assert(data['diaspora_handle'] == c_from.diasp.username)
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
@@ -208,14 +221,18 @@ class PostMessage(MessageHandlerBase):
             type='text/x-markdown',
             body=data['raw_message'].encode('utf-8'),
         ), order=0, inline=True)
+        p.tags = cls.find_tags(data['raw_message'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
 
-        p.diasp = DiasporaPost(guid=data['guid'])
+        p.diasp = DiasporaPost(
+            guid=data['guid'],
+            type='public' if public else 'limited'
+        )
         db.session.commit()
 
     @classmethod
-    def generate(cls, u_from, c_to, post, text, public):
+    def generate(cls, u_from, c_to, post, text, public=False):
         diasp = DiasporaPost.get_for_post(post)
         req = etree.Element("status_message")
         cls.struct_to_xml(req, [
@@ -229,7 +246,7 @@ class PostMessage(MessageHandlerBase):
 
 
 @diaspora_message_handler('/XML/post/conversation')
-class PrivateMessage(SignableMixin, MessageHandlerBase):
+class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -252,11 +269,12 @@ class PrivateMessage(SignableMixin, MessageHandlerBase):
                 type='text/x-markdown' if tag == 'text' else 'text/plain',
                 body=(data.get(tag, None) or msg[tag]).encode('utf-8'),
             ), order=order, inline=True)
+        p.tags = cls.find_tags(data['raw_message'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
         db.session.commit()
 
-        p.diasp = DiasporaPost(guid=data['guid'])
+        p.diasp = DiasporaPost(guid=data['guid'], type='private')
         db.session.commit()
 
     @classmethod
@@ -302,7 +320,7 @@ class PostParticipation(MessageHandlerBase):
 
 
 @diaspora_message_handler('/XML/post/comment')
-class SubPost(SignableMixin, MessageHandlerBase):
+class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -326,6 +344,7 @@ class SubPost(SignableMixin, MessageHandlerBase):
             type='text/x-markdown',
             body=data['text'].encode('utf-8'),
         ), order=0, inline=True)
+        p.tags = cls.find_tags(data['raw_message'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
 
@@ -353,7 +372,7 @@ class SubPost(SignableMixin, MessageHandlerBase):
 
 
 @diaspora_message_handler('/XML/post/message')
-class SubPM(SignableMixin, MessageHandlerBase):
+class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -376,6 +395,7 @@ class SubPM(SignableMixin, MessageHandlerBase):
             type='text/x-markdown',
             body=data['text'].encode('utf-8'),
         ), order=0, inline=True)
+        p.tags = cls.find_tags(data['raw_message'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
 

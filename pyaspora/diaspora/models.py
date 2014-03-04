@@ -153,6 +153,7 @@ class DiasporaPost(db.Model):
     __tablename__ = 'diaspora_posts'
     post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
     guid = Column(String, nullable=False)
+    type = Column(String, nullable=True)
 
     post = relationship('Post', single_parent=True,
                         backref=backref('diasp', uselist=False))

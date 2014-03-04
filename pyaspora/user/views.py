@@ -2,7 +2,8 @@
 Actions concerning a local User, who is mastered on this node.
 """
 
-import json
+from json import dumps as json_dumps
+from Crypto.Hash import SHA256
 from flask import Blueprint, request, session, url_for
 
 from pyaspora.contact.views import json_contact
@@ -13,11 +14,16 @@ from pyaspora.tag.models import Tag
 from pyaspora.user import models
 from pyaspora.user.session import log_in_user, logged_in_user, \
     require_logged_in_user
+from pyaspora.utils.email import send_template
 from pyaspora.utils.validation import check_attachment_is_safe, post_param
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
     redirect, render_response
 
 blueprint = Blueprint('users', __name__, template_folder='templates')
+
+
+def _hash_for_pk(user):
+    return SHA256(user.private_key.encode('ascii')).hexdigest()
 
 
 @blueprint.route('/login', methods=['GET'])
@@ -70,6 +76,15 @@ def create():
     my_user.generate_keypair(password)
     db.session.commit()
 
+    send_template(my_user.email, 'user_activate_email.tpl', {
+        'link': url_for(
+            '.activate',
+            user_id=my_user.id,
+            key_hash=_hash_for_pk(my_user),
+            _external=True
+        )
+    })
+
     data = {}
     add_logged_in_user_to_data(data, None)
 
@@ -94,9 +109,14 @@ def activate(user_id, key_hash):
     sign-up email that confirms the email address is valid.
     """
     matched_user = models.User.get(user_id)
-    return  # FIXME
 
     if not matched_user:
+        abort(404, 'Not found')
+
+    if matched_user.activated:
+        abort(404, 'Not found')
+
+    if key_hash != _hash_for_pk(matched_user):
         abort(404, 'Not found')
 
     matched_user.activate()
@@ -183,7 +203,7 @@ def edit(_user):
         order=0,
         inline=True,
         mime_part=MimePart(
-            body=json.dumps({
+            body=json_dumps({
                 'fields_changed': changed
             }).encode('utf-8'),
             type='application/x-pyaspora-profile-update',

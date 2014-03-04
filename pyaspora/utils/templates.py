@@ -59,7 +59,10 @@ def since(dt, base=None, chunks=1):
         else:
             val = getattr(delta, section, None)
         if val:
-            result.append('{0} {1}'.format(val, section if val != 1 else section[:-1]))
+            result.append('{0} {1}'.format(
+                val,
+                section if val != 1 else section[:-1]
+            ))
         if chunks and len(result) >= chunks:
             break
     return prefix + ', '.join(result) + suffix

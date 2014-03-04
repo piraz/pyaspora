@@ -6,7 +6,8 @@ except:
 
 from pyaspora.content.models import MimePart
 from pyaspora.database import db
-from pyaspora.diaspora.models import DiasporaContact, MessageQueue
+from pyaspora.diaspora.models import DiasporaContact, DiasporaPost, \
+    MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.post.views import json_post
 from pyaspora.roster.models import Subscription
@@ -49,12 +50,43 @@ def send_post(post, private):
         Subscription.to_contact == post.author
     )
     targets = [s.from_contact for s in targets if s.from_contact.diasp]
-    if not self_share.public:
+
+    if post.diasp and post.diasp.type:
+        # Sent before, must keep same type
+        private = (post.diasp.type == 'private')
+        public = (post.diasp.type == 'public')
+    elif post.parent and post.root().diasp and post.root().diasp.type:
+        # Reply must be of same type
+        root_diasp = post.root().diasp
+        private = (root_diasp.type == 'private')
+        public = (root_diasp.type == 'public' and self_share.public)
+    else:
+        # Decide on visibility
+        public = self_share.public
+        if public:
+            private = False
+        diasp = DiasporaPost.get_for_post(post, commit=False)
+        if public:
+            diasp.type = 'public'
+        elif private:
+            diasp.type = 'private'
+        else:
+            diasp.type = 'limited'
+        db.session.add(diasp)
+        db.session.commit()
+
+    if public:
+        targets = post.author.friends()
+    else:
         shares = set([s.contact_id or s.contact.id for s in post.shares])
         targets = [c for c in targets if c.id in shares]
 
     json = json_post(post, children=False)
     text = "\n\n".join([p['body']['text'] for p in json['parts']])
+    if post.tags:
+        text += '\n( ' + ' '.join(
+            '#{0}'.format(t.name) for t in post.tags
+        ) + ' )'
 
     senders = {
         'private': {
