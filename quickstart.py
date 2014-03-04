@@ -16,4 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///../database.sqlite'
 # This controls where uploaded files are placed temporarily
 app.config['UPLOAD_FOLDER'] = '/tmp'
 
+assert app.secret_key and ('SMTP_FROM', 'SMTP_URL') in app.config, \
+    'You need to edit quickstart.py to configure the application'
+
 app.run(debug=True)
