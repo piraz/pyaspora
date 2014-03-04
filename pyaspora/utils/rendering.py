@@ -1,3 +1,4 @@
+from dateutil.tz import tzlocal, tzutc
 from flask import jsonify, make_response, render_template, request, url_for, \
     abort as flask_abort, redirect as flask_redirect
 from lxml import etree
@@ -101,3 +102,10 @@ def send_xml(doc, content_type='text/xml'):
         doc, xml_declaration=True, pretty_print=True, encoding="UTF-8"))
     response.headers['Content-Type'] = content_type
     return response
+
+
+def ensure_timezone(dt):
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=tzlocal())
+    else:
+        return dt

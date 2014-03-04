@@ -30,6 +30,7 @@ app.register_blueprint(diaspora_blueprint)  # Diaspora has certain fixed URLs
 
 # Global template utility functions
 app.add_template_filter(templates.nl2br, name='nl2br')
+app.add_template_filter(templates.since, name='since')
 app.add_template_global(templates.chunk_url_params, name='chunk_url_params')
 
 

@@ -5,7 +5,6 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 from flask import url_for
 from datetime import datetime
-from dateutil.tz import tzlocal, tzutc
 from lxml import etree
 try:
     from urllib.error import URLError
@@ -23,6 +22,7 @@ from pyaspora.diaspora.protocol import DiasporaMessageBuilder
 from pyaspora.diaspora.utils import import_url_as_mimepart
 from pyaspora.post.models import Post
 from pyaspora.tag.models import Tag
+from pyaspora.utils.rendering import ensure_timezone
 
 HANDLERS = {}
 
@@ -69,9 +69,7 @@ class MessageHandlerBase:
 
     @classmethod
     def format_dt(cls, dt):
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=tzlocal())
-        return dt.astimezone(tzutc()).strftime('%Y-%m-%d %H:%M:%S %Z')
+        return ensure_timezone(dt).astimezone(tzutc()).strftime('%Y-%m-%d %H:%M:%S %Z')
 
 
 class SignableMixin:

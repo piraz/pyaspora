@@ -73,7 +73,7 @@ Standard widgets
     {% endfor %}
 
     <p class="metadata">
-        <span class="time moment" title="{{post.created_at}}">{{post.created_at}}</span>
+        <span class="time" title="{{post.created_at}}">{{post.created_at|since}}</span>
     {% if post.tags %}
         -
         <span class="tags">

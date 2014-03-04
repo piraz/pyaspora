@@ -8,20 +8,6 @@ Standard page layout.
     {% block head %}
     <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}" />
     <title>Pyaspora</title>
-    <script type="text/javascript" src="{{url_for('static', filename='moment-with-langs.min.js')}}"></script>
-    <script type="text/javascript">
-        function fixtimes() {
-            if(document.getElementsByClassName) {
-                eles = document.getElementsByClassName('time moment');
-                for(i=0; i < eles.length; ++i) {
-                    ele = eles[i];
-                    if(ele.attributes.title) {
-                        ele.textContent = moment(ele.attributes.title.value).from();
-                    }
-                }
-            }
-        }
-    </script>
     {% endblock %}
 </head>
 <body onload="fixtimes()">
