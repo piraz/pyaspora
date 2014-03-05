@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from base64 import b64decode
 from flask import request
 from lxml import html

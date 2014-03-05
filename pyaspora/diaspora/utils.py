@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from sqlalchemy.sql import and_
 try:
     from urllib.request import urlopen

@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from functools import wraps
 from Crypto.PublicKey import RSA
 from flask import current_app, session

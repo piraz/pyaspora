@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from dateutil.tz import tzlocal, tzutc
 from flask import jsonify, make_response, render_template, request, url_for, \
     abort as flask_abort, redirect as flask_redirect

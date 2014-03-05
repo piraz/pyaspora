@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import codecs
 import json
 from flask import render_template_string, url_for

@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_, not_

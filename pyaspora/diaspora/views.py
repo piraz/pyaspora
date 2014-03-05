@@ -4,6 +4,8 @@ can also do User actions), but they may be Contacts on other nodes using
 cached information.
 """
 
+from __future__ import absolute_import
+
 import base64
 import json
 from flask import abort, Blueprint, request, url_for

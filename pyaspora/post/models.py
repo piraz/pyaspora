@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import backref, contains_eager, relationship

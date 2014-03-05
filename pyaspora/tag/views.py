@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from flask import Blueprint, url_for
 from sqlalchemy.sql import desc
 

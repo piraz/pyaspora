@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from flask import Blueprint, request
 from sqlalchemy.sql import desc, or_
 from sqlalchemy.orm import contains_eager

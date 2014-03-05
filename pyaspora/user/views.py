@@ -2,6 +2,8 @@
 Actions concerning a local User, who is mastered on this node.
 """
 
+from __future__ import absolute_import
+
 from json import dumps as json_dumps
 from Crypto.Hash import SHA256
 from flask import Blueprint, request, session, url_for
@@ -151,7 +153,11 @@ def edit(_user):
     changed = []
     order = 0
 
-    notif_freq = post_param('notification_frequency_hours', template='users_edit.tpl', optional=True)
+    notif_freq = post_param(
+        'notification_frequency_hours',
+        template='users_edit.tpl',
+        optional=True
+    )
     _user.notification_hours = int(notif_freq) if notif_freq else None
     db.session.add(_user)
 

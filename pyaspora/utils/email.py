@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+
 from flask import current_app, get_template_attribute, render_template
 from smtplib import SMTP, SMTP_SSL, LMTP
 try:
