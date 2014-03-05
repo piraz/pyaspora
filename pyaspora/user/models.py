@@ -5,6 +5,7 @@ from sqlalchemy.sql.expression import func
 
 from pyaspora.contact.models import Contact
 from pyaspora.database import db
+from pyaspora.utils.email import send_template
 
 
 class User(db.Model):
@@ -31,6 +32,9 @@ class User(db.Model):
     private_key = Column(String, nullable=False)
     contact_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
     activated = Column(DateTime(timezone=True), nullable=True, default=None)
+    notification_hours = Column(Integer, nullable=True, default=None)
+    last_notified = Column(DateTime(timezone=True), nullable=True, default=None)
+
     contact = relationship(Contact, single_parent=True,
                            backref=backref('user', uselist=False))
 
@@ -60,6 +64,18 @@ class User(db.Model):
             contact = Contact()
         self.contact = contact
         db.session.add(self)
+
+    def notify_event(self):
+        if not self.activated:
+            return # notifications disabled until activated
+
+        if not self.notification_hours:
+            return # notifications disabled
+
+        if last_notified and last_notified > datetime.now() - timedelta(hours=self.notification_hours):
+            return # too soon
+
+        send_template(self.email, 'user_event_email.tpl', {})
 
     def activate(self):
         """

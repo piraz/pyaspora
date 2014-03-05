@@ -37,6 +37,17 @@ Sign-up form for creating a new account on the local server.
     <input type="text" name="tags" value="{% for tag in tags %}{{tag.name}}{% if not loop.last %} {% endif %}{% endfor %}" />
 </p>
 
+<h3>Account settings</h3>
+
+<p>Notify me about new content and messages
+    <select name="notification_frequency_hours">
+        <option value=""{% if not notification_frequency_hours %} selected="selected"{%endif%}>never</option>
+        <option value="1"{% if notification_frequency_hours and 24 > notification_frequency_hours >= 1 %} selected="selected"{%endif%}>no more than once an hour</option>
+        <option value="24"{% if notification_frequency_hours and 168 > notification_frequency_hours >= 24 %} selected="selected"{%endif%}>no more than once a day</option>
+        <option value="168"{% if notification_frequency_hours and notification_frequency_hours >= 168 %} selected="selected"{%endif%}>no more than once a week</option>
+    </select>
+</p>
+
 <p>
     <input type="submit" value="Save" class="button" />
 </p>

@@ -129,6 +129,7 @@ def activate(user_id, key_hash):
 def info(_user):
     data = json_user(_user)
     add_logged_in_user_to_data(data, _user)
+    data['notification_frequency_hours'] = _user.notification_hours
     return render_response('users_edit.tpl', data)
 
 
@@ -149,6 +150,10 @@ def edit(_user):
     p = Post(author=_user.contact)
     changed = []
     order = 0
+
+    notif_freq = post_param('notification_frequency_hours', template='users_edit.tpl', optional=True)
+    _user.notification_hours = int(notif_freq) if notif_freq else None
+    db.session.add(_user)
 
     attachment = request.files.get('avatar', None)
     if attachment and attachment.filename:
@@ -216,6 +221,7 @@ def edit(_user):
         db.session.add(_user.contact)
         p.share_with([_user.contact])
         p.thread_modified()
-        db.session.commit()
+
+    db.session.commit()
 
     return redirect(url_for('contacts.profile', contact_id=_user.contact.id))

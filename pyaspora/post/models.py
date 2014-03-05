@@ -205,7 +205,9 @@ class Post(db.Model):
             if not existing_share:
                 db.session.add(Share(contact=contact, post=self,
                                      public=show_on_wall))
-                if not contact.user:
+                if contact.user:
+                    contact.user.notify_event()
+                else:
                     # FIXME share via diasp
                     pass
 
