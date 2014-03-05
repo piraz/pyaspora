@@ -1,4 +1,4 @@
-{% set subject = 'New notifications received on your Pyaspora account' %}
+{% set subject = 'New notifications received on your Pyaspora account' -%}
 Good news - new items have been received on your Pyaspora account.
 
 Visit the website now to see what they are.
@@ -8,4 +8,4 @@ Visit the website now to see what they are.
 You can disable these email notification or change their frequency on your
 user control panel:
 
-{{url_for('user.info', _external=True)}}
+{{url_for('users.info', _external=True)}}

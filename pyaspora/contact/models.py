@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-import json
+from json import dumps
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import joinedload, relationship
 from sqlalchemy.sql import and_
@@ -103,7 +103,7 @@ class Contact(db.Model):
             order=0,
             inline=True,
             mime_part=MimePart(
-                body=json.dumps({
+                body=dumps({
                     'from': self.id,
                     'to': contact.id,
                 }).encode('utf-8'),

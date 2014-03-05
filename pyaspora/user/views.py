@@ -4,9 +4,9 @@ Actions concerning a local User, who is mastered on this node.
 
 from __future__ import absolute_import
 
-from json import dumps as json_dumps
 from Crypto.Hash import SHA256
-from flask import Blueprint, request, session, url_for
+from flask import Blueprint, current_app, request, session, url_for
+from json import dumps as json_dumps
 
 from pyaspora.contact.views import json_contact
 from pyaspora.content.models import MimePart
@@ -54,6 +54,8 @@ def process_login():
 
 @blueprint.route('/create', methods=['GET'])
 def create_form():
+    if not current_app.config.get('ALLOW_CREATION', False):
+        abort(403, 'Disabled by site administrator')
     return render_response('users_create_form.tpl')
 
 
@@ -62,6 +64,9 @@ def create():
     """
     Create a new User (sign-up).
     """
+    if not current_app.config.get('ALLOW_CREATION', False):
+        abort(403, 'Disabled by site administrator')
+
     user = logged_in_user()
     if user:
         data = {}

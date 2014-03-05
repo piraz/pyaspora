@@ -208,7 +208,8 @@ class Post(db.Model):
                 db.session.add(Share(contact=contact, post=self,
                                      public=show_on_wall))
                 if contact.user:
-                    contact.user.notify_event()
+                    if contact.id != self.author_id:
+                        contact.user.notify_event()
                 else:
                     # FIXME share via diasp
                     pass

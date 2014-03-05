@@ -151,7 +151,9 @@ def hcard(guid):
         "entity_photo_small": "50px"
     }
     for k, v in photos.items():
-        src = "/static/nophoto.png"  # FIXME
+        src = url_for('contacts.avatar', contact_id=c.id, _external=True) \
+            if c.avatar \
+            else url_for('static', filename='nophoto.png', _external=True)
         dl = etree.SubElement(author, "dl", **{'class': k})
         etree.SubElement(dl, "dt").text = "Photo"
         dd = etree.SubElement(dl, "dd")
@@ -185,6 +187,8 @@ def receive(guid):
     queue_item.body = request.form['xml'].encode('ascii')
     db.session.add(queue_item)
     db.session.commit()
+
+    diasp.contact.user.notify_event()
 
     return 'OK'
 

@@ -147,6 +147,9 @@ class MessageQueue(db.Model):
     remote_id = Column(Integer, ForeignKey('contacts.id'), nullable=True)
     format = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        nullable=False, default=func.now())
+    error = Column(LargeBinary, nullable=True)
 
     local_user = relationship('User', backref='message_queue')
 

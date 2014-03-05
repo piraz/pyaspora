@@ -1,4 +1,4 @@
-{% set subject = 'Your Pyaspora account has been created, activate it now' %}
+{% set subject = 'Your Pyaspora account has been created, activate it now' -%}
 You (or someone claiming to be you has recently created a Pyaspora account. If
 you created it, then please activate it now:
 

@@ -1,12 +1,14 @@
 from __future__ import absolute_import
 
-import base64
-import Crypto.Random
-import json
-import re
+from base64 import b64decode, b64encode, urlsafe_b64decode, urlsafe_b64encode
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.Hash import SHA256
+from Crypto.PublicKey import RSA
+from Crypto.Random import get_random_bytes
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
+from json import dumps, loads
+from lxml import etree
+from re import match as re_match, sub as re_sub
 try:
     from urllib.parse import quote as url_quote, quote_plus, unquote_plus, \
         urlencode, urlparse
@@ -18,7 +20,6 @@ except:
     from urllib2 import build_opener, HTTPRedirectHandler, Request
     from urlparse import urlparse
 
-from lxml import etree
 
 # The namespace for the Diaspora envelope
 PROTOCOL_NS = "https://joindiaspora.com/protocol"
@@ -43,14 +44,14 @@ class DiasporaMessageBuilder:
         """
 
         # We need an AES key for the envelope
-        self.inner_iv = Crypto.Random.get_random_bytes(AES.block_size)
-        self.inner_key = Crypto.Random.get_random_bytes(32)
+        self.inner_iv = get_random_bytes(AES.block_size)
+        self.inner_key = get_random_bytes(32)
         self.inner_encrypter = AES.new(
             self.inner_key, AES.MODE_CBC, self.inner_iv)
 
         # ...and one for the payload message
-        self.outer_iv = Crypto.Random.get_random_bytes(AES.block_size)
-        self.outer_key = Crypto.Random.get_random_bytes(32)
+        self.outer_iv = get_random_bytes(AES.block_size)
+        self.outer_key = get_random_bytes(32)
         self.outer_encrypter = AES.new(
             self.outer_key, AES.MODE_CBC, self.outer_iv)
         self.message = message
@@ -77,9 +78,9 @@ class DiasporaMessageBuilder:
         """
         decrypted_header = etree.Element("decrypted_header")
         etree.SubElement(decrypted_header, "iv").text = \
-            base64.b64encode(self.inner_iv)
+            b64encode(self.inner_iv)
         etree.SubElement(decrypted_header, "aes_key").text = \
-            base64.b64encode(self.inner_key)
+            b64encode(self.inner_key)
         etree.SubElement(decrypted_header, "author_id").text = \
             self.author_username
         return self.xml_to_string(decrypted_header)
@@ -99,9 +100,9 @@ class DiasporaMessageBuilder:
         """
         Record the information on the key used to encrypt the header.
         """
-        d = json.dumps({
-            "iv": base64.b64encode(self.outer_iv).decode("ascii"),
-            "key": base64.b64encode(self.outer_key).decode("ascii")
+        d = dumps({
+            "iv": b64encode(self.outer_iv).decode("ascii"),
+            "key": b64encode(self.outer_key).decode("ascii")
         })
         return d
 
@@ -119,11 +120,11 @@ class DiasporaMessageBuilder:
         The actual header and the encrypted outer (header) key are put into a
         document together.
         """
-        aes_key = base64.b64encode(self.create_encrypted_outer_aes_key_bundle(
+        aes_key = b64encode(self.create_encrypted_outer_aes_key_bundle(
             public_key)).decode("ascii")
-        ciphertext = base64.b64encode(self.create_ciphertext()).decode("ascii")
+        ciphertext = b64encode(self.create_ciphertext()).decode("ascii")
 
-        d = json.dumps({
+        d = dumps({
             "aes_key": aes_key,
             "ciphertext": ciphertext
         })
@@ -135,7 +136,7 @@ class DiasporaMessageBuilder:
         sure what this is for, but is required to interact.
         """
         doc = etree.Element("encrypted_header")
-        doc.text = base64.b64encode(self.create_encrypted_header_json_object(
+        doc.text = b64encode(self.create_encrypted_header_json_object(
             public_key).encode("ascii"))
         return doc
 
@@ -173,21 +174,21 @@ class DiasporaMessageBuilder:
         env = etree.SubElement(doc, "{%s}env" % nsmap["me"])
         etree.SubElement(env, "{%s}encoding" % nsmap["me"]).text = 'base64url'
         etree.SubElement(env, "{%s}alg" % nsmap["me"]).text = 'RSA-SHA256'
-        payload = base64.urlsafe_b64encode(base64.b64encode(
+        payload = urlsafe_b64encode(b64encode(
             self.create_encrypted_payload())).decode("ascii")
-        # Split every 6 chars
+        # Split every 60 chars
         payload = '\n'.join([payload[start:start+60]
                              for start in range(0, len(payload), 60)])
         payload = payload + "\n"
         etree.SubElement(env, "{%s}data" % nsmap["me"],
                          {"type": "application/xml"}).text = payload
         sig_contents = payload + "." + \
-            base64.b64encode(b"application/xml").decode("ascii") + "." + \
-            base64.b64encode(b"base64url").decode("ascii") + "." + \
-            base64.b64encode(b"RSA-SHA256").decode("ascii")
+            b64encode(b"application/xml").decode("ascii") + "." + \
+            b64encode(b"base64url").decode("ascii") + "." + \
+            b64encode(b"RSA-SHA256").decode("ascii")
         sig_hash = SHA256.new(sig_contents.encode("ascii"))
         cipher = PKCSSign.new(self.private_key)
-        sig = base64.urlsafe_b64encode(cipher.sign(sig_hash))
+        sig = urlsafe_b64encode(cipher.sign(sig_hash))
         etree.SubElement(env, "{%s}sig" % nsmap["me"]).text = sig
         return self.xml_to_string(doc)
 
@@ -242,41 +243,51 @@ class DiasporaMessageParser:
             doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text,
             key)
         sender = header.find(".//author_id").text
-        inner_iv = base64.b64decode(header.find(".//iv").text.encode("ascii"))
-        inner_key = base64.b64decode(
+        inner_iv = b64decode(header.find(".//iv").text.encode("ascii"))
+        inner_key = b64decode(
             header.find(".//aes_key").text.encode("ascii"))
 
         sending_contact = self.contact_fetcher(sender).contact
-        self.verify_signature(sending_contact, doc)
-
-        decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
         body = doc.find(
             ".//{http://salmon-protocol.org/ns/magic-env}data").text
-        body = base64.b64decode(base64.urlsafe_b64decode(body.encode("ascii")))
+        sig = doc.find(
+            ".//{http://salmon-protocol.org/ns/magic-env}sig").text
+        self.verify_signature(sending_contact, body, sig.encode('ascii'))
+
+        decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
+        body = b64decode(urlsafe_b64decode(body.encode("ascii")))
         body = decrypter.decrypt(body)
         body = self.pkcs7_unpad(body)
         return body, sending_contact
 
-    def verify_signature(self, user, message):
+    def verify_signature(self, contact, payload, sig):
         """
         Verify the signed XML elements to have confidence that the claimed
         author did actually generate this message.
         """
-        pass  # FIXME
+        sig_contents = '.'.join([
+            payload,
+            b64encode(b"application/xml").decode("ascii"),
+            b64encode(b"base64url").decode("ascii"),
+            b64encode(b"RSA-SHA256").decode("ascii")
+        ])
+        sig_hash = SHA256.new(sig_contents.encode("ascii"))
+        cipher = PKCSSign.new(RSA.importKey(contact.public_key))
+        assert(cipher.verify(sig_hash, urlsafe_b64decode(sig)))
 
     def parse_header(self, b64data, key):
         """
         Extract the header and decrypt it. This requires the User's private
         key and hence the passphrase for the key.
         """
-        decoded_json = base64.b64decode(b64data.encode("ascii"))
-        rep = json.loads(decoded_json.decode("ascii"))
+        decoded_json = b64decode(b64data.encode("ascii"))
+        rep = loads(decoded_json.decode("ascii"))
         outer_key_details = self.decrypt_outer_aes_key_bundle(
             rep["aes_key"], key)
         header = self.get_decrypted_header(
-            base64.b64decode(rep["ciphertext"].encode("ascii")),
-            key=base64.b64decode(outer_key_details["key"].encode("ascii")),
-            iv=base64.b64decode(outer_key_details["iv"].encode("ascii"))
+            b64decode(rep["ciphertext"].encode("ascii")),
+            key=b64decode(outer_key_details["key"].encode("ascii")),
+            iv=b64decode(outer_key_details["iv"].encode("ascii"))
         )
         return header
 
@@ -288,10 +299,10 @@ class DiasporaMessageParser:
         assert(key)
         cipher = PKCS1_v1_5.new(key)
         decoded_json = cipher.decrypt(
-            base64.b64decode(data.encode("ascii")),
+            b64decode(data.encode("ascii")),
             sentinel=None
         )
-        return json.loads(decoded_json.decode("ascii"))
+        return loads(decoded_json.decode("ascii"))
 
     def get_decrypted_header(self, ciphertext, key, iv):
         """
@@ -331,7 +342,7 @@ class WebfingerRequest(object):
         """
         print("in wf fetch")
         template_url = self._get_template()
-        target_url = re.sub(
+        target_url = re_sub(
             '\{uri\}',
             quote_plus(
                 self.request_email.scheme + ':' + self.request_email.path
@@ -362,7 +373,7 @@ class WebfingerRequest(object):
         if url.scheme != "acct":
             raise TypeError()
         self.request_email = url
-        match = re.match('.*\@(.*)', url.path)
+        match = re_match('.*\@(.*)', url.path)
         self.hostmeta = HostMeta(match.group(1))
 
 

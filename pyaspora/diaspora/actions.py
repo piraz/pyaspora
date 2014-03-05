@@ -86,7 +86,6 @@ class SignableMixin:
             if e.text is not None
             and not e.tag.endswith('_signature')
         ])
-        print("sig_contents", sig_contents)
         sig_hash = SHA256.new(sig_contents.encode("utf-8"))
         cipher = PKCSSign.new(u_from._unlocked_key)
         return b64encode(cipher.sign(sig_hash))
@@ -99,7 +98,6 @@ class SignableMixin:
             if e.text is not None
             and not e.tag.endswith('_signature')
         ])
-        print("sig_contents", sig_contents)
         sig_hash = SHA256.new(sig_contents.encode("utf-8"))
         cipher = PKCSSign.new(RSA.importKey(contact.public_key))
         return cipher.verify(sig_hash, signature)
@@ -271,7 +269,7 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
                 type='text/x-markdown' if tag == 'text' else 'text/plain',
                 body=(data.get(tag, None) or msg[tag]).encode('utf-8'),
             ), order=order, inline=True)
-        p.tags = cls.find_tags(data['raw_message'])
+        p.tags = cls.find_tags(data['text'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
         db.session.commit()
@@ -346,7 +344,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
             type='text/x-markdown',
             body=data['text'].encode('utf-8'),
         ), order=0, inline=True)
-        p.tags = cls.find_tags(data['raw_message'])
+        p.tags = cls.find_tags(data['text'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
 

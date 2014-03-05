@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from Crypto.PublicKey import RSA
+from datetime import datetime, timedelta
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import backref, joinedload, relationship
 from sqlalchemy.sql.expression import func
@@ -75,7 +76,7 @@ class User(db.Model):
         if not self.notification_hours:
             return  # notifications disabled
 
-        if last_notified and last_notified > \
+        if self.last_notified and self.last_notified > \
                 datetime.now() - timedelta(hours=self.notification_hours):
             return  # too soon
 
