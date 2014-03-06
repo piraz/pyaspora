@@ -6,10 +6,11 @@ cached information.
 
 from __future__ import absolute_import
 
-import base64
-import json
+from base64 import b64encode
 from flask import abort, Blueprint, request, url_for
+from json import dumps
 from lxml import etree
+from sqlalchemy.sql import desc
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
@@ -17,6 +18,8 @@ from pyaspora.diaspora.actions import process_incoming_message
 from pyaspora.diaspora.models import DiasporaContact, MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.diaspora.utils import process_incoming_queue
+from pyaspora.post.models import Post, Share
+from pyaspora.post.views import json_post
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import redirect, send_xml
 
@@ -95,7 +98,7 @@ def webfinger(contact_addr):
         doc, "Link",
         rel='diaspora-public-key',
         type='RSA',
-        href=base64.b64encode(c.public_key.encode('ascii'))
+        href=b64encode(c.public_key.encode('ascii'))
     )
 
     return send_xml(doc)
@@ -219,8 +222,37 @@ def json_feed(guid):
     Look up the User identified by GUID and return the User's public feed
     in the requested format (eg. "atom", "json").
     """
-    # FIXME - stub implementation
-    return json.dumps([])
+    contact = DiasporaContact.get_by_guid(guid)
+    if not(contact and contact.contact.user):
+        abort(404, 'No such contact', force_status=True)
+
+    feed_query = Post.Queries.public_wall_for_contact(contact.contact)
+    feed = db.session.query(Post).join(Share).filter(feed_query). \
+        order_by(desc(Post.thread_modified_at)). \
+        group_by(Post.id).limit(99)
+
+    ret = []
+    for post in feed:
+        avatar = ''  # FIXME: contact.avatar_link
+        json = json_post(post, children=False)
+        text = "\n\n".join([p['body']['text'] for p in json['parts']])
+        rep = {
+            "author": {
+                "diaspora_id": contact.username,
+                "name": contact.contact.realname,
+                "guid": contact.guid,
+            },
+            "created_at": post.created_at.isoformat(),
+            "text": text,
+            "public": True,
+            "post_type": "StatusMessage",
+            "guid": post.diasp.guid,
+            "interacted_at": post.root().thread_modified_at.isoformat(),
+            "provider_display_name": None,
+        }
+        ret.append(rep)
+
+    return dumps(ret)
 
 
 @blueprint.route('/diaspora/run_queue', methods=['GET'])
