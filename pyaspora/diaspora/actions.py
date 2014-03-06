@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 
-import json
 from base64 import b64encode, b64decode
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
-from flask import url_for
 from datetime import datetime
 from dateutil.tz import tzutc
+from flask import url_for
+from json import dumps
 from lxml import etree
 from re import compile as re_compile
 try:
@@ -50,14 +50,27 @@ def process_incoming_message(payload, c_from, u_to):
 
 class MessageHandlerBase:
     @classmethod
-    def send(cls, u_from, c_to, **kwargs):
+    def _build(cls, u_from, c_to, **kwargs):
         diasp = DiasporaContact.get_for_contact(u_from.contact)
         xml = cls.generate(u_from, c_to, **kwargs)
         m = DiasporaMessageBuilder(xml, diasp.username, u_from._unlocked_key)
+        return m
+
+    @classmethod
+    def send(cls, u_from, c_to, **kwargs):
+        m = cls._build(u_from, c_to, **kwargs)
         url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
-        print("posting {0} to {1}".format(etree.tostring(xml), url))
+        print("posting {0} to {1}".format(etree.tostring(m.message), url))
         resp = m.post(url, RSA.importKey(c_to.public_key))
+        return resp
+
+    @classmethod
+    def send_public(cls, u_from, c_to, **kwargs):
+        m = cls._build(u_from, None, **kwargs)
+        url = "{0}receive/public".format(c_to.diasp.server)
+        print("posting {0} to {1}".format(etree.tostring(m.message), url))
+        resp = m.post(url, None)
         return resp
 
     @classmethod
@@ -144,7 +157,7 @@ class Profile(MessageHandlerBase):
         )
         c_from.bio = MimePart(
             text_preview=data.get('bio', '(bio)'),
-            body=json.dumps(data).encode('utf-8'),
+            body=dumps(data).encode('utf-8'),
             type='application/x-pyaspora-diaspora-profile'
         )
         if 'image_url' in data:
@@ -212,8 +225,10 @@ class Unsubscribe(SignableMixin, MessageHandlerBase):
 @diaspora_message_handler('/XML/post/status_message')
 class PostMessage(TagMixin, MessageHandlerBase):
     @classmethod
-    def receive(cls, xml, c_from, u_to, public=False):
+    def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
+        public = (data['public'] == 'true')
+        assert(public or u_to)
         assert(data['diaspora_handle'] == c_from.diasp.username)
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         p = Post(author=c_from, created_at=created)
@@ -222,7 +237,10 @@ class PostMessage(TagMixin, MessageHandlerBase):
             body=data['raw_message'].encode('utf-8'),
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['raw_message'])
-        p.share_with([c_from, u_to.contact])
+        if public:
+            p.share_with([c_from], show_on_wall=True)
+        else:
+            p.share_with([c_from, u_to.contact])
         p.thread_modified()
 
         p.diasp = DiasporaPost(
@@ -232,14 +250,14 @@ class PostMessage(TagMixin, MessageHandlerBase):
         db.session.commit()
 
     @classmethod
-    def generate(cls, u_from, c_to, post, text, public=False):
+    def generate(cls, u_from, c_to, post, text):
         diasp = DiasporaPost.get_for_post(post)
         req = etree.Element("status_message")
         cls.struct_to_xml(req, [
             {'raw_message': text},
             {'guid': diasp.guid},
             {'diaspora_handle': u_from.contact.diasp.username},
-            {'public': 'true' if public else 'false'},
+            {'public': 'false' if c_to else 'true'},
             {'created_at': cls.format_dt(post.created_at)}
         ])
         return req
@@ -327,8 +345,9 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         assert(data['diaspora_handle'] == c_from.diasp.username)
         parent = DiasporaPost.get_by_guid(data['parent_guid']).post
         assert(parent)
-        assert(parent.shared_with(c_from))
-        assert(parent.shared_with(u_to))
+        if u_to:
+            assert(parent.shared_with(c_from))
+            assert(parent.shared_with(u_to))
         node = xml[0][0]
         assert(cls.valid_signature(c_from, data['author_signature'], node))
         if 'parent_author_signature' in data:
@@ -345,7 +364,10 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
             body=data['text'].encode('utf-8'),
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['text'])
-        p.share_with([c_from, u_to.contact])
+        if u_to:
+            p.share_with([c_from, u_to.contact])
+        else:
+            p.share_with([c_from], show_on_wall=True)
         p.thread_modified()
 
         p.diasp = DiasporaPost(guid=data['guid'])
@@ -463,4 +485,47 @@ class Photo(MessageHandlerBase):
         ), order=0, inline=bool(mime.startswith('image/')))
         parent.thread_modified()
         db.session.add(parent)
+        db.session.commit()
+
+
+@diaspora_message_handler('/XML/post/reshare')
+class Reshare(MessageHandlerBase):
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        data = cls.as_dict(xml)
+        shared = DiasporaPost.get_by_guid(data['root_guid'])
+        assert(shared)
+        shared = shared.post
+        created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
+        post = Post(author=c_from, created_at=created)
+        share_part = MimePart(
+            type='application/x-pyaspora-share',
+            body=dumps({
+                'post': {'id': shared.id},
+                'author': {
+                    'id': shared.author_id,
+                    'name': shared.author.realname,
+                }
+            }).encode('utf-8'),
+            text_preview="shared {0}'s post".format(shared.author.realname)
+        )
+        post.add_part(share_part, order=0, inline=True)
+        order = 0
+        for part in shared.parts:
+            if part.mime_part.type != 'application/x-pyaspora-share':
+                order += 1
+                post.add_part(part.mime_part, inline=part.inline, order=order)
+        if not post.tags:
+            post.tags = shared.tags
+        if u_to:
+            post.share_with([c_from, u_to.contact])
+        else:
+            post.share_with([c_from], show_on_wall=True)
+        post.thread_modified()
+
+        post.diasp = DiasporaPost(
+            guid=data['guid'],
+            type='limited' if u_to else 'public'
+        )
+        db.session.add(post)
         db.session.commit()

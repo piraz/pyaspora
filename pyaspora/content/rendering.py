@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 
-import codecs
-import json
+from codecs import utf_8_decode
 from flask import render_template_string, url_for
+from json import loads
 from markdown import markdown
 
 renderers = {}
@@ -37,10 +37,10 @@ def text_plain(part, fmt, url):
         if fmt == 'text/html':
             return render_template_string(
                 '{{text|nl2br}}',
-                text=codecs.utf_8_decode(part.mime_part.body)[0]
+                text=utf_8_decode(part.mime_part.body)[0]
             )
         if fmt == 'text/plain':
-            return codecs.utf_8_decode(part.mime_part.body)[0]
+            return utf_8_decode(part.mime_part.body)[0]
     return None
 
 
@@ -50,7 +50,7 @@ def text_html(part, fmt, url):
     Renderer for text/html.
     """
     if part.inline and fmt == 'text/html':
-        return codecs.utf_8_decode(part.mime_part.body)[0]
+        return utf_8_decode(part.mime_part.body)[0]
     return None
 
 
@@ -60,7 +60,7 @@ def text_markdown(part, fmt, url):
     Renderer for text/x-markdown (MarkDown).
     """
     if part.inline:
-        md = codecs.utf_8_decode(part.mime_part.body)[0]
+        md = utf_8_decode(part.mime_part.body)[0]
         if fmt == 'text/html':
             return markdown(
                 md,
@@ -97,7 +97,7 @@ def pyaspora_subscribe(part, fmt, url):
     if fmt != 'text/html' or not part.inline:
         return
 
-    payload = json.loads(part.mime_part.body.decode('utf-8'))
+    payload = loads(part.mime_part.body.decode('utf-8'))
     to_contact = Contact.get(payload['to'])
     return render_template_string(
         'subscribed to <a href="{{profile}}">{{name}}</a>',
@@ -115,7 +115,7 @@ def pyaspora_share(part, fmt, url):
     if fmt != 'text/html' or not part.inline:
         return
 
-    payload = json.loads(part.mime_part.body.decode('utf-8'))
+    payload = loads(part.mime_part.body.decode('utf-8'))
     author = payload['author']
     return render_template_string(
         "shared <a href='{{profile}}'>{{name}}</a>'s post",
@@ -164,7 +164,7 @@ def render(part, fmt, url=None):
 
 @renderer(['application/x-pyaspora-diaspora-profile'])
 def diaspora_profile(part, fmt, url):
-    payload = json.loads(part.mime_part.body.decode('utf-8'))
+    payload = loads(part.mime_part.body.decode('utf-8'))
     if fmt != 'text/html' or not part.inline:
         return
 

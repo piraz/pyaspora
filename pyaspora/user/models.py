@@ -69,7 +69,7 @@ class User(db.Model):
         self.contact = contact
         db.session.add(self)
 
-    def notify_event(self):
+    def notify_event(self, commit=True):
         if not self.activated:
             return  # notifications disabled until activated
 
@@ -81,6 +81,11 @@ class User(db.Model):
             return  # too soon
 
         send_template(self.email, 'user_event_email.tpl', {})
+
+        self.last_notified = datetime.now()
+        db.session.add(self)
+        if commit:
+            db.session.commit()
 
     def activate(self):
         """

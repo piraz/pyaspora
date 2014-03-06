@@ -76,7 +76,7 @@ class DiasporaMessageBuilder:
         Build the XML document for the header. The header contains the key
         used to encrypt the message body.
         """
-        decrypted_header = etree.Element("decrypted_header")
+        decrypted_header = etree.Element('decrypted_header')
         etree.SubElement(decrypted_header, "iv").text = \
             b64encode(self.inner_iv)
         etree.SubElement(decrypted_header, "aes_key").text = \
@@ -84,6 +84,12 @@ class DiasporaMessageBuilder:
         etree.SubElement(decrypted_header, "author_id").text = \
             self.author_username
         return self.xml_to_string(decrypted_header)
+
+    def create_public_header(self):
+        decrypted_header = etree.Element('header')
+        etree.SubElement(decrypted_header, "author_id").text = \
+            self.author_username
+        return decrypted_header
 
     def create_ciphertext(self):
         """
@@ -170,12 +176,18 @@ class DiasporaMessageBuilder:
             'me': 'http://salmon-protocol.org/ns/magic-env'
         }
         doc = etree.Element("{%s}diaspora" % nsmap[None], nsmap=nsmap)
-        doc.append(self.create_encrypted_header(recipient_public_key))
+        if recipient_public_key:
+            doc.append(self.create_encrypted_header(recipient_public_key))
+        else:
+            doc.append(self.create_public_header())
         env = etree.SubElement(doc, "{%s}env" % nsmap["me"])
         etree.SubElement(env, "{%s}encoding" % nsmap["me"]).text = 'base64url'
         etree.SubElement(env, "{%s}alg" % nsmap["me"]).text = 'RSA-SHA256'
-        payload = urlsafe_b64encode(b64encode(
-            self.create_encrypted_payload())).decode("ascii")
+        if recipient_public_key:
+            payload = urlsafe_b64encode(b64encode(
+                self.create_encrypted_payload())).decode("ascii")
+        else:
+            payload = urlsafe_b64encode(self.create_payload()).decode("ascii")
         # Split every 60 chars
         payload = '\n'.join([payload[start:start+60]
                              for start in range(0, len(payload), 60)])
@@ -239,13 +251,16 @@ class DiasporaMessageParser:
         """
         xml = xml.lstrip().encode("utf-8")
         doc = etree.fromstring(xml)
-        header = self.parse_header(
-            doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text,
-            key)
-        sender = header.find(".//author_id").text
-        inner_iv = b64decode(header.find(".//iv").text.encode("ascii"))
-        inner_key = b64decode(
-            header.find(".//aes_key").text.encode("ascii"))
+        header = doc.find(".//{"+PROTOCOL_NS+"}header")
+        if header is not None:  # Public
+            encrypted = False
+            sender = header.find(".//{"+PROTOCOL_NS+"}author_id").text
+        else:
+            header = self.parse_header(
+                doc.find(".//{"+PROTOCOL_NS+"}encrypted_header").text,
+                key)
+            encrypted = True
+            sender = header.find(".//author_id").text
 
         sending_contact = self.contact_fetcher(sender).contact
         body = doc.find(
@@ -254,10 +269,18 @@ class DiasporaMessageParser:
             ".//{http://salmon-protocol.org/ns/magic-env}sig").text
         self.verify_signature(sending_contact, body, sig.encode('ascii'))
 
-        decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
-        body = b64decode(urlsafe_b64decode(body.encode("ascii")))
-        body = decrypter.decrypt(body)
-        body = self.pkcs7_unpad(body)
+        if encrypted:
+            inner_iv = b64decode(header.find(".//iv").text.encode("ascii"))
+            inner_key = b64decode(
+                header.find(".//aes_key").text.encode("ascii"))
+
+            decrypter = AES.new(inner_key, AES.MODE_CBC, inner_iv)
+            body = b64decode(urlsafe_b64decode(body.encode("ascii")))
+            body = decrypter.decrypt(body)
+            body = self.pkcs7_unpad(body)
+        else:
+            body = urlsafe_b64decode(body.encode("ascii"))
+
         return body, sending_contact
 
     def verify_signature(self, contact, payload, sig):
@@ -340,7 +363,6 @@ class WebfingerRequest(object):
         """
         Fetch the WebFinger profile and return the XML document.
         """
-        print("in wf fetch")
         template_url = self._get_template()
         target_url = re_sub(
             '\{uri\}',
@@ -349,7 +371,6 @@ class WebfingerRequest(object):
             ),
             template_url
         )
-        print("about to connect to {}".format(target_url))
         return etree.parse(urlopen(target_url))
 
     def _get_template(self):
@@ -399,7 +420,6 @@ class HostMeta(object):
         """
         Create the connection to the remote host.
         """
-        print("hostmeta connection to {}".format(url))
         request = Request(url)
         opener = build_opener(RedirectTrackingHandler())
         return opener.open(request, timeout=5)

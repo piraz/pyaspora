@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-import json
 from flask import Blueprint, request, url_for
+from json import dumps
 from sqlalchemy.sql import and_, not_
 
 from pyaspora.content.models import MimePart
@@ -390,7 +390,7 @@ def create(_user):
         shared = relationship['post']
         share_part = MimePart(
             type='application/x-pyaspora-share',
-            body=json.dumps({
+            body=dumps({
                 'post': {'id': shared.id},
                 'author': {
                     'id': shared.author_id,

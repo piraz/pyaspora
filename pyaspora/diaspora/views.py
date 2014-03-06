@@ -13,7 +13,9 @@ from lxml import etree
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
+from pyaspora.diaspora.actions import process_incoming_message
 from pyaspora.diaspora.models import DiasporaContact, MessageQueue
+from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.diaspora.utils import process_incoming_queue
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import redirect, send_xml
@@ -173,8 +175,6 @@ def receive(guid):
     """
     Receive a Salmon Slap and save it for when the user logs in.
     """
-    if guid == 'public':
-        assert(False)
 
     diasp = DiasporaContact.get_by_guid(guid)
     if diasp is None or not diasp.contact.user:
@@ -191,6 +191,26 @@ def receive(guid):
     diasp.contact.user.notify_event()
 
     return 'OK'
+
+
+@blueprint.route('/receive/public', methods=['POST'])
+def receive_public():
+    dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
+    ret, c_from = dmp.decode(request.form['xml'], None)
+    try:
+        process_incoming_message(ret, c_from, None)
+        success = True
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        success = False
+    finally:
+        db.session.commit()
+
+    if success:
+        return 'OK'
+    else:
+        return 'Error', 400
 
 
 @blueprint.route('/people/<string:guid>', methods=['GET'])

@@ -101,10 +101,16 @@ def send_post(post, private):
         }
     }
 
-    for target in targets:
-        sender = senders['private' if private else 'public']
-        sender = sender['child' if post.parent else 'parent']
-        sender.send(post.author.user, target, post=post, text=text)
+    sender = senders['private' if private else 'public']
+    sender = sender['child' if post.parent else 'parent']
+    if public:
+        # De-dupe by server
+        targets = {c.diasp.server: c for c in targets}
+        for target in targets.values():
+            sender.send_public(post.author.user, target, post=post, text=text)
+    else:
+        for target in targets:
+            sender.send(post.author.user, target, post=post, text=text)
 
 
 def import_url_as_mimepart(url):

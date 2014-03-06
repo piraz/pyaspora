@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-import re
+from re import search as re_search, split as re_split
 
 
 class TagParseMixin:
@@ -12,7 +12,7 @@ class TagParseMixin:
         if len(name) > 100:
             return False
 
-        if re.search(r'[^a-z0-9_]', name):
+        if re_search(r'[^a-z0-9_]', name):
             return False
 
         if '__' in name:
@@ -29,7 +29,7 @@ class TagParseMixin:
     @classmethod
     def parse_line(cls, line, create=True, **kwargs):
         tags = []
-        for possible_tag in re.split('[,\s]+', line):
+        for possible_tag in re_split('[,\s]+', line):
             tag = cls.get_by_name(
                 possible_tag.lower(),
                 create=create,
