@@ -93,7 +93,7 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
             data['actions']['share'] = \
                 url_for('posts.share', post_id=post.id, _external=True)
 
-        if share and share.contact_id == viewing_as.id:
+        if share and viewing_as and share.contact_id == viewing_as.id:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
             if not post.parent_id:

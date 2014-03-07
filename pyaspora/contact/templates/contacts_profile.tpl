@@ -36,7 +36,13 @@ Display a contact's "wall", which varies according to who is viewing it.
     <h3>About</h3>
 
     <div class="profile-bio">
-        {{bio}}
+        {% if bio.body.html %}
+            {{bio.body.html |safe}}
+        {% elif bio.body.text %}
+            {{bio.body.text}}
+        {% else %}
+            {{bio.text_preview}}
+        {% endif %}
     </div>
 {% endif %}
 

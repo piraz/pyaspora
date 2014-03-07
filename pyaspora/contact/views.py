@@ -6,16 +6,17 @@ cached information.
 
 from __future__ import absolute_import
 
-from flask import Blueprint, make_response, request, url_for, \
-    abort as flask_abort
+from flask import Blueprint, request, url_for, abort as flask_abort
 from lxml import etree
+from sqlalchemy.orm import contains_eager
 from sqlalchemy.sql import desc, or_
 
 from pyaspora.contact import models
 from pyaspora.database import db
 from pyaspora.tag.views import json_tag
+from pyaspora.utils import get_server_name
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
-    redirect, render_response, send_xml
+    raw_response, redirect, render_response, send_xml
 from pyaspora.user.session import logged_in_user, require_logged_in_user
 
 blueprint = Blueprint('contacts', __name__, template_folder='templates')
@@ -24,7 +25,10 @@ blueprint = Blueprint('contacts', __name__, template_folder='templates')
 @blueprint.route('/<int:contact_id>/avatar', methods=['GET'])
 def avatar(contact_id):
     """
-    Display the photo (or other media) that represents a Contact.
+    Display the photo (or other media item) that represents a Contact.
+    If the user is logged in they can view the avatar for any contact, but
+    if not logged in then only locally-mastered contacts have their avatar
+    displayed.
     """
     contact = models.Contact.get(contact_id)
     if not contact:
@@ -36,14 +40,13 @@ def avatar(contact_id):
     if not part:
         abort(404, 'Contact has no avatar', force_status=True)
 
-    response = make_response(part.body)
-    response.headers['Content-Type'] = part.type
-    return response
+    return raw_response(part.body, part.type)
 
 
 def _profile_base(contact_id, public=False):
     """
-    Display the profile (possibly with feed) for the contact.
+    Standard data for profile-alike pages, including the profile page and feed
+    pages.
     """
     from pyaspora.post.models import Post, Share
     from pyaspora.post.views import json_posts
@@ -66,11 +69,16 @@ def _profile_base(contact_id, public=False):
             shared_query = Post.Queries.author_shared_with(
                 contact, viewing_as)
             feed_query = or_(feed_query, shared_query)
-        feed = db.session.query(Post).join(Share).filter(feed_query). \
-            order_by(desc(Post.thread_modified_at)). \
-            group_by(Post.id).limit(limit)
 
-        data['feed'] = json_posts([(p, None) for p in feed], viewing_as)
+        feed = db.session.query(Share). \
+            join(Post). \
+            filter(feed_query). \
+            order_by(desc(Post.thread_modified_at)). \
+            group_by(Post.id). \
+            options(contains_eager(Share.post)). \
+            limit(limit)
+
+        data['feed'] = json_posts([(s.post, s) for s in feed], viewing_as)
 
     add_logged_in_user_to_data(data, viewing_as)
     return data, contact
@@ -78,30 +86,42 @@ def _profile_base(contact_id, public=False):
 
 @blueprint.route('/<int:contact_id>/profile', methods=['GET'])
 def profile(contact_id):
+    """
+    Display the profile (possibly with feed) for the contact.
+    """
     data, contact = _profile_base(
         contact_id,
         request.args.get('public', False)
     )
     if not contact.user and not logged_in_user():
         abort(404, 'No such contact', force_status=True)
+    if contact.user and not contact.user.activated:
+        abort(404, 'No such contact', force_status=True)
     return render_response('contacts_profile.tpl', data)
 
 
 @blueprint.route('/<int:contact_id>/feed', methods=['GET'])
 def feed(contact_id):
+    """
+    An Atom feed of public events for the contact. Only available for contacts
+    who are local to this server.
+    """
     data, contact = _profile_base(contact_id, public=True)
-    if not contact.user:
+    if not(contact.user and contact.user.activated):
         flask_abort(404, 'No such user')
+
+    # Fake "guid" for the user, derived from the ID
+    guid = '{0}-{1}'.format(get_server_name(), contact.user.id)
 
     ns = 'http://www.w3.org/2005/Atom'
     doc = etree.Element("{%s}feed" % ns, nsmap={None: ns})
-    etree.SubElement(doc, "title").text = \
-        'Diaspora feed for {0}'.format(data['name'])
+    etree.SubElement(doc, "title").text = 'Pyaspora feed for {0}'.format(
+        data['name']
+    )
     etree.SubElement(doc, "link").text = data['link']
-    etree.SubElement(doc, "updated").text = \
-        data['feed'][0]['created_at'] if data['feed'] \
-        else contact.user.activated.isoformat()
-    etree.SubElement(doc, "id").text = contact.guid
+    etree.SubElement(doc, "updated").text = data['feed'][0]['created_at'] \
+        if data['feed'] else contact.user.activated.isoformat()
+    etree.SubElement(doc, "id").text = guid
     etree.SubElement(doc, "generator").text = 'Pyaspora'
 
     author = etree.SubElement(doc, 'author')
@@ -111,27 +131,36 @@ def feed(contact_id):
     for post in data['feed']:
         entry = etree.SubElement(doc, 'entry')
         etree.SubElement(entry, "id").text = \
-            "{0}-{1}".format(contact.guid, post['id'])
+            "{0}-{1}".format(guid, post['id'])
         etree.SubElement(entry, "title").text = \
             post['parts'][0]['body']['text']
         etree.SubElement(entry, "updated").text = post['created_at']
         etree.SubElement(entry, "content").text = \
-            "\n\n".join([p['body']['text'] for p in post['parts']])
+            "\n\n".join(p['body']['text'] for p in post['parts'])
 
     return send_xml(doc)
 
 
 def json_contact(contact, viewing_as=None):
     """
-    A suitable representation of the contact that can be turned into JSON
-    without too much problem.
+    A suitable representation of the contact that can be turned into JSON.
+    If "viewing_as" (a local contact) is supplied, the data visible to that
+    contact will be returned; otherwise only public data is visible.
     """
+    from pyaspora.post.models import PostPart
+    from pyaspora.post.views import json_part
     resp = {
         'id': contact.id,
-        'link': url_for('contacts.profile',
-                        contact_id=contact.id, _external=True),
-        'subscriptions': url_for('contacts.subscriptions',
-                                 contact_id=contact.id, _external=True),
+        'link': url_for(
+            'contacts.profile',
+            contact_id=contact.id,
+            _external=True
+        ),
+        'subscriptions': url_for(
+            'contacts.subscriptions',
+            contact_id=contact.id,
+            _external=True
+        ),
         'name': contact.realname,
         'bio': '',
         'avatar': None,
@@ -146,33 +175,47 @@ def json_contact(contact, viewing_as=None):
         'tags': [json_tag(t) for t in contact.interests]
     }
     if contact.avatar:
-        resp['avatar'] = url_for('contacts.avatar',
-                                 contact_id=contact.id, _external=True)
+        resp['avatar'] = url_for(
+            'contacts.avatar',
+            contact_id=contact.id,
+            _external=True
+        )
 
     if contact.bio:
-        resp['bio'] = contact.bio.body.decode('utf-8')
+        resp['bio'] = json_part(PostPart(mime_part=contact.bio, inline=True))
 
     if viewing_as:
         if viewing_as.id == contact.id:
-            resp['actions']['edit'] = url_for('users.info', _external=True)
-        if viewing_as.contact.subscribed_to(contact):
-            resp['actions']['remove'] = url_for('roster.unsubscribe',
-                                                contact_id=contact.id,
-                                                _external=True)
-            resp['actions']['post'] = url_for('posts.create',
-                                              target_type='contact',
-                                              target_id=contact.id,
-                                              _external=True)
-            resp['actions']['edit_groups'] = url_for(
-                'roster.edit_contact_groups_form',
-                contact_id=contact.id,
-                _external=True
-            )
+            resp['actions'].update({
+                'edit': url_for('users.info', _external=True)
+            })
+        elif viewing_as.contact.subscribed_to(contact):
+            resp['actions'].update({
+                'remove': url_for(
+                    'roster.unsubscribe',
+                    contact_id=contact.id,
+                    _external=True
+                ),
+                'post': url_for(
+                    'posts.create',
+                    target_type='contact',
+                    target_id=contact.id,
+                    _external=True
+                ),
+                'edit_groups': url_for(
+                    'roster.edit_contact_groups_form',
+                    contact_id=contact.id,
+                    _external=True
+                )
+            })
         else:
-            if viewing_as.id != contact.id:
-                resp['actions']['add'] = url_for('roster.subscribe',
-                                                 contact_id=contact.id,
-                                                 _external=True)
+            resp['actions'].update({
+                'add': url_for(
+                    'roster.subscribe',
+                    contact_id=contact.id,
+                    _external=True
+                )
+            })
 
     return resp
 
@@ -181,13 +224,14 @@ def json_contact(contact, viewing_as=None):
 @require_logged_in_user
 def subscriptions(contact_id, _user):
     """
-    Display the friend list for the contact (who must be local to this
-    server.
+    Display the friend list for the contact (who must be local to this server,
+    because this server doesn't hold the full friend list for remote users).
     """
     contact = models.Contact.get(contact_id)
-    if not contact or not contact.user:
+    if not(contact.user and contact.user.activated):
         abort(404, 'No such contact', force_status=True)
 
+    # Looking at our own list? You'll be wanting the edit view.
     if contact.id == _user.contact.id:
         return redirect(url_for('roster.view', _external=True))
 

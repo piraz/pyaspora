@@ -6,8 +6,17 @@ from flask import jsonify, make_response, render_template, request, url_for, \
 from lxml import etree
 
 
+ACCEPTABLE_BROWSER_IMAGE_FORMATS = ('image/jpeg', 'image/gif', 'image/png')
+
+
 def _desired_format(default='html'):
     return request.args.get('alt', 'html')
+
+
+def raw_response(body, mime_type):
+    response = make_response(body)
+    response.headers['Content-Type'] = mime_type
+    return response
 
 
 def render_response(template_name, data_structure=None, output_format=None):

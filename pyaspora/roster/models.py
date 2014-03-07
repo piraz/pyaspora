@@ -27,12 +27,9 @@ class Subscription(db.Model):
     from_contact = relationship("Contact", backref="subscriptions",
                                 foreign_keys=[from_id])
     to_id = Column(Integer, ForeignKey('contacts.id'),
-                   primary_key=True)
+                   primary_key=True, index=True)
     to_contact = relationship("Contact", backref="subscribers",
                               foreign_keys=[to_id])
-
-    group_id = Column(Integer, ForeignKey('subscription_groups.id'),
-                      nullable=True)
 
     class Queries:
         @classmethod

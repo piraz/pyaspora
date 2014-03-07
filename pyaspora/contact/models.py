@@ -42,15 +42,26 @@ class Contact(db.Model):
                        primaryjoin='Contact.bio_id==MimePart.id')
 
     @classmethod
-    def get(cls, contact_id):
+    def get(cls, contact_id, prefetch=True):
         """
         Get a contact by primary key ID. None is returned if the Contact
-        doesn't exist.
+        doesn't exist. If prefetch is true (which it is by default) the
+        contact's bio and avatar parts will be pre-fetched, along with any
+        interests.
         """
-        return db.session.query(cls).get(contact_id)
+        if prefetch:
+            res = cls.get_many([contact_id])
+            return res[0] if res else None
+        else:
+            return db.session.query(cls).get(contact_id)
 
     @classmethod
     def get_many(cls, contact_ids):
+        """
+        Fetch several contacts in one query, including the same pre-fetch
+        items as Contact.get(). The contacts are returned in an unsorted
+        order.
+        """
         return db.session.query(cls). \
             options(
                 joinedload(cls.avatar),
@@ -61,18 +72,17 @@ class Contact(db.Model):
 
     def subscribe(self, contact):
         """
-        Subscribe self to contact, onto self's group named
-        <group>.
+        Subscribe self to contact.
         """
         from pyaspora.diaspora.actions import Subscribe, Profile
         from pyaspora.roster.models import Subscription
         assert(self.user or contact.user)
         sub = Subscription.create(self, contact)
         db.session.add(sub)
-        self.notify_subscribe(contact)
         if not contact.user:
             Subscribe.send(self.user, contact)
             Profile.send(self.user, contact)
+        self.notify_subscribe(contact)
 
     def unsubscribe(self, contact):
         """
@@ -91,7 +101,11 @@ class Contact(db.Model):
 
     def notify_subscribe(self, contact):
         """
-        Contact <self> has subscribed to contact <contact>
+        Notify contact <contact> that they have a new follower (<self>),
+        usually by placing an item in their feed. This is so the contact
+        can see them and decide if they wish to follow them in return.
+        The notice is also placed on <self>'s feed so they can know that
+        they sent it.
         """
         from pyaspora.post.models import Post
 
@@ -132,11 +146,19 @@ class Contact(db.Model):
 
     def friends(self):
         """
-        Returns a list of Subscriptions de-duped by Contact (a Contact may
-        exist in several SubscriptionGroups, this will select one at random if
-        so).
+        Returns a list of Subscriptions that this contact made to others.
         """
         from pyaspora.roster.models import Subscription
         friends = db.session.query(Contact).join(Subscription.to_contact). \
             filter(Subscription.from_contact == self)
+        return friends
+
+    def followers(self):
+        """
+        Returns a list of Subscriptions that have expressed an interest in
+        this contact.
+        """
+        from pyaspora.roster.models import Subscription
+        friends = db.session.query(Contact).join(Subscription.from_contact). \
+            filter(Subscription.to_contact == self)
         return friends

@@ -1,10 +1,10 @@
 from __future__ import absolute_import
 
-from flask import Blueprint, make_response
+from flask import Blueprint
 
 from pyaspora.content.models import MimePart
 from pyaspora.user.session import logged_in_user
-from pyaspora.utils.rendering import abort
+from pyaspora.utils.rendering import abort, raw_response
 
 blueprint = Blueprint('content', __name__, template_folder='templates')
 
@@ -23,8 +23,6 @@ def raw(part_id):
     # it.
     for link in part.posts:
         if link.post.has_permission_to_view(logged_in):
-            ret = make_response(part.body)
-            ret.headers['Content-Type'] = part.type
-            return ret
+            return raw_response(part.body, part.type)
 
     abort(403, 'Forbidden')

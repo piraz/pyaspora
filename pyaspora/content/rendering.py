@@ -1,9 +1,10 @@
 from __future__ import absolute_import
 
-from codecs import utf_8_decode
 from flask import render_template_string, url_for
 from json import loads
 from markdown import markdown
+
+from pyaspora.utils.rendering import ACCEPTABLE_BROWSER_IMAGE_FORMATS
 
 renderers = {}
 
@@ -37,10 +38,10 @@ def text_plain(part, fmt, url):
         if fmt == 'text/html':
             return render_template_string(
                 '{{text|nl2br}}',
-                text=utf_8_decode(part.mime_part.body)[0]
+                text=part.mime_part.body.decode('utf-8')
             )
         if fmt == 'text/plain':
-            return utf_8_decode(part.mime_part.body)[0]
+            return part.mime_part.body.decode('utf-8')
     return None
 
 
@@ -50,7 +51,7 @@ def text_html(part, fmt, url):
     Renderer for text/html.
     """
     if part.inline and fmt == 'text/html':
-        return utf_8_decode(part.mime_part.body)[0]
+        return part.mime_part.body.decode('utf-8')
     return None
 
 
@@ -60,7 +61,7 @@ def text_markdown(part, fmt, url):
     Renderer for text/x-markdown (MarkDown).
     """
     if part.inline:
-        md = utf_8_decode(part.mime_part.body)[0]
+        md = part.mime_part.body.decode('utf-8')
         if fmt == 'text/html':
             return markdown(
                 md,
@@ -74,7 +75,7 @@ def text_markdown(part, fmt, url):
     return None
 
 
-@renderer(['image/jpeg', 'image/gif', 'image/png'])
+@renderer(ACCEPTABLE_BROWSER_IMAGE_FORMATS)
 def common_images(part, fmt, url):
     """
     Renderer for image/* that a browser can display in an <img> tag.
@@ -82,8 +83,11 @@ def common_images(part, fmt, url):
     if fmt == 'text/html' and part.inline:
         return render_template_string(
             '<img src="{{url}}" alt="{{alt}}" />',
-            url=url_for('content.raw',
-                        part_id=part.mime_part.id, _external=True),
+            url=url_for(
+                'content.raw',
+                part_id=part.mime_part.id,
+                _external=True
+            ),
             alt=part.mime_part.text_preview
         )
 
@@ -95,14 +99,17 @@ def pyaspora_subscribe(part, fmt, url):
     """
     from pyaspora.contact.models import Contact
     if fmt != 'text/html' or not part.inline:
-        return
+        return None
 
     payload = loads(part.mime_part.body.decode('utf-8'))
     to_contact = Contact.get(payload['to'])
     return render_template_string(
         'subscribed to <a href="{{profile}}">{{name}}</a>',
-        profile=url_for('contacts.profile',
-                        contact_id=to_contact.id, _external=True),
+        profile=url_for(
+            'contacts.profile',
+            contact_id=to_contact.id,
+            _external=True
+        ),
         name=to_contact.realname
     )
 
@@ -113,14 +120,17 @@ def pyaspora_share(part, fmt, url):
     Standard message for when a post is shared.
     """
     if fmt != 'text/html' or not part.inline:
-        return
+        return None
 
     payload = loads(part.mime_part.body.decode('utf-8'))
     author = payload['author']
     return render_template_string(
         "shared <a href='{{profile}}'>{{name}}</a>'s post",
-        profile=url_for('contacts.profile',
-                        contact_id=author['id'], _external=True),
+        profile=url_for(
+            'contacts.profile',
+            contact_id=author['id'],
+            _external=True
+        ),
         name=author['name']
     )
 
@@ -164,31 +174,35 @@ def render(part, fmt, url=None):
 
 @renderer(['application/x-pyaspora-diaspora-profile'])
 def diaspora_profile(part, fmt, url):
+    """
+    Renders a Diaspora profile received from a remote server. Diaspora has
+    rather more feature-rich profiles than Pyaspora.
+    """
     payload = loads(part.mime_part.body.decode('utf-8'))
     if fmt != 'text/html' or not part.inline:
-        return
+        return None
 
     templ = """
-    {{bio}}
+    <p>{{bio or '(no info)'}}</p>
     <table>
-        {% if gender %}
+        {%- if gender %}
         <tr>
             <th>Gender</th>
             <td>{{gender}}</td>
         </tr>
-        {% endif %}
-        {% if birthday %}
+        {% endif -%}
+        {%- if birthday %}
         <tr>
             <th>Birthday</th>
             <td>{{birthday}}</td>
         </tr>
-        {% endif %}
-        {% if location %}
+        {% endif -%}
+        {%- if location %}
         <tr>
             <th>Location</th>
             <td>{{location}}</td>
         </tr>
-        {% endif %}
+        {% endif -%}
     </table>
     """
     return render_template_string(templ, **payload)
