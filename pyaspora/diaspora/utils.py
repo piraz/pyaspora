@@ -24,7 +24,7 @@ def process_incoming_queue(user):
             MessageQueue.format == MessageQueue.INCOMING,
             MessageQueue.local_user == user
         )
-    )
+    ).order_by(MessageQueue.created_at)
     dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
     for qi in queue_items:
         ret, c_from = dmp.decode(qi.body.decode('ascii'), user._unlocked_key)

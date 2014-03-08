@@ -15,11 +15,11 @@ from sqlalchemy.sql import desc
 from pyaspora import db
 from pyaspora.contact.models import Contact
 from pyaspora.diaspora.actions import process_incoming_message
-from pyaspora.diaspora.models import DiasporaContact, MessageQueue
+from pyaspora.diaspora.models import DiasporaContact, DiasporaPost, \
+    MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.diaspora.utils import process_incoming_queue
 from pyaspora.post.models import Post, Share
-from pyaspora.post.views import json_post
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import redirect, send_xml
 
@@ -55,7 +55,7 @@ def webfinger(contact_addr):
     """
     contact_id, _ = contact_addr.split('@')
     c = Contact.get(int(contact_id))
-    if c is None or not c.user:
+    if not c or not c.user or not c.activated:
         abort(404, 'No such contact')
     diasp = DiasporaContact.get_for_contact(c)
 
@@ -121,10 +121,16 @@ def hcard(guid):
     doc = etree.Element("{%s}div" % ns, nsmap={None: ns}, id="content")
     etree.SubElement(doc, "h1").text = c.realname
     content_inner = etree.SubElement(
-        doc, 'div', **{'class': "content_inner"})
+        doc,
+        'div',
+        **{'class': "content_inner"}
+    )
     author = etree.SubElement(
-        content_inner, 'div', id="i", **{
-            'class': "entity_profile vcard author"})
+        content_inner,
+        'div',
+        id="i",
+        **{'class': "entity_profile vcard author"}
+    )
 
     etree.SubElement(author, "h2").text = "User profile"
 
@@ -132,8 +138,11 @@ def hcard(guid):
     etree.SubElement(dl, 'dt').text = 'Nickname'
     dd = etree.SubElement(dl, 'dd')
     etree.SubElement(
-        dd, 'a', rel='me', href=url_for('index'), **{
-            'class': "nickname url uid"}
+        dd,
+        'a',
+        rel='me',
+        href=url_for('index'),
+        **{'class': "nickname url uid"}
     ).text = c.realname
 
     dl = etree.SubElement(author, 'dl', **{'class': "entity_fn"})
@@ -144,26 +153,33 @@ def hcard(guid):
     etree.SubElement(dl, 'dt').text = 'URL'
     dd = etree.SubElement(dl, 'dd')
     etree.SubElement(
-        dd, 'a', id='pod_location', rel='me',
+        dd,
+        'a',
+        id='pod_location',
+        rel='me',
         href=url_for('index', _external=True),
-        **{'class': "url"}).text = url_for('index', _external=True)
+        **{'class': "url"}
+    ).text = url_for('index', _external=True)
 
-    # FIXME - need to resize photos. Having no photos causes Diaspora to
-    # crash, so we need to return *something* in all cases.
+    # FIXME - need to resize photos
     photos = {
         "entity_photo": "300px",
         "entity_photo_medium": "100px",
         "entity_photo_small": "50px"
     }
     for k, v in photos.items():
-        src = url_for('contacts.avatar', contact_id=c.id, _external=True) \
-            if c.avatar \
-            else url_for('static', filename='nophoto.png', _external=True)
+        src = diasp.photo_url()
         dl = etree.SubElement(author, "dl", **{'class': k})
         etree.SubElement(dl, "dt").text = "Photo"
         dd = etree.SubElement(dl, "dd")
-        etree.SubElement(dd, "img", height=v, width=v, src=src,
-                         **{'class': "photo avatar"})
+        etree.SubElement(
+            dd,
+            'img',
+            height=v,
+            width=v,
+            src=src,
+            **{'class': "photo avatar"}
+        )
 
     dl = etree.SubElement(author, 'dl', **{'class': "entity_searchable"})
     etree.SubElement(dl, 'dt').text = 'Searchable'
@@ -178,7 +194,6 @@ def receive(guid):
     """
     Receive a Salmon Slap and save it for when the user logs in.
     """
-
     diasp = DiasporaContact.get_by_guid(guid)
     if diasp is None or not diasp.contact.user:
         abort(404, 'No such contact')
@@ -198,6 +213,9 @@ def receive(guid):
 
 @blueprint.route('/receive/public', methods=['POST'])
 def receive_public():
+    """
+    Receive a public Salmon Slap and process it now.
+    """
     dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
     ret, c_from = dmp.decode(request.form['xml'], None)
     try:
@@ -220,7 +238,7 @@ def receive_public():
 def json_feed(guid):
     """
     Look up the User identified by GUID and return the User's public feed
-    in the requested format (eg. "atom", "json").
+    as Diaspora-style JSON.
     """
     contact = DiasporaContact.get_by_guid(guid)
     if not(contact and contact.contact.user):
@@ -233,9 +251,7 @@ def json_feed(guid):
 
     ret = []
     for post in feed:
-        avatar = ''  # FIXME: contact.avatar_link
-        json = json_post(post, children=False)
-        text = "\n\n".join([p['body']['text'] for p in json['parts']])
+        text = DiasporaPost.get_for_post(post, commit=False).as_text()
         rep = {
             "author": {
                 "diaspora_id": contact.username,
@@ -260,16 +276,3 @@ def json_feed(guid):
 def run_queue(_user):
     process_incoming_queue(_user)
     return 'OK'
-
-
-@blueprint.route('/diaspora/contacts/<string:addr>', methods=['GET'])
-@require_logged_in_user
-def external_contact(addr, _user):
-    diasp = DiasporaContact.get_by_username(addr)
-    if not diasp:
-        abort(404, 'Could not find contact with this address')
-    return redirect(url_for(
-        'contacts.profile',
-        contact_id=diasp.contact.id,
-        _external=True
-    ))

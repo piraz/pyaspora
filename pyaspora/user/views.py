@@ -1,7 +1,6 @@
 """
 Actions concerning a local User, who is mastered on this node.
 """
-
 from __future__ import absolute_import
 
 from Crypto.Hash import SHA256
@@ -30,6 +29,9 @@ def _hash_for_pk(user):
 
 @blueprint.route('/login', methods=['GET'])
 def login():
+    """
+    Display the user login form.
+    """
     user = logged_in_user()
     if user:
         data = {}
@@ -44,6 +46,10 @@ def login():
 
 @blueprint.route('/login', methods=['POST'])
 def process_login():
+    """
+    Log the user in, checking their credentials and configuring the session,
+    and redirect them to the home page.
+    """
     password = post_param('password', template='users_login_form.tpl')
     email = post_param('email', template='users_login_form.tpl')
     user = log_in_user(email, password)
@@ -54,6 +60,9 @@ def process_login():
 
 @blueprint.route('/create', methods=['GET'])
 def create_form():
+    """
+    Display the form to create a new user account.
+    """
     if not current_app.config.get('ALLOW_CREATION', False):
         abort(403, 'Disabled by site administrator')
     return render_response('users_create_form.tpl')
@@ -100,6 +109,9 @@ def create():
 
 @blueprint.route('/logout', methods=['GET'])
 def logout():
+    """
+    End a user session.
+    """
     session['key'] = None
     session['user_id'] = None
 
@@ -112,8 +124,8 @@ def logout():
 @blueprint.route('/activate/<int:user_id>/<string:key_hash>', methods=['GET'])
 def activate(user_id, key_hash):
     """
-    Activate a user. This is intended to be a clickable link from the
-    sign-up email that confirms the email address is valid.
+    Activate a user. This is intended to be a clickable link from the sign-up
+    email that confirms the email address is valid.
     """
     matched_user = models.User.get(user_id)
 
@@ -134,6 +146,9 @@ def activate(user_id, key_hash):
 @blueprint.route('/info', methods=['GET'])
 @require_logged_in_user
 def info(_user):
+    """
+    Form to view or edit information on the currently logged-in user.
+    """
     data = json_user(_user)
     add_logged_in_user_to_data(data, _user)
     data['notification_frequency_hours'] = _user.notification_hours
@@ -141,6 +156,9 @@ def info(_user):
 
 
 def json_user(user):
+    """
+    JSON-serialisable view of a User.
+    """
     data = {
         'id': user.id,
         'email': user.email,
@@ -152,6 +170,11 @@ def json_user(user):
 @blueprint.route('/info', methods=['POST'])
 @require_logged_in_user
 def edit(_user):
+    """
+    Apply the changes from the user edit form. This updates such varied things
+    as the profile photo and bio, the email address, name, password and
+    interests.
+    """
     from pyaspora.post.models import Post
 
     p = Post(author=_user.contact)

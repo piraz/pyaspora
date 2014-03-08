@@ -4,5 +4,5 @@ flask-sqlalchemy
 jinja2
 lxml
 markdown
-pycrypto
+pycrypto>=2.6
 sqlalchemy

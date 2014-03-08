@@ -1,3 +1,6 @@
+"""
+Database models relating to rosters (friend lists and subscriptions).
+"""
 from __future__ import absolute_import
 
 from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
@@ -10,15 +13,14 @@ from pyaspora.utils.models import TagParseMixin
 
 class Subscription(db.Model):
     """
-    A one-way 'friendship' between a user and a contact (that could be local
-    or external).  This class doesn't store the user explicitly, but via a
-    SubscriptionGroup.
+    A one-way 'friendship' between a contact and another contact (that could
+    be local or external).
 
     Fields:
-        group - the SubscriptionGroup this Subscription is part of
-        group_id - the database primary key of the above
-        contact - the Contact the user is subscribed to
-        contact_id - the database primary key of the above
+        from - the Contact that expressed an interest in "to"
+        from_id - the database primary key of the above
+        to - the Contact that <from> is interested in
+        to_id - the database primary key of the above
     """
 
     __tablename__ = "subscriptions"
@@ -31,38 +33,21 @@ class Subscription(db.Model):
     to_contact = relationship("Contact", backref="subscribers",
                               foreign_keys=[to_id])
 
-    class Queries:
-        @classmethod
-        def user_subs_for_contacts(cls, user, contact_ids):
-            return and_(
-                Subscription.to_id.in_(contact_ids),
-                Subscription.from_id == user.contact.id
-            )
-
-    @classmethod
-    def create(cls, from_contact, to_contact):
-        """
-        Create a new subscription, where <user> subscribes to <contact> with
-        type <subtype>.  The group name <group> will be used, and the group
-        will be created if it doesn't already exist. A privacy level of
-        <private> will be assigned to the Subscription.
-        """
-        sub = cls(
-            from_contact=from_contact,
-            to_contact=to_contact
-        )
-        db.session.add(sub)
-        return sub
-
 
 class SubscriptionTag(db.Model):
+    """
+    A link between a SubscriptionGroup and a Subscription. One Subscription
+    can feature in several groups at once.
+
+    Fields:
+        subscription_id - the Subscription this link is from
+        group_id - the SubscriptionGroup this link is to
+    """
     __tablename__ = "subscription_tags"
-    subscription_id = Column(Integer, ForeignKey('subscriptions.from_id'),
-                             primary_key=True)
-    subscription = relationship("Subscription")
     group_id = Column(Integer, ForeignKey('subscription_groups.id'),
                       primary_key=True)
-    group = relationship("SubscriptionGroup")
+    subscription_id = Column(Integer, ForeignKey('subscriptions.from_id'),
+                             primary_key=True, index=True)
 
 
 class SubscriptionGroup(TagParseMixin, db.Model):
@@ -75,7 +60,7 @@ class SubscriptionGroup(TagParseMixin, db.Model):
         user - the User this group belongs to
         user_id - the database primary key of the above
         name - the category name. Must be unique for the user
-        subscriptions - a list of Subscriptions that art part of this group
+        subscriptions - a list of Subscriptions that are part of this group
     """
 
     __tablename__ = "subscription_groups"
@@ -101,24 +86,13 @@ class SubscriptionGroup(TagParseMixin, db.Model):
         """
         return db.session.query(cls).get(groupid)
 
-    def has_contact(self, contact):
-        for sub in self.subscriptions:
-            if sub.contact_id == contact.id:
-                return sub
-        return None
-
-    def add_contact(self, contact, subtype):
-        if self.has_contact(contact):
-            return
-        sub = Subscription(contact=contact, group=self, type=subtype)
-        db.session.add(sub)
-
     @classmethod
     def get_by_name(cls, name, user, create=True):
         """
         Returns the group named <group> owned by User <user>. If the group
         does not exist and <create> is False, None will be returned. If
         <create> is True, a new SubscriptionGroup will be created and returned.
+        The caller may need to commit the new group.
         """
         if not cls.name_is_valid(name):
             return

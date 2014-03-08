@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from base64 import b64decode
-from flask import request
+from flask import request, url_for
 from lxml import html
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, \
     String
@@ -20,6 +20,7 @@ except:
 from pyaspora import db
 from pyaspora.contact.models import Contact
 from pyaspora.diaspora.protocol import WebfingerRequest
+from pyaspora.post.views import json_post
 
 
 class DiasporaContact(db.Model):
@@ -126,6 +127,25 @@ class DiasporaContact(db.Model):
 
         return d
 
+    def photo_url(self):
+        """
+        Diaspora requires all contacts have pictures, even if they haven't
+        chosen one. This call returns a default if a picture hasn't been
+        uploaded.
+        """
+        if self.contact.avatar:
+            return url_for(
+                'contacts.avatar',
+                contact_id=self.contact_id,
+                _external=True
+            )
+        else:
+            return url_for(
+                'static',
+                filename='nophoto.png',
+                _external=True
+            )
+
 
 class MessageQueue(db.Model):
     """
@@ -182,3 +202,8 @@ class DiasporaPost(db.Model):
     @classmethod
     def get_by_guid(cls, guid):
         return db.session.query(cls).filter(cls.guid == guid).first()
+
+    def as_text(self):
+        json = json_post(self.post, children=False)
+        text = "\n\n".join([p['body']['text'] for p in json['parts']])
+        return text

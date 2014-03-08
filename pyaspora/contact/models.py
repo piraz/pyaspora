@@ -77,7 +77,7 @@ class Contact(db.Model):
         from pyaspora.diaspora.actions import Subscribe, Profile
         from pyaspora.roster.models import Subscription
         assert(self.user or contact.user)
-        sub = Subscription.create(self, contact)
+        sub = Subscription(from_contact=self, to_contact=contact)
         db.session.add(sub)
         if not contact.user:
             Subscribe.send(self.user, contact)

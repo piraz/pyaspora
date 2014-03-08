@@ -1,3 +1,7 @@
+"""
+Database models relating to tagging Posts and Contacts with topics of interest.
+Similar to hashtags.
+"""
 from __future__ import absolute_import
 
 from sqlalchemy import Column, ForeignKey, Integer, String
@@ -70,6 +74,10 @@ class Tag(TagParseMixin, db.Model):
     class Queries:
         @classmethod
         def public_posts_for_tags(cls, tag_ids):
+            """
+            All publicly-shared posts that contain a certain tag. Assumes that
+            the query already contains Share.
+            """
             from pyaspora.post.models import Share
             return and_(
                 Tag.id.in_(tag_ids),
@@ -79,8 +87,14 @@ class Tag(TagParseMixin, db.Model):
 
     @classmethod
     def get_by_name(cls, name, create=True):
+        """
+        Look up a Tag by textual name. If create is true (the default) a new
+        Tag will be created if required. Returns None if the Tag name is
+        invalid or the tag cannot be found. The caller will need to commit
+        the session to save any created tags.
+        """
         if not cls.name_is_valid(name):
-            return
+            return None
 
         tag = db.session.query(cls).filter(cls.name == name).first()
         if create and not tag and cls.name_is_valid(name):

@@ -1,3 +1,6 @@
+"""
+Views relating to roster (friend list) viewing and management.
+"""
 from __future__ import absolute_import
 
 from flask import Blueprint, request, url_for
@@ -17,6 +20,10 @@ blueprint = Blueprint('roster', __name__, template_folder='templates')
 
 
 def json_contact_with_groups(sub, user):
+    """
+    Enhanced version of json_contact that also details which SubcriptionGroups
+    a user belongs to.
+    """
     result = json_contact(sub.to_contact, user)
     result['groups'] = [json_group(g, sub.to_contact) for g in sub.groups]
     return result
@@ -25,6 +32,9 @@ def json_contact_with_groups(sub, user):
 @blueprint.route('/edit', methods=['GET'])
 @require_logged_in_user
 def view(_user):
+    """
+    View and edit the logged in user's roster.
+    """
     subs = db.session.query(Subscription). \
         filter(Subscription.from_contact == _user.contact)
     data = {
@@ -37,14 +47,25 @@ def view(_user):
 
 
 def json_group(g, contact=None):
+    """
+    JSON data structure for one SubscriptionGroup, including group
+    management actions. If a contact is supplied, an action link to
+    remove that contact from the group will also be supplied.
+    """
     data = {
         'id': g.id,
         'name': g.name,
-        'link': url_for('roster.view_group',
-                        group_id=g.id, _external=True),
+        'link': url_for(
+            'roster.view_group',
+            group_id=g.id,
+            _external=True
+        ),
         'actions': {
-            'rename': url_for('roster.rename_group',
-                              group_id=g.id, _external=True)
+            'rename': url_for(
+                'roster.rename_group',
+                group_id=g.id,
+                _external=True
+            )
         },
     }
     if contact:
@@ -60,6 +81,9 @@ def json_group(g, contact=None):
 @blueprint.route('/groups/<int:group_id>', methods=['GET'])
 @require_logged_in_user
 def view_group(group_id, _user):
+    """
+    Display the info and members of one SubscriptionGroup.
+    """
     group = SubscriptionGroup.get(group_id)
     if not(group) or group.user_id != _user.id:
         abort(404, 'No such group')
@@ -80,6 +104,9 @@ def view_group(group_id, _user):
 @blueprint.route('/contacts/<int:contact_id>/edit', methods=['GET'])
 @require_logged_in_user
 def edit_contact_groups_form(contact_id, _user):
+    """
+    Form to edit which SubscriptionGroups a contact is in.
+    """
     contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact')
@@ -106,6 +133,9 @@ def edit_contact_groups_form(contact_id, _user):
 @blueprint.route('/groups/<int:group_id>/rename', methods=['POST'])
 @require_logged_in_user
 def rename_group(group_id, _user):
+    """
+    Change the name of an existing group.
+    """
     group = SubscriptionGroup.get(group_id)
     if not(group) or group.user_id != _user.id:
         abort(404, 'No such group')
@@ -124,6 +154,10 @@ def rename_group(group_id, _user):
 )
 @require_logged_in_user
 def remove_contact(group_id, contact_id, _user):
+    """
+    Remove a contact from an existing SubscriptionGroup. The Subscription
+    remains. If the SubscriptionGroup becomes empty it will be removed.
+    """
     group = SubscriptionGroup.get(group_id)
     if not(group) or group.user_id != _user.id:
         abort(404, 'No such group')
@@ -133,11 +167,11 @@ def remove_contact(group_id, contact_id, _user):
         if s.to_contact.id != contact_id
     ]
     group.subscriptions = new_list
-    db.session.commit()
 
     if not new_list:
         db.session.delete(group)
-        db.session.commit()
+
+    db.session.commit()
 
     return redirect(url_for('.view', _external=True))
 
@@ -145,6 +179,9 @@ def remove_contact(group_id, contact_id, _user):
 @blueprint.route('/contacts/<int:contact_id>/subscribe', methods=['POST'])
 @require_logged_in_user
 def subscribe(contact_id, _user):
+    """
+    Add a contact to the logged-in users roster.
+    """
     contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
@@ -158,6 +195,9 @@ def subscribe(contact_id, _user):
 @blueprint.route('/contacts/<int:contact_id>/unsubscribe', methods=['POST'])
 @require_logged_in_user
 def unsubscribe(contact_id, _user):
+    """
+    Remove a contact to the logged-in users roster.
+    """
     contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
@@ -173,6 +213,11 @@ def unsubscribe(contact_id, _user):
 @blueprint.route('/contacts/<int:contact_id>/edit', methods=['POST'])
 @require_logged_in_user
 def save_contact_groups(contact_id, _user):
+    """
+    Change which SubscriptionGroups a contact is in by parsing a string
+    of keywords (like tag processing). Any new terms will create new
+    groups; any now-empty groups will be deleted.
+    """
     contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)

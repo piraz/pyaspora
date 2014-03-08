@@ -1,3 +1,6 @@
+"""
+Database models for locally-mastered users.
+"""
 from __future__ import absolute_import
 
 from Crypto.PublicKey import RSA
@@ -70,6 +73,10 @@ class User(db.Model):
         db.session.add(self)
 
     def notify_event(self, commit=True):
+        """
+        Let the user know that there are new things for them to view, according
+        to their notification preferences.
+        """
         if not self.activated:
             return  # notifications disabled until activated
 
@@ -112,6 +119,11 @@ class User(db.Model):
         """
         RSAkey = RSA.generate(2048)
         self.private_key = RSAkey.exportKey(
-            format='PEM', pkcs=1, passphrase=passphrase).decode("ascii")
+            format='PEM',
+            pkcs=1,
+            passphrase=passphrase
+        ).decode("ascii")
         self.contact.public_key = RSAkey.publickey().exportKey(
-            format='PEM', pkcs=1).decode("ascii")
+            format='PEM',
+            pkcs=1
+        ).decode("ascii")
