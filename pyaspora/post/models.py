@@ -22,6 +22,7 @@ class Share(db.Model):
         post - the Post that is being shared with <contact>
         post_id - the database primary key of the above
         public - whether the post is shown on the user's public wall
+        hidden - whether the author has hidden the post from their feed
         shared_at - the DateTime the Post was shared with the Contact (that
                     is, the Share creation date)
     """
@@ -91,6 +92,8 @@ class Post(db.Model):
         parent - if this Post is a comment on another Post, this links to the
                  parent Post. May be None.
         parent_id - the database primary key for the above
+        thread_modified_at - last modification of the post or children, only
+                             set on posts with no parent (top-level items)
         shares - Shares of this Post (occurrences in feeds/on walls)
         parts - PostParts that this Post consists of (the Post contents)
         children - Posts that have this post as the parent
@@ -225,12 +228,19 @@ class Post(db.Model):
         return share
 
     def root(self):
+        """
+        The top-level post that started this thread.
+        """
         post = self
         while post.parent:
             post = post.parent
         return post
 
     def thread_modified(self):
+        """
+        Mark this thread as having been modified. This makes it "bubble up" in
+        contact feeds. Requires the caller commit the session.
+        """
         post = self.root()
         post.thread_modified_at = datetime.now()
         if post.id != self.id:
