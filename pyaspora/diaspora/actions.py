@@ -32,6 +32,10 @@ HANDLERS = {}
 
 
 def diaspora_message_handler(xpath):
+    """
+    Decorator which registers a handler to handle messages from the D* netork,
+    selected if the incoming messages matches <xpath>.
+    """
     def _inner(cls):
         HANDLERS[xpath] = cls
         return cls
@@ -39,6 +43,9 @@ def diaspora_message_handler(xpath):
 
 
 def process_incoming_message(payload, c_from, u_to):
+    """
+    Decide which type of message this is, and call the correct handler.
+    """
     xml = payload.lstrip()
     print(xml)
     doc = etree.fromstring(xml)
@@ -49,8 +56,15 @@ def process_incoming_message(payload, c_from, u_to):
 
 
 class MessageHandlerBase:
+    """
+    Generic base class for base handlers.
+    """
+
     @classmethod
     def _build(cls, u_from, c_to, **kwargs):
+        """
+        Generate an XML message to send to a remote node.
+        """
         diasp = DiasporaContact.get_for_contact(u_from.contact)
         xml = cls.generate(u_from, c_to, **kwargs)
         m = DiasporaMessageBuilder(xml, diasp.username, u_from._unlocked_key)
@@ -58,6 +72,9 @@ class MessageHandlerBase:
 
     @classmethod
     def send(cls, u_from, c_to, **kwargs):
+        """
+        Send a message from <u_from> to <c_to>.
+        """
         m = cls._build(u_from, c_to, **kwargs)
         url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
@@ -67,6 +84,10 @@ class MessageHandlerBase:
 
     @classmethod
     def send_public(cls, u_from, c_to, **kwargs):
+        """
+        Send a message from <u_from> to the remote server that <c_to> is on,
+        as a public message.
+        """
         m = cls._build(u_from, None, **kwargs)
         url = "{0}receive/public".format(c_to.diasp.server)
         print("posting {0} to {1}".format(etree.tostring(m.message), url))
@@ -75,25 +96,45 @@ class MessageHandlerBase:
 
     @classmethod
     def struct_to_xml(cls, node, struct):
+        """
+        Turn a list of dicts into XML nodes with tag names taken from the dict
+        keys and element text taken from dict values. This is a list of dicts
+        so that the XML nodes can be ordered in the XML output.
+        """
         for obj in struct:
             for k, v in obj.items():
                 etree.SubElement(node, k).text = v
 
     @classmethod
     def as_dict(cls, xml):
+        """
+        Turn the children of node <xml> into a dict, keyed by tag name. This
+        is only a shallow conversation - child nodes are not recursively
+        processed.
+        """
         node = xml[0][0]
         return {e.tag: e.text for e in node}
 
     @classmethod
     def format_dt(cls, dt):
+        """
+        Format a datetime in the way that D* nodes expect.
+        """
         return ensure_timezone(dt).astimezone(tzutc()).strftime(
             '%Y-%m-%d %H:%M:%S %Z'
         )
 
 
 class SignableMixin:
+    """
+    Mix-in to handle 'signing' and verifying blocks of XML.
+    """
+
     @classmethod
     def generate_signature(cls, u_from, node):
+        """
+        Sign a given node with <u_from>'s key.
+        """
         sig_contents = ';'.join([
             e.text for e in node
             if e.text is not None
@@ -105,6 +146,9 @@ class SignableMixin:
 
     @classmethod
     def valid_signature(cls, contact, signature, node):
+        """
+        Validate <signature> convirms that <contact> signed the node <node>.
+        """
         signature = b64decode(signature)
         sig_contents = ';'.join([
             e.text for e in node
@@ -117,20 +161,32 @@ class SignableMixin:
 
 
 class TagMixin:
+    """
+    Mix-in for messages that receive tag strings (#word) and need to parse
+    them into Tag objects.
+    """
     tag_re = re_compile('#[a-zA-z0-9_]+')
 
     @classmethod
     def find_tags(cls, text):
+        """
+        Parse <text> for things that look like tags and return matching Tag
+        objects.
+        """
         tl = ' '.join(m.group(0)[1:] for m in cls.tag_re.finditer(text))
         return Tag.parse_line(tl, create=True)
 
 
 @diaspora_message_handler('/XML/post/request')
 class Subscribe(MessageHandlerBase):
+    """
+    Notification of subscription creation.
+    """
+
     @classmethod
     def receive(cls, xml, c_from, u_to):
         """
-        Contact c_from has subcribed to u_to
+        Contact <c_from> has subcribed to <u_to>.
         """
         data = cls.as_dict(xml)
         assert(data['sender_handle'] == c_from.diasp.username)
@@ -138,6 +194,9 @@ class Subscribe(MessageHandlerBase):
 
     @classmethod
     def generate(cls, u_from, c_to):
+        """
+        User <u_from> wishes to subscribe to <c_to>.
+        """
         req = etree.Element("request")
         cls.struct_to_xml(req, [
             {'sender_handle': u_from.contact.diasp.username},
@@ -147,9 +206,16 @@ class Subscribe(MessageHandlerBase):
 
 
 @diaspora_message_handler('/XML/post/profile')
-class Profile(MessageHandlerBase):
+class Profile(TagMixin, MessageHandlerBase):
+    """
+    Notification that a profile has changed.
+    """
+
     @classmethod
     def receive(cls, xml, c_from, u_to):
+        """
+        Contact <c_from has updated their profile.
+        """
         data = cls.as_dict(xml)
         assert(data['diaspora_handle'] == c_from.diasp.username)
         c_from.realname = " ".join(
@@ -170,15 +236,17 @@ class Profile(MessageHandlerBase):
         else:
             c_from.avatar = None
 
-        tags = data.get('tag_string', None) or ''
-        tags = ' '.join(tags.split('#'))
-        c_from.interests = Tag.parse_line(tags)
+        c_from.interests = cls.find_tags(data['tag_string'] or '')
 
         db.session.add(c_from)
         db.session.commit()
 
     @classmethod
     def generate(cls, u_from, c_to):
+        """
+        User <u_from> has updated their profile and wishes to let contact
+        <c_to> know.
+        """
         req = etree.Element("profile")
         name_parts = u_from.contact.realname.split(maxsplit=2)
         if len(name_parts) == 1:
