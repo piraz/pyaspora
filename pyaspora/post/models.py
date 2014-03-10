@@ -195,27 +195,68 @@ class Post(db.Model):
         db.session.add(link)
         return link
 
+    def is_public(self):
+        """
+        Returns true if anybody has made this Post public.
+        """
+        return db.session.query(Share).filter(
+            Share.public == True
+        ).first()
+
+    def author_made_public(self):
+        """
+        Returns true if the original author made this Post public.
+        """
+        return db.session.query(Share).filter(and_(
+            Share.contact == self.author,
+            Share.public == True
+        )).first()
+
+    def can_change_privacy(self, new_state):
+        if new_state and self.parent_id and not self.root().is_public():
+            return False
+        if self.diasp:
+            return self.diasp.can_change_privacy()
+        return True
+
+    def _send_to_remotes(self, contacts):
+        """
+        Arrange to send this post to contacts on the remote node.
+        """
+        from pyaspora.diaspora.models import DiasporaPost
+        contacts = [c for c in contacts if not c.user]
+        if contacts:
+            DiasporaPost.get_for_post(self).send_to(contacts)
+
+    def implicit_share(self, contacts):
+        """
+        Contacts can see the content because it is public, but it is not
+        directly shared with them.
+        """
+        self._send_to_remotes(contacts)
+
     def share_with(self, contacts, show_on_wall=False):
         """
         Share this Post with all the contacts in list <contacts>. This method
         doesn't share the post if the Contact already has this Post shared
         with them.
         """
+        new_shares = []
         for contact in contacts:
             existing_share = None
+            remotes = []
             if self.id:
                 existing_share = db.session.query(Share).filter(
                     and_(Share.post == self,
                          Share.contact == contact)).first()
             if not existing_share:
+                new_shares.append(contact)
                 db.session.add(Share(contact=contact, post=self,
                                      public=show_on_wall))
                 if contact.user:
                     if contact.id != self.author_id:
                         contact.user.notify_event()
-                else:
-                    # FIXME share via diasp
-                    pass
+        self._send_to_remotes(new_shares)
 
     def shared_with(self, contact):
         """

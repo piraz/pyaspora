@@ -206,4 +206,65 @@ class DiasporaPost(db.Model):
     def as_text(self):
         json = json_post(self.post, children=False)
         text = "\n\n".join([p['body']['text'] for p in json['parts']])
+        if self.post.tags:
+            text += '\n( ' + ' '.join(
+                '#{0}'.format(t.name) for t in self.post.tags
+            ) + ' )'
         return text
+
+    def send_to(self, targets, private):
+        from pyaspora.diaspora.actions import PostMessage, PrivateMessage, \
+            SubPost, SubPM
+
+        post = self.post
+
+        assert(post.author.user)
+
+        self_share = post.shared_with(post.author)
+        assert(self_share)
+
+        if self.type:
+            # Sent before, must keep same type
+            private = (post.diasp.type == 'private')
+            public = (post.diasp.type == 'public')
+        elif post.parent and post.root().diasp and post.root().diasp.type:
+            # Reply must be of same type
+            root_diasp = post.root().diasp
+            private = (root_diasp.type == 'private')
+            public = (root_diasp.type == 'public' and self_share.public)
+        else:
+            # Decide on visibility
+            public = self_share.public
+            if public:
+                private = False
+                self.type = 'public'
+            elif private:
+                self.type = 'private'
+            else:
+                self.type = 'limited'
+            db.session.add(diasp)
+            db.session.commit()
+
+        text = self.as_text()
+
+        senders = {
+            'private': {
+                'parent': PrivateMessage,
+                'child': SubPM,
+            },
+            'public': {
+                'parent': PostMessage,
+                'child': SubPost,
+            }
+        }
+
+        sender = senders['private' if private else 'public']
+        sender = sender['child' if post.parent else 'parent']
+        if public:
+            # De-dupe by server
+            targets = {c.diasp.server: c for c in targets}
+            for target in targets.values():
+                sender.send_public(post.author.user, target, post=post, text=text)
+        else:
+            for target in targets:
+                sender.send(post.author.user, target, post=post, text=text)

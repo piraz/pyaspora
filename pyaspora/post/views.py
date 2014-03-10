@@ -96,15 +96,14 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
         if share and viewing_as and share.contact_id == viewing_as.id:
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
-            if not post.parent_id:
-                if share.public:
-                    data['actions']['unmake_public'] = \
-                        url_for('posts.set_public',
-                                post_id=post.id, toggle='0', _external=True)
-                else:
-                    data['actions']['make_public'] = \
-                        url_for('posts.set_public',
-                                post_id=post.id, toggle='1', _external=True)
+            if share.public and post.can_change_privacy(False):
+                data['actions']['unmake_public'] = \
+                    url_for('posts.set_public',
+                            post_id=post.id, toggle='0', _external=True)
+            elif post.can_change_privacy(True):
+                data['actions']['make_public'] = \
+                    url_for('posts.set_public',
+                            post_id=post.id, toggle='1', _external=True)
 
     if not cache:
         _fill_cache(c, bool(share))
@@ -135,6 +134,9 @@ def _fill_cache(c, show_shares=False):
 
 
 def json_share(share, cache=None):
+    """
+    Turn a Share into a sensible format for serialisation.
+    """
     contact_repr = _get_cached(cache, 'contact', share.contact_id) if cache \
         else json_contact(share.contact)
     return {
@@ -262,6 +264,10 @@ def set_public(post_id, toggle):
     is True then the post will appear.
     """
     share = _get_share_for_post(post_id)
+    toggle = bool(toggle)
+
+    if not share.post.can_change_privacy(toggle):
+        abort(403, 'Not available')
 
     if share.public != toggle:
         share.public = toggle
@@ -349,8 +355,6 @@ def create(_user):
     """
     Create a new Post and Share it with the selected Contacts.
     """
-    from pyaspora.diaspora.utils import send_post
-
     body = post_param('body')
     relationship = {
         'type': post_param('relationship_type', optional=True),
@@ -425,22 +429,38 @@ def create(_user):
 
     db.session.add(post)
 
-    post.share_with([_user.contact], show_on_wall=(target['type'] == 'wall'))
+    is_public = (target_type == 'wall')
+
+    post.share_with([_user.contact], show_on_wall=is_public)
+
+    # Sigh, need an ID for the post
+    db.session.commit()
+
+    # Decide who the user wished to share it with
+    followers = {c.id: c for c in _user.contact.followers}
+    targets = []
+
     if target['type'] == 'all_friends':
-        for friend in _user.contact.friends():
-            post.share_with([friend])
+        targets = _user.contact.friends()
     if target['type'] == 'contact':
-        for friend in _user.contact.friends():
-            if str(friend.id) == target['id']:
-                post.share_with([friend])
+        targets = [c for c in followers if _user.contact.friends()
+            if str(friend.id) == target['id']]
     if target['type'] == 'group':
         for group in _user.groups:
             if str(group.id) == target['id']:
-                post.share_with([s.contact for s in group.subscriptions])
+                targets = [s.contact for s in group.subscriptions]
+    if target['type'] == 'wall':
+        targets = followers
+
+    # ...but only those targets who are interested in the sender!
+    post.share_with([t for target in targets if t.id in followers])
+
+    if is_public:
+        # Public posts go to any followers
+        already_shared = set([c.id for c in targets])
+        post.implicit_share([f for f in followers.values() if f.id not in already_shared])
 
     db.session.commit()
-
-    send_post(post, target['type'] == 'contact')
 
     data = json_post(post)
     return redirect(url_for('feed.view', _external=True), data_structure=data)
