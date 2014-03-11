@@ -232,7 +232,9 @@ class Post(db.Model):
         Contacts can see the content because it is public, but it is not
         directly shared with them.
         """
-        self._send_to_remotes(contacts)
+        if self.author.user:
+            # Only announce locally-generated content
+            self._send_to_remotes(contacts)
 
     def share_with(self, contacts, show_on_wall=False):
         """
@@ -250,7 +252,9 @@ class Post(db.Model):
                                      public=show_on_wall))
                 if contact.user and contact.id != self.author_id:
                     contact.user.notify_event(commit=False)
-        self._send_to_remotes(new_shares)
+        if self.author.user:
+            # Only announce locally-generated content
+            self._send_to_remotes(new_shares)
 
     def shared_with(self, contact):
         """

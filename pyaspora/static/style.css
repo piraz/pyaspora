@@ -107,6 +107,12 @@ th {
     .feedpost {
         background-color: #e0e0e0;
     }
+
+    .processing-count {
+        font-size: xx-large;
+        font-style: italic;
+        font-family: serif;
+    }
 }
 
 @media print {
@@ -118,4 +124,3 @@ th {
         display: none;
     }
 }
-

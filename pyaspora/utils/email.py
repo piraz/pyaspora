@@ -35,7 +35,6 @@ def send_mail(from_addr, to, subject, body):
     assert(dest_url.scheme in type_handlers)
 
     sender = type_handlers[dest_url.scheme](**init_args)
-    sender.set_debuglevel(True)
 
     sender.ehlo_or_helo_if_needed()
 

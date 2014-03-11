@@ -1,11 +1,12 @@
 from __future__ import absolute_import
 
 from base64 import b64decode
-from flask import request, url_for
+from flask import current_app, request, url_for
 from lxml import html
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, \
     String
 from sqlalchemy.orm import backref, relationship
+from sqlalchemy.sql import and_
 from sqlalchemy.sql.expression import func
 from traceback import format_exc
 from uuid import uuid4
@@ -21,7 +22,7 @@ except:
 from pyaspora import db
 from pyaspora.contact.models import Contact
 from pyaspora.diaspora import import_url_as_mimepart
-from pyaspora.diaspora.protocol import WebfingerRequest
+from pyaspora.diaspora.protocol import DiasporaMessageParser, WebfingerRequest
 from pyaspora.post.views import json_post
 
 
@@ -180,25 +181,26 @@ class MessageQueue(db.Model):
         @classmethod
         def pending_items_for_user(cls, user):
             return and_(
-                cls.format == cls.INCOMING,
-                cls.local_user == user
+                MessageQueue.format == MessageQueue.INCOMING,
+                MessageQueue.local_user == user
             )
 
     @classmethod
     def has_pending_items(cls, user):
-        first_item = db.session.query(cls).filter(
+        first = db.session.query(cls).filter(
             cls.Queries.pending_items_for_user(user)
         ).order_by(cls.created_at).first()
         return bool(first and not first.error)
 
     @classmethod
-    def process_incoming_queue(cls, user):
+    def process_incoming_queue(cls, user, max_items=None):
         from pyaspora.diaspora.actions import process_incoming_message
 
         queue_items = db.session.query(MessageQueue).filter(
             cls.Queries.pending_items_for_user(user)
         ).order_by(cls.created_at)
         dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
+        processed = 0
         for qi in queue_items:
             if qi.error:
                 break
@@ -209,8 +211,13 @@ class MessageQueue(db.Model):
             )
             try:
                 process_incoming_message(ret, c_from, user)
+                processed += 1
+                if max_items and processed > max_items:
+                    break
             except Exception:
-                qi.error = format_exc()
+                err = format_exc()
+                qi.error = err.encode('utf-8')
+                current_app.logger.error(err)
                 db.session.add(qi)
                 break
             else:

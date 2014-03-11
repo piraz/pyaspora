@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from flask import Blueprint, request
+from flask import Blueprint, request, url_for
 from sqlalchemy.sql import desc, or_
 from sqlalchemy.orm import contains_eager
 
@@ -10,7 +10,7 @@ from pyaspora.post.views import json_posts
 from pyaspora.tag.models import PostTag, Tag
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import add_logged_in_user_to_data, \
-    render_response
+    redirect, render_response
 
 blueprint = Blueprint('feed', __name__, template_folder='templates')
 
@@ -21,6 +21,10 @@ def view(_user):
     """
     Show the logged-in user their own feed.
     """
+    from pyaspora.diaspora.models import MessageQueue
+    if MessageQueue.has_pending_items(_user):
+        return redirect(url_for('diaspora.run_queue', _external=True))
+
     limit = int(request.args.get('limit', 99))
     friend_ids = [f.id for f in _user.contact.friends()]
     clauses = [Post.Queries.shared_with_contact(_user.contact)]

@@ -7,10 +7,13 @@ cached information.
 from __future__ import absolute_import
 
 from base64 import b64encode
-from flask import abort, Blueprint, request, url_for
+from datetime import datetime, timedelta
+from flask import abort, Blueprint, current_app, make_response, request, \
+    url_for
 from json import dumps
 from lxml import etree
 from sqlalchemy.sql import desc
+from traceback import format_exc
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
@@ -20,7 +23,8 @@ from pyaspora.diaspora.models import DiasporaContact, DiasporaPost, \
 from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.post.models import Post, Share
 from pyaspora.user.session import require_logged_in_user
-from pyaspora.utils.rendering import redirect, send_xml
+from pyaspora.utils.rendering import add_logged_in_user_to_data, \
+    redirect, render_response, send_xml
 
 blueprint = Blueprint('diaspora', __name__, template_folder='templates')
 
@@ -219,18 +223,12 @@ def receive_public():
     ret, c_from = dmp.decode(request.form['xml'], None)
     try:
         process_incoming_message(ret, c_from, None)
-        success = True
+        return 'OK'
     except Exception:
-        import traceback
-        traceback.print_exc()
-        success = False
+        current_app.logger.error(format_exc())
+        return 'Error', 400
     finally:
         db.session.commit()
-
-    if success:
-        return 'OK'
-    else:
-        return 'Error', 400
 
 
 @blueprint.route('/people/<string:guid>', methods=['GET'])
@@ -273,5 +271,25 @@ def json_feed(guid):
 @blueprint.route('/diaspora/run_queue', methods=['GET'])
 @require_logged_in_user
 def run_queue(_user):
-    MessageQueue.process_incoming_queue(_user)
-    return 'OK'
+    start = datetime.now()
+    retry = True
+    processed = int(request.args.get('processed', 0))
+    while datetime.now() < start + timedelta(seconds=3):
+        if not MessageQueue.has_pending_items(_user):
+            retry = False
+            break
+        MessageQueue.process_incoming_queue(_user, max_items=1)
+        processed += 1
+
+    data = {
+        'count': processed,
+        'next': url_for('.run_queue', processed=processed, _external=True)
+    }
+    add_logged_in_user_to_data(data, _user)
+
+    if retry:
+        resp = make_response(render_response('diaspora_queue.tpl', data))
+        resp.headers['Refresh'] = '1;{0}'.format(data['next'])
+        return resp
+    else:
+        return redirect(url_for('feed.view'))
