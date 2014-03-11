@@ -21,9 +21,9 @@ except:
 
 from pyaspora import db
 from pyaspora.content.models import MimePart
+from pyaspora.diaspora import import_url_as_mimepart
 from pyaspora.diaspora.models import DiasporaContact, DiasporaPost
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder
-from pyaspora.diaspora.utils import import_url_as_mimepart
 from pyaspora.post.models import Post
 from pyaspora.tag.models import Tag
 from pyaspora.utils.rendering import ensure_timezone

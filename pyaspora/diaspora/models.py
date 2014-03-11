@@ -20,6 +20,7 @@ except:
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
+from pyaspora.diaspora import import_url_as_mimepart
 from pyaspora.diaspora.protocol import WebfingerRequest
 from pyaspora.post.views import json_post
 
@@ -75,7 +76,6 @@ class DiasporaContact(db.Model):
         Fetch information about a Diaspora user and import it into the Contact
         provided.
         """
-        from pyaspora.diaspora.utils import import_url_as_mimepart
         try:
             wf = WebfingerRequest(addr).fetch()
         except URLError:

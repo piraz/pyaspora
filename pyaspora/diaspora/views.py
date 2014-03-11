@@ -18,7 +18,6 @@ from pyaspora.diaspora.actions import process_incoming_message
 from pyaspora.diaspora.models import DiasporaContact, DiasporaPost, \
     MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser
-from pyaspora.diaspora.utils import process_incoming_queue
 from pyaspora.post.models import Post, Share
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import redirect, send_xml
@@ -274,5 +273,5 @@ def json_feed(guid):
 @blueprint.route('/diaspora/run_queue', methods=['GET'])
 @require_logged_in_user
 def run_queue(_user):
-    process_incoming_queue(_user)
+    MessageQueue.process_incoming_queue(_user)
     return 'OK'
