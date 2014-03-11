@@ -322,3 +322,6 @@ class DiasporaPost(db.Model):
         else:
             for target in targets:
                 sender.send(post.author.user, target, post=post, text=text)
+
+    def can_change_privacy(self):
+        return False  # Generally, no
