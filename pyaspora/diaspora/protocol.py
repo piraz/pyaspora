@@ -6,6 +6,7 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
+from flask import current_app
 from json import dumps, loads
 from lxml import etree
 from re import match as re_match, sub as re_sub
@@ -461,8 +462,8 @@ class HostMeta(object):
         If any part of fetching the HostMeta occurs insecurely (eg. over HTTP)
         then attempt to fetch and validate the signature of the HostMeta).
         """
-        return True  # FIXME - implement
-        print(etree.tostring(tree))
+        assert current_app.config.get('ALLOW_INSECURE_HOSTMETA', False), \
+            "Configuration doesn't permit HTTP lookup"
 
 
 class RedirectTrackingHandler(HTTPRedirectHandler):
