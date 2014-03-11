@@ -444,7 +444,7 @@ def create(_user):
         targets = _user.contact.friends()
     if target['type'] == 'contact':
         targets = [c for c in followers if _user.contact.friends()
-            if str(friend.id) == target['id']]
+                   if str(friend.id) == target['id']]
     if target['type'] == 'group':
         for group in _user.groups:
             if str(group.id) == target['id']:
@@ -458,7 +458,9 @@ def create(_user):
     if is_public:
         # Public posts go to any followers
         already_shared = set([c.id for c in targets])
-        post.implicit_share([f for f in followers.values() if f.id not in already_shared])
+        post.implicit_share([
+            f for f in followers.values() if f.id not in already_shared
+        ])
 
     db.session.commit()
 

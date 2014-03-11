@@ -173,10 +173,7 @@ class Post(db.Model):
             if contact.id == self.author_id:
                 return True
 
-        # Is it visible to the world anywhere?
-        is_public = db.session.query(Share).filter(
-            and_(Share.public, Share.post == self)).first()
-        return bool(is_public)
+        return bool(self.is_public())
 
     def viewable_children(self, contact=None):
         """
@@ -199,9 +196,10 @@ class Post(db.Model):
         """
         Returns true if anybody has made this Post public.
         """
-        return db.session.query(Share).filter(
-            Share.public == True
-        ).first()
+        return db.session.query(Share).filter(and_(
+            Share.public,
+            Share.post == self
+        )).first()
 
     def author_made_public(self):
         """
@@ -209,7 +207,8 @@ class Post(db.Model):
         """
         return db.session.query(Share).filter(and_(
             Share.contact == self.author,
-            Share.public == True
+            Share.public,
+            Share.post == self
         )).first()
 
     def can_change_privacy(self, new_state):
@@ -245,17 +244,12 @@ class Post(db.Model):
         for contact in contacts:
             existing_share = None
             remotes = []
-            if self.id:
-                existing_share = db.session.query(Share).filter(
-                    and_(Share.post == self,
-                         Share.contact == contact)).first()
-            if not existing_share:
+            if not self.shared_with(contact):
                 new_shares.append(contact)
                 db.session.add(Share(contact=contact, post=self,
                                      public=show_on_wall))
-                if contact.user:
-                    if contact.id != self.author_id:
-                        contact.user.notify_event()
+                if contact.user and contact.id != self.author_id:
+                    contact.user.notify_event(commit=False)
         self._send_to_remotes(new_shares)
 
     def shared_with(self, contact):
@@ -263,10 +257,10 @@ class Post(db.Model):
         Returns a boolean indicating whether this Post has already been shared
         with Contact <contact>.
         """
-        share = db.session.query(Share).filter(
-            and_(Share.contact == contact,
-                 Share.post == self)).first()
-        return share
+        return db.session.query(Share).filter(and_(
+            Share.contact == contact,
+            Share.post == self
+        )).first()
 
     def root(self):
         """
@@ -283,6 +277,6 @@ class Post(db.Model):
         contact feeds. Requires the caller commit the session.
         """
         post = self.root()
-        post.thread_modified_at = datetime.now()
+        post.thread_modified_at = func.now()
         if post.id != self.id:
             db.session.add(post)

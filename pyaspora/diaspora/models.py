@@ -7,6 +7,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, \
     String
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql.expression import func
+from traceback import format_exc
 from uuid import uuid4
 try:
     from urllib.error import URLError
@@ -175,6 +176,47 @@ class MessageQueue(db.Model):
 
     local_user = relationship('User', backref='message_queue')
 
+    class Queries:
+        @classmethod
+        def pending_items_for_user(cls, user):
+            return and_(
+                cls.format == cls.INCOMING,
+                cls.local_user == user
+            )
+
+    @classmethod
+    def has_pending_items(cls, user):
+        first_item = db.session.query(cls).filter(
+            cls.Queries.pending_items_for_user(user)
+        ).order_by(cls.created_at).first()
+        return bool(first and not first.error)
+
+    @classmethod
+    def process_incoming_queue(cls, user):
+        from pyaspora.diaspora.actions import process_incoming_message
+
+        queue_items = db.session.query(MessageQueue).filter(
+            cls.Queries.pending_items_for_user(user)
+        ).order_by(cls.created_at)
+        dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
+        for qi in queue_items:
+            if qi.error:
+                break
+
+            ret, c_from = dmp.decode(
+                qi.body.decode('ascii'),
+                user._unlocked_key
+            )
+            try:
+                process_incoming_message(ret, c_from, user)
+            except Exception:
+                qi.error = format_exc()
+                db.session.add(qi)
+                break
+            else:
+                db.session.delete(qi)
+        db.session.commit()
+
 
 class DiasporaPost(db.Model):
     __tablename__ = 'diaspora_posts'
@@ -264,7 +306,12 @@ class DiasporaPost(db.Model):
             # De-dupe by server
             targets = {c.diasp.server: c for c in targets}
             for target in targets.values():
-                sender.send_public(post.author.user, target, post=post, text=text)
+                sender.send_public(
+                    post.author.user,
+                    target,
+                    post=post,
+                    text=text
+                )
         else:
             for target in targets:
                 sender.send(post.author.user, target, post=post, text=text)
