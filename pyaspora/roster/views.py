@@ -231,10 +231,10 @@ def save_contact_groups(contact_id, _user):
         template='roster_edit_group.tpl',
         optional=True
     ) or ''
-    new_groups = {
-        g.name: g for g in
+    new_groups = dict(
+        (g.name, g) for g in
         SubscriptionGroup.parse_line(groups, create=True, user=_user)
-    }
+    )
     old_groups = dit((g.name, g) for g in sub.groups)
 
     for group_name, group in old_groups.items():
