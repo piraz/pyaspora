@@ -311,7 +311,7 @@ class DiasporaPost(db.Model):
         sender = sender['child' if post.parent else 'parent']
         if public:
             # De-dupe by server
-            targets = {c.diasp.server: c for c in targets}
+            targets = dict((c.diasp.server, c) for c in targets)
             for target in targets.values():
                 sender.send_public(
                     post.author.user,

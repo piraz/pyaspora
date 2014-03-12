@@ -437,7 +437,7 @@ def create(_user):
     db.session.commit()
 
     # Decide who the user wished to share it with
-    followers = {c.id: c for c in _user.contact.followers()}
+    followers = dict((c.id, c) for c in _user.contact.followers())
     targets = []
 
     if target['type'] == 'all_friends':

@@ -113,7 +113,7 @@ class MessageHandlerBase:
         processed.
         """
         node = xml[0][0]
-        return {e.tag: e.text for e in node}
+        return dict((e.tag, e.text) for e in node)
 
     @classmethod
     def format_dt(cls, dt):
@@ -337,7 +337,7 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
         node = xml.xpath('//message')[0]
-        msg = {e.tag: e.text for e in node}
+        msg = dict((e.tag, e.text) for e in node)
         assert(data['diaspora_handle'] == c_from.diasp.username)
         assert(msg['diaspora_handle'] == c_from.diasp.username)
         assert(cls.valid_signature(c_from, msg['author_signature'], node))
