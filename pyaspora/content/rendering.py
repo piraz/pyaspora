@@ -63,13 +63,20 @@ def text_markdown(part, fmt, url):
     if part.inline:
         md = part.mime_part.body.decode('utf-8')
         if fmt == 'text/html':
-            return markdown(
-                md,
-                output_format='xhtml',
-                safe_mode='replace',
-                html_replacement_text='(could not show this)',
-                lazy_ol=False
-            )
+            try:
+                return markdown(
+                    md,
+                    output_format='xhtml',
+                    safe_mode='replace',
+                    html_replacement_text='(could not show this)',
+                    lazy_ol=False
+                )
+            except TypeError:
+                return markdown(
+                    md,
+                    output_format='xhtml',
+                    safe_mode='replace',
+                )
         if fmt == 'text/plain':
             return md
     return None
