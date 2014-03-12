@@ -429,7 +429,7 @@ def create(_user):
 
     db.session.add(post)
 
-    is_public = (target_type == 'wall')
+    is_public = (target['type'] == 'wall')
 
     post.share_with([_user.contact], show_on_wall=is_public)
 
@@ -437,23 +437,23 @@ def create(_user):
     db.session.commit()
 
     # Decide who the user wished to share it with
-    followers = {c.id: c for c in _user.contact.followers}
+    followers = {c.id: c for c in _user.contact.followers()}
     targets = []
 
     if target['type'] == 'all_friends':
         targets = _user.contact.friends()
     if target['type'] == 'contact':
-        targets = [c for c in followers if _user.contact.friends()
-                   if str(friend.id) == target['id']]
+        targets = [c for c_id, c in followers.items()
+                   if c_id == int(target['id'])]
     if target['type'] == 'group':
         for group in _user.groups:
-            if str(group.id) == target['id']:
-                targets = [s.contact for s in group.subscriptions]
+            if group.id == int(target['id']):
+                targets = [s.to_contact for s in group.subscriptions]
     if target['type'] == 'wall':
-        targets = followers
+        targets = followers.values()
 
     # ...but only those targets who are interested in the sender!
-    post.share_with([t for target in targets if t.id in followers])
+    post.share_with([t for t in targets if t.id in followers])
 
     if is_public:
         # Public posts go to any followers

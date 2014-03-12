@@ -58,6 +58,9 @@ def send_mail(from_addr, to, subject, body):
 
 
 def send_template(to, template, data):
+    if not current_app.config.get('SMTP_FROM'):
+        return
+
     subj = get_template_attribute(template, 'subject')
     body = render_template(template, **data)
     send_mail(current_app.config['SMTP_FROM'], to, subj, body)
