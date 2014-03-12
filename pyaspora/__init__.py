@@ -30,9 +30,17 @@ app.register_blueprint(users_blueprint, url_prefix='/users')
 app.register_blueprint(diaspora_blueprint)  # Diaspora has certain fixed URLs
 
 # Global template utility functions
-app.add_template_filter(templates.nl2br, name='nl2br')
-app.add_template_filter(templates.since, name='since')
-app.add_template_global(templates.chunk_url_params, name='chunk_url_params')
+try:
+    app.add_template_filter(templates.nl2br, name='nl2br')
+    app.add_template_filter(templates.since, name='since')
+    app.add_template_global(
+        templates.chunk_url_params,
+        name='chunk_url_params'
+    )
+except:
+    app.jinja_env.filters['nl2br'] = templates.nl2br
+    app.jinja_env.filters['since'] = templates.since
+    app.jinja_env.globals['chunk_url_params'] = templates.chunk_url_params
 
 
 def init_db():
