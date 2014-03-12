@@ -55,6 +55,7 @@ th {
 .feedpost .feedpost.unrolled {
     border-left: none;
     margin-left: 0em;
+    padding-bottom: 0em;
     padding-left: 0em;
 }
 
