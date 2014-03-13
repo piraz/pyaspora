@@ -323,3 +323,11 @@ class DiasporaPost(db.Model):
 
     def can_change_privacy(self):
         return False  # Generally, no
+
+    def can_reply_with(self, target):
+        if target.name == 'self':
+            return True
+        if self.type and self.type == 'p':
+            return target.name == 'public'
+        else:
+            return target.name == 'existing'

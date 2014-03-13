@@ -100,7 +100,11 @@ class Contact(Target):
             contact = contact[0]
         else:
             return
-        if contact.subscribed(post.author):
+        if cls._contact_wants_to_hear_from_user(
+            post.author,
+            contact,
+            post.parent
+        ):
             post.share_with([contact])
 
 

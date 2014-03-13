@@ -213,21 +213,6 @@ def comment(post_id, _user):
         }
     })
 
-    if post.author_id == _user.contact_id:
-        data.update({
-            'default_target': {
-                'type': 'all_friends',
-                'id': None
-            }
-        })
-    else:
-        data.update({
-            'default_target': {
-                'type': 'contact',
-                'id': post.author_id
-            }
-        })
-
     return render_response('posts_create_form.tpl', data)
 
 
@@ -287,6 +272,11 @@ def _base_create_form(user, parent=None):
             t for t in target_list
             if t.permitted_for_reply(user, parent)
         )
+        if parent.diasp:
+            targets = (
+                t for t in targets
+                if parent.diasp.can_reply_with(t)
+            )
     else:
         targets = (
             t for t in target_list
@@ -402,7 +392,7 @@ def create(_user):
     db.session.add(post)
     db.session.commit()
 
-    targets_by_name[target].make_shares(post, target['id'])
+    targets_by_name[target['type']].make_shares(post, target['id'])
     db.session.commit()
 
     data = json_post(post)
