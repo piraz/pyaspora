@@ -212,11 +212,17 @@ class Post(db.Model):
         )).first()
 
     def can_change_privacy(self, new_state):
-        if new_state and self.parent_id and not self.root().is_public():
-            return False
+        if new_state:
+            if self.parent_id and not self.parent.is_public():
+                return False
+        else:
+            if any(c.is_public() for c in self.children):
+                return False
+
         if self.diasp:
             return self.diasp.can_change_privacy()
-        return True
+        else:
+            return True
 
     def _send_to_remotes(self, contacts):
         """
@@ -244,8 +250,6 @@ class Post(db.Model):
         """
         new_shares = []
         for contact in contacts:
-            existing_share = None
-            remotes = []
             if not self.shared_with(contact):
                 new_shares.append(contact)
                 db.session.add(Share(contact=contact, post=self,

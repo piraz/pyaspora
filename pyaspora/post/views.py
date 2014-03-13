@@ -10,7 +10,7 @@ from pyaspora.contact.models import Contact
 from pyaspora.contact.views import json_contact
 from pyaspora.database import db
 from pyaspora.post.models import Post, PostPart, Share
-from pyaspora.roster.views import json_group
+from pyaspora.post.targets import target_list, targets_by_name
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
     redirect, render_response
 from pyaspora.utils.validation import check_attachment_is_safe, post_param
@@ -203,7 +203,7 @@ def comment(post_id, _user):
     if not post.has_permission_to_view(_user.contact):
         abort(403, 'Forbidden')
 
-    data = _base_create_form(_user)
+    data = _base_create_form(_user, post)
 
     data.update({
         'relationship': {
@@ -281,52 +281,21 @@ def set_public(post_id, toggle):
     return redirect(url_for('feed.view', _external=True))
 
 
-def _create_form_targets(user):
-    data = [
-        {
-            'name': 'self',
-            'description': 'Only visible to myself',
-            'targets': None
-        }
-    ]
-    user_list = [json_contact(c) for c in user.contact.friends()]
-    if user_list:
-        data.append({
-            'name': 'contact',
-            'description': 'Share with one friend',
-            'targets': user_list
-        })
+def _base_create_form(user, parent=None):
+    if parent:
+        targets = (
+            t for t in target_list
+            if t.permitted_for_reply(user, parent)
+        )
+    else:
+        targets = (
+            t for t in target_list
+            if t.permitted_for_new(user)
+        )
 
-    group_list = user.groups
-    if group_list:
-        data.append({
-            'name': 'group',
-            'description': 'Share with a group of friends',
-            'targets': [json_group(g, user) for g in group_list]
-        })
-
-    if user_list:
-        data.append({
-            'name': 'all_friends',
-            'description': 'Share with all my friends',
-            'targets': None
-        })
-
-    data.append(
-        {
-            'name': 'wall',
-            'description': 'Show to everyone on my wall',
-            'targets': None
-        }
-    )
-
-    return data
-
-
-def _base_create_form(user):
     data = {
         'next': url_for('.create', _external=True),
-        'targets': _create_form_targets(user),
+        'targets': [t.json_target(user, parent) for t in targets],
         'use_advanced_form': False
     }
     add_logged_in_user_to_data(data, user)
@@ -365,6 +334,8 @@ def create(_user):
         'type': post_param('target_type'),
         'id': post_param('target_id', optional=True),
     }
+
+    assert(target['type'] in targets_by_name)
 
     # Loathe inflexible HTML forms
     if target['id'] is None:
@@ -427,41 +398,11 @@ def create(_user):
 
     post.thread_modified()
 
+    # Sigh, need an ID for the post for making shares
     db.session.add(post)
-
-    is_public = (target['type'] == 'wall')
-
-    post.share_with([_user.contact], show_on_wall=is_public)
-
-    # Sigh, need an ID for the post
     db.session.commit()
 
-    # Decide who the user wished to share it with
-    followers = dict((c.id, c) for c in _user.contact.followers())
-    targets = []
-
-    if target['type'] == 'all_friends':
-        targets = _user.contact.friends()
-    if target['type'] == 'contact':
-        targets = [c for c_id, c in followers.items()
-                   if c_id == int(target['id'])]
-    if target['type'] == 'group':
-        for group in _user.groups:
-            if group.id == int(target['id']):
-                targets = [s.to_contact for s in group.subscriptions]
-    if target['type'] == 'wall':
-        targets = followers.values()
-
-    # ...but only those targets who are interested in the sender!
-    post.share_with([t for t in targets if t.id in followers])
-
-    if is_public:
-        # Public posts go to any followers
-        already_shared = set([c.id for c in targets])
-        post.implicit_share([
-            f for f in followers.values() if f.id not in already_shared
-        ])
-
+    targets_by_name[target].make_shares(post, target['id'])
     db.session.commit()
 
     data = json_post(post)
