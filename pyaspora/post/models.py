@@ -225,7 +225,7 @@ class Post(db.Model):
         from pyaspora.diaspora.models import DiasporaPost
         contacts = [c for c in contacts if not c.user]
         if contacts:
-            DiasporaPost.get_for_post(self).send_to(contacts, private=False)  # FIXME
+            DiasporaPost.get_for_post(self).send_to(contacts)
 
     def implicit_share(self, contacts):
         """

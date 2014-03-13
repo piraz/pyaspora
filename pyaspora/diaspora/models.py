@@ -261,7 +261,7 @@ class DiasporaPost(db.Model):
             ) + ' )'
         return text
 
-    def send_to(self, targets, private):
+    def send_to(self, targets, private=False):
         from pyaspora.diaspora.actions import PostMessage, PrivateMessage, \
             SubPost, SubPM
 
