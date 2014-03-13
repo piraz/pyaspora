@@ -22,6 +22,10 @@ from pyaspora.user.session import logged_in_user, require_logged_in_user
 blueprint = Blueprint('contacts', __name__, template_folder='templates')
 
 
+class FakePart:
+    pass
+
+
 @blueprint.route('/<int:contact_id>/avatar', methods=['GET'])
 def avatar(contact_id):
     """
@@ -182,7 +186,10 @@ def json_contact(contact, viewing_as=None):
         )
 
     if contact.bio:
-        resp['bio'] = json_part(PostPart(mime_part=contact.bio, inline=True))
+        fake_part = FakePart()
+        fake_part.inline = True
+        fake_part.mime_part = contact.bio
+        resp['bio'] = json_part(fake_part)
 
     if viewing_as:
         if viewing_as.id == contact.id:

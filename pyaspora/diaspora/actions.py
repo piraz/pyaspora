@@ -6,17 +6,15 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCSSign
 from datetime import datetime
 from dateutil.tz import tzutc
-from flask import url_for
+from flask import current_app, url_for
 from json import dumps
 from lxml import etree
 from re import compile as re_compile
 try:
-    from urllib.error import URLError
     from urllib.parse import urljoin
     from urllib.request import urlopen
 except:
     from urllib import urlopen
-    from urllib2 import URLError
     from urlparse import urljoin
 
 from pyaspora import db
@@ -47,7 +45,11 @@ def process_incoming_message(payload, c_from, u_to):
     Decide which type of message this is, and call the correct handler.
     """
     xml = payload.lstrip()
-    print(xml)
+    current_app.logger.debug(
+        "Message received from {0} for {1}\n{2}".format(
+            c_from.id, u_to.id if u_to else '(none)', xml
+        )
+    )
     doc = etree.fromstring(xml)
     for xpath, handler in HANDLERS.items():
         if doc.xpath(xpath):
@@ -190,7 +192,8 @@ class Subscribe(MessageHandlerBase):
         """
         data = cls.as_dict(xml)
         assert(data['sender_handle'] == c_from.diasp.username)
-        c_from.subscribe(u_to.contact)
+        if not c_from.subscribed_to(u_to.contact):
+            c_from.subscribe(u_to.contact)
 
     @classmethod
     def generate(cls, u_from, c_to):
@@ -358,9 +361,8 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
         p.tags = cls.find_tags(data['text'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
-        db.session.commit()
-
         p.diasp = DiasporaPost(guid=data['guid'], type='private')
+        db.session.add(p)
         db.session.commit()
 
     @classmethod
@@ -439,6 +441,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         p.thread_modified()
 
         p.diasp = DiasporaPost(guid=data['guid'])
+        db.session.add(p)
         db.session.commit()
 
     @classmethod
@@ -488,8 +491,8 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         p.tags = cls.find_tags(data['raw_message'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
-
         p.diasp = DiasporaPost(guid=data['guid'])
+        db.session.add(p)
         db.session.commit()
 
     @classmethod

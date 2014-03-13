@@ -274,8 +274,8 @@ class DiasporaPost(db.Model):
 
         if self.type:
             # Sent before, must keep same type
-            private = (post.diasp.type == 'private')
-            public = (post.diasp.type == 'public')
+            private = (self.type == 'private')
+            public = (self.type == 'public')
         elif post.parent and post.root().diasp and post.root().diasp.type:
             # Reply must be of same type
             root_diasp = post.root().diasp
@@ -291,8 +291,6 @@ class DiasporaPost(db.Model):
                 self.type = 'private'
             else:
                 self.type = 'limited'
-            db.session.add(diasp)
-            db.session.commit()
 
         text = self.as_text()
 
