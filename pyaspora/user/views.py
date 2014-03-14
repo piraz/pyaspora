@@ -151,7 +151,10 @@ def info(_user):
     """
     data = json_user(_user)
     add_logged_in_user_to_data(data, _user)
-    data['notification_frequency_hours'] = _user.notification_hours
+    data.update({
+        'notification_frequency_hours': _user.notification_hours,
+        'email': _user.email
+    })
     return render_response('users_edit.tpl', data)
 
 
@@ -187,6 +190,21 @@ def edit(_user):
         optional=True
     )
     _user.notification_hours = int(notif_freq) if notif_freq else None
+
+    email = post_param('email', optional=True)
+    if email and email != _user.email:
+        _user.email = email
+
+    old_pw = post_param('current_password', optional=True)
+    new_pw1 = post_param('new_password', optional=True)
+    new_pw2 = post_param('new_password2', optional=True)
+    if old_pw and new_pw1 and new_pw2:
+        if new_pw1 != new_pw2:
+            abort(400, 'New passwords do not match')
+        try:
+            _user.change_password(old_pw, new_pw1)
+        except ValueError:
+            abort(400, 'Old password is incorrect')
     db.session.add(_user)
 
     attachment = request.files.get('avatar', None)

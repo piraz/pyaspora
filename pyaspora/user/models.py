@@ -111,6 +111,21 @@ class User(db.Model):
         except (ValueError, IndexError, TypeError):
             return None
 
+    def change_password(self, old_pw, new_pw):
+        """
+        Change the password on the key from <old_pw> to <new_pw>. Throws a
+        ValueError if <old_pw> is incorrect. The caller must commit the session
+        to save the new key.
+        """
+        unlocked_key = self.unlock_key_with_password(old_pw)
+        if not unlocked_key:
+            raise ValueError()
+        self.private_key = unlocked_key.exportKey(
+            format='PEM',
+            pkcs=1,
+            passphrase=new_pw
+        ).decode("ascii")
+
     def generate_keypair(self, passphrase):
         """
         Generate a 2048-bit RSA key. The key will be stored in the User
