@@ -80,7 +80,10 @@ class MessageHandlerBase:
         m = cls._build(u_from, c_to, **kwargs)
         url = "{0}receive/users/{1}".format(
             c_to.diasp.server, c_to.diasp.guid)
-        print("posting {0} to {1}".format(etree.tostring(m.message), url))
+        current_app.logger.debug("posting {0} to {1}".format(
+            etree.tostring(m.message),
+            url
+        ))
         resp = m.post(url, RSA.importKey(c_to.public_key))
         return resp
 
@@ -92,7 +95,10 @@ class MessageHandlerBase:
         """
         m = cls._build(u_from, None, **kwargs)
         url = "{0}receive/public".format(c_to.diasp.server)
-        print("posting {0} to {1}".format(etree.tostring(m.message), url))
+        current_app.logger.debug("posting {0} to {1}".format(
+            etree.tostring(m.message),
+            url
+        ))
         resp = m.post(url, None)
         return resp
 
@@ -151,12 +157,15 @@ class SignableMixin:
         """
         Validate <signature> convirms that <contact> signed the node <node>.
         """
-        signature = b64decode(signature)
+        assert(contact)
+        assert(signature)
+        assert(node is not None)
         sig_contents = ';'.join([
             e.text for e in node
             if e.text is not None
             and not e.tag.endswith('_signature')
         ])
+        signature = b64decode(signature)
         sig_hash = SHA256.new(sig_contents.encode("utf-8"))
         cipher = PKCSSign.new(RSA.importKey(contact.public_key))
         return cipher.verify(sig_hash, signature)
@@ -412,22 +421,26 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
-        assert(data['diaspora_handle'] == c_from.diasp.username)
+        author = DiasporaContact.get_by_username(
+            data['diaspora_handle'], True, False
+        )
+        assert(author)
+        author = author.contact
         parent = DiasporaPost.get_by_guid(data['parent_guid']).post
         assert(parent)
         if u_to:
             assert(parent.shared_with(c_from))
             assert(parent.shared_with(u_to))
         node = xml[0][0]
-        assert(cls.valid_signature(c_from, data['author_signature'], node))
+        assert(cls.valid_signature(author, data['author_signature'], node))
         if 'parent_author_signature' in data:
             assert(
                 cls.valid_signature(
-                    c_from, data['parent_author_signature'], node
+                    parent.author, data['parent_author_signature'], node
                 )
             )
 
-        p = Post(author=c_from)
+        p = Post(author=author)
         p.parent = parent
         p.add_part(MimePart(
             type='text/x-markdown',
@@ -454,7 +467,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
             {'guid': diasp.guid},
             {'parent_guid': p_diasp.guid},
             {'text': text},
-            {'diaspora_handle': u_from.contact.diasp.username}
+            {'diaspora_handle': post.diasp.username}
         ])
         etree.SubElement(req, "author_signature").text = \
             cls.generate_signature(u_from, req)
@@ -469,16 +482,20 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
-        assert(data['diaspora_handle'] == c_from.diasp.username)
+        author = DiasporaContact.get_by_username(
+            data['diaspora_handle'], True, False
+        )
+        assert(author)
+        author = author.contact
         parent = DiasporaPost.get_by_guid(data['parent_guid']).post
         assert(parent)
         assert(parent.shared_with(c_from))
         assert(parent.shared_with(u_to))
         node = xml[0][0]
-        assert(cls.valid_signature(c_from, data['author_signature'], node))
+        assert(cls.valid_signature(author, data['author_signature'], node))
         if 'parent_author_signature' in data:
             assert(cls.valid_signature(
-                c_from, data['parent_author_signature'], node
+                parent.author, data['parent_author_signature'], node
             ))
 
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')

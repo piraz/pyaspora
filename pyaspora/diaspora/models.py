@@ -162,12 +162,12 @@ class MessageQueue(db.Model):
         format - the protocol format of the payload
         body - the message payload, in a protocol-specific format
     """
-    OUTGOING = 'application/x-pyaspora-outbound'
     INCOMING = 'application/x-diaspora-slap'
+    PUBLIC_INCOMING = 'application/x-diaspora-public-slap'
 
     __tablename__ = 'message_queue'
     id = Column(Integer, primary_key=True)
-    local_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    local_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     remote_id = Column(Integer, ForeignKey('contacts.id'), nullable=True)
     format = Column(String, nullable=False)
     body = Column(LargeBinary, nullable=False)

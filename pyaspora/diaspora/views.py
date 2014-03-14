@@ -225,7 +225,16 @@ def receive_public():
         process_incoming_message(ret, c_from, None)
         return 'OK'
     except Exception:
-        current_app.logger.error(format_exc())
+        err = format_exc()
+        current_app.logger.error(err)
+        db.session.expunge_all()
+        queue_item = MessageQueue()
+        queue_item.local_user = None
+        queue_item.remote = None
+        queue_item.format = MessageQueue.PUBLIC_INCOMING
+        queue_item.body = request.form['xml'].encode('ascii')
+        queue_item.error = err
+        db.session.add(queue_item)
         return 'Error', 400
     finally:
         db.session.commit()
