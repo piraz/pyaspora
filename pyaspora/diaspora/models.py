@@ -55,7 +55,6 @@ class DiasporaContact(db.Model):
 
     @classmethod
     def get_by_guid(cls, guid):
-        print("look up", guid)
         return db.session.query(cls).filter(cls.guid == guid).first()
 
     @classmethod
@@ -318,6 +317,9 @@ class DiasporaPost(db.Model):
                     text=text
                 )
         else:
+            # Can only send to followers
+            followers = set([c.id for c in post.author.followers()])
+            targets = [t for t in targets if t.id in followers]
             for target in targets:
                 sender.send(post.author.user, target, post=post, text=text)
 

@@ -37,5 +37,4 @@ class TagParseMixin:
             )
             if tag:
                 tags.append(tag)
-        print(repr(tags))
         return tags

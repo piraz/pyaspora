@@ -68,7 +68,8 @@ class MessageHandlerBase:
         Generate an XML message to send to a remote node.
         """
         diasp = DiasporaContact.get_for_contact(u_from.contact)
-        xml = cls.generate(u_from, c_to, **kwargs)
+        fn = kwargs.pop('fn', cls.generate)
+        xml = fn(u_from, c_to, **kwargs)
         m = DiasporaMessageBuilder(xml, diasp.username, u_from._unlocked_key)
         return m
 
@@ -421,6 +422,8 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
+        if DiasporaPost.get_by_guid(data['guid']):
+            return
         author = DiasporaContact.get_by_username(
             data['diaspora_handle'], True, False
         )
@@ -436,7 +439,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         if 'parent_author_signature' in data:
             assert(
                 cls.valid_signature(
-                    parent.author, data['parent_author_signature'], node
+                    p.root().author, data['parent_author_signature'], node
                 )
             )
 
@@ -448,14 +451,19 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['text'])
         if u_to:
-            p.share_with([c_from, u_to.contact])
+            p.share_with([p.author, u_to.contact])
+            if p.author_id != c_from.id:
+                p.share_with([c_from])
         else:
-            p.share_with([c_from], show_on_wall=True)
+            p.share_with([p.author], show_on_wall=True)
         p.thread_modified()
 
         p.diasp = DiasporaPost(guid=data['guid'])
         db.session.add(p)
         db.session.commit()
+
+        if p.parent.author_id == u_to.contact.id:
+            cls.forward(u_to, p, node)
 
     @classmethod
     def generate(cls, u_from, c_to, post, text):
@@ -467,7 +475,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
             {'guid': diasp.guid},
             {'parent_guid': p_diasp.guid},
             {'text': text},
-            {'diaspora_handle': post.diasp.username}
+            {'diaspora_handle': post.author.diasp.username}
         ])
         etree.SubElement(req, "author_signature").text = \
             cls.generate_signature(u_from, req)
@@ -476,12 +484,35 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
                 cls.generate_signature(u_from, req)
         return req
 
+    @classmethod
+    def forward(cls, u_from, post, node):
+        parent_sig = [n for n in node if n.tag == 'parent_author_signature']
+        assert(not parent_sig)
+        etree.SubElement(node, "parent_author_signature").text = \
+            cls.generate_signature(u_from, node)
+        def _builder(u_from, c_to, n):
+            return n
+        targets = [s.to_contact for s in post.parent.shares
+                   if s.to_contact_id != post.author_id]
+        post.share_with([targets])
+        is_public = (p.root().is_public())
+        if is_public:
+            targets.append(list(u_from.contact.followers()))
+        targets = [c for c in targets if not c.user]
+        for target in targets:
+            if is_public:  # FIXME dedupe servers
+                cls.send_public(u_from, target, n=node, fn=_builder)
+            else:
+                cls.send(u_from, target, n=node, fn=_builder)
+
 
 @diaspora_message_handler('/XML/post/message')
 class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
+        if DiasporaPost.get_by_guid(data['guid']):
+            return
         author = DiasporaContact.get_by_username(
             data['diaspora_handle'], True, False
         )
@@ -506,7 +537,9 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
             body=data['text'].encode('utf-8'),
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['raw_message'])
-        p.share_with([c_from, u_to.contact])
+        p.share_with([p.author, u_to.contact])
+        if p.author_id != c_from.id:
+            p.share_with([c_from])
         p.thread_modified()
         p.diasp = DiasporaPost(guid=data['guid'])
         db.session.add(p)
@@ -523,7 +556,7 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
             {'parent_guid': p_diasp.guid},
             {'text': text},
             {'created_at': cls.format_dt(post.created_at)},
-            {'diaspora_handle': u_from.contact.diasp.username},
+            {'diaspora_handle': post.author.diasp.username},
             {'conversation_guid': p_diasp.guid}
         ])
         etree.SubElement(req, "author_signature").text = \

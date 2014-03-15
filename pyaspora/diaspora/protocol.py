@@ -472,7 +472,6 @@ class RedirectTrackingHandler(HTTPRedirectHandler):
     """
     def http_error_301(self, req, fp, code, msg, headers):
         new_url = req.get_full_url()
-        print(repr(headers))
         result = HTTPRedirectHandler.http_error_301(
             self, req, fp, code, msg, headers)
         if not hasattr(result, "redirected_via"):

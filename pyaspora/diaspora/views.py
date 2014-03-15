@@ -115,7 +115,6 @@ def hcard(guid):
     fetch-by-GUID.
     """
     diasp = DiasporaContact.get_by_guid(guid)
-    print("diasp={}".format(diasp))
     if diasp is None or not diasp.contact.user:
         abort(404, 'No such contact')
     c = diasp.contact

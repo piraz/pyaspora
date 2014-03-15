@@ -215,6 +215,7 @@ class AllFriends(Target):
                 c,
                 post.parent
             )
+            and s.contact_id != post.author_id
         ]
         post.share_with(contacts)
 
@@ -249,6 +250,7 @@ class ExistingViewers(Target):
                 s.contact,
                 post.parent
             )
+            and s.contact_id != post.author_id
         ]
         post.share_with(contacts)
 
