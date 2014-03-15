@@ -232,7 +232,7 @@ def receive_public():
         queue_item.remote = None
         queue_item.format = MessageQueue.PUBLIC_INCOMING
         queue_item.body = request.form['xml'].encode('ascii')
-        queue_item.error = err
+        queue_item.error = err.encode('utf-8')
         db.session.add(queue_item)
         return 'Error', 400
     finally:
@@ -301,3 +301,27 @@ def run_queue(_user):
         return resp
     else:
         return redirect(url_for('feed.view'))
+
+
+@blueprint.route('/diaspora/run_public_queue', methods=['GET'])
+@require_logged_in_user
+def run_public_queue(_user):
+    queue_items = db.session.query(MessageQueue).filter(
+        MessageQueue.Queries.pending_public_items()
+    ).order_by(MessageQueue.created_at)
+    for qi in queue_items:
+        if qi.error:
+            break
+
+        try:
+            qi.process_incoming()
+        except Exception:
+            err = format_exc()
+            qi.error = err.encode('utf-8')
+            current_app.logger.error(err)
+            db.session.add(qi)
+            break
+        else:
+            db.session.delete(qi)
+    db.session.commit()
+    return redirect(url_for('feed.view'))

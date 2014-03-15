@@ -308,6 +308,8 @@ class PostMessage(TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
+        if DiasporaPost.get_by_guid(data['guid']):
+            return
         public = (data['public'] == 'true')
         assert(public or u_to)
         assert(data['diaspora_handle'] == c_from.diasp.username)
@@ -349,6 +351,8 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
+        if DiasporaPost.get_by_guid(data['guid']):
+            return
         node = xml.xpath('//message')[0]
         msg = dict((e.tag, e.text) for e in node)
         assert(data['diaspora_handle'] == c_from.diasp.username)
@@ -439,7 +443,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         if 'parent_author_signature' in data:
             assert(
                 cls.valid_signature(
-                    p.root().author, data['parent_author_signature'], node
+                    parent.root().author, data['parent_author_signature'], node
                 )
             )
 
@@ -452,17 +456,18 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         p.tags = cls.find_tags(data['text'])
         if u_to:
             p.share_with([p.author, u_to.contact])
-            if p.author_id != c_from.id:
-                p.share_with([c_from])
         else:
             p.share_with([p.author], show_on_wall=True)
+        if p.author_id != c_from.id:
+            p.share_with([c_from])
+
         p.thread_modified()
 
         p.diasp = DiasporaPost(guid=data['guid'])
         db.session.add(p)
         db.session.commit()
 
-        if p.parent.author_id == u_to.contact.id:
+        if (p.parent.author_id == u_to.contact.id) or not u_to:
             cls.forward(u_to, p, node)
 
     @classmethod
@@ -488,20 +493,22 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
     def forward(cls, u_from, post, node):
         parent_sig = [n for n in node if n.tag == 'parent_author_signature']
         assert(not parent_sig)
-        etree.SubElement(node, "parent_author_signature").text = \
-            cls.generate_signature(u_from, node)
+        if u_from:
+            etree.SubElement(node, "parent_author_signature").text = \
+                cls.generate_signature(u_from, node)
+
         def _builder(u_from, c_to, n):
             return n
         targets = [s.to_contact for s in post.parent.shares
                    if s.to_contact_id != post.author_id]
         post.share_with([targets])
-        is_public = (p.root().is_public())
+        is_public = (post.root().is_public())
         if is_public:
-            targets.append(list(u_from.contact.followers()))
+            targets.append(list(post.author.followers()))
         targets = [c for c in targets if not c.user]
         for target in targets:
             if is_public:  # FIXME dedupe servers
-                cls.send_public(u_from, target, n=node, fn=_builder)
+                cls.send_public(None, target, n=node, fn=_builder)
             else:
                 cls.send(u_from, target, n=node, fn=_builder)
 

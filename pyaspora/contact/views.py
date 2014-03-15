@@ -8,10 +8,11 @@ from __future__ import absolute_import
 
 from flask import Blueprint, request, url_for, abort as flask_abort
 from lxml import etree
+from re import match as re_match
 from sqlalchemy.orm import contains_eager
 from sqlalchemy.sql import desc, or_
 
-from pyaspora.contact import models
+from pyaspora.contact.models import Contact
 from pyaspora.database import db
 from pyaspora.tag.views import json_tag
 from pyaspora.utils import get_server_name
@@ -34,7 +35,7 @@ def avatar(contact_id):
     if not logged in then only locally-mastered contacts have their avatar
     displayed.
     """
-    contact = models.Contact.get(contact_id)
+    contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
     if not contact.user and not logged_in_user():
@@ -55,7 +56,7 @@ def _profile_base(contact_id, public=False):
     from pyaspora.post.models import Post, Share
     from pyaspora.post.views import json_posts
 
-    contact = models.Contact.get(contact_id)
+    contact = Contact.get(contact_id)
     if not contact:
         abort(404, 'No such contact', force_status=True)
 
@@ -151,7 +152,6 @@ def json_contact(contact, viewing_as=None):
     If "viewing_as" (a local contact) is supplied, the data visible to that
     contact will be returned; otherwise only public data is visible.
     """
-    from pyaspora.post.models import PostPart
     from pyaspora.post.views import json_part
     resp = {
         'id': contact.id,
@@ -234,7 +234,7 @@ def subscriptions(contact_id, _user):
     Display the friend list for the contact (who must be local to this server,
     because this server doesn't hold the full friend list for remote users).
     """
-    contact = models.Contact.get(contact_id)
+    contact = Contact.get(contact_id)
     if not(contact.user and contact.user.activated):
         abort(404, 'No such contact', force_status=True)
 
@@ -249,3 +249,32 @@ def subscriptions(contact_id, _user):
     add_logged_in_user_to_data(data, _user)
 
     return render_response('contacts_friend_list.tpl', data)
+
+
+@blueprint.route('/search', methods=['GET'])
+@require_logged_in_user
+def search(_user):
+    from pyaspora.diaspora.models import DiasporaContact
+    term = request.args.get('searchterm', None) or \
+        abort(400, 'No search term provided')
+    print(term)
+    if re_match('[A-Za-z0-9._]+@[A-Za-z0-9.]+$', term):
+        try:
+            print("fetch")
+            print(DiasporaContact.get_by_username(term))
+        except:
+            import traceback
+            traceback.print_exc()
+
+    matches = db.session.query(Contact).outerjoin(DiasporaContact).filter(or_(
+        DiasporaContact.username.contains(term),
+        Contact.realname.contains(term)
+    )).order_by(Contact.realname).limit(99)
+
+    data = {
+        'contacts': [json_contact(c, _user) for c in matches]
+    }
+
+    add_logged_in_user_to_data(data, _user)
+
+    return render_response('contacts_search_results.tpl', data)

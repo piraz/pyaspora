@@ -10,7 +10,13 @@ Standard widgets
         {% if contact.avatar %}
             <img src="{{contact.avatar}}" alt="Avatar" class="avatar" height="24" width="24" />
         {% endif %}
-        <a href="{{contact.link}}">{{contact.name or '(anonymous)'}}</a>
+        <a href="{{contact.link}}">
+       		{%- if contact.name.strip() == "" %}
+       			(anonymous)
+       		{%- else -%}
+       			{{contact.name}}
+        	{%- endif -%}
+        </a>
     </div>
 {% endmacro %}
 

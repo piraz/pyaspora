@@ -30,7 +30,7 @@ class DiasporaContact(db.Model):
     __tablename__ = 'diaspora_contacts'
     contact_id = Column(Integer, ForeignKey('contacts.id'), primary_key=True)
     guid = Column(String, nullable=False, unique=True)
-    username = Column(String, nullable=False)
+    username = Column(String, nullable=False, unique=True)
     server = Column(String, nullable=False)
 
     contact = relationship('Contact', single_parent=True,
@@ -184,6 +184,10 @@ class MessageQueue(db.Model):
                 MessageQueue.local_user == user
             )
 
+        @classmethod
+        def pending_public_items(cls):
+            return MessageQueue.format == MessageQueue.PUBLIC_INCOMING
+
     @classmethod
     def has_pending_items(cls, user):
         first = db.session.query(cls).filter(
@@ -193,23 +197,16 @@ class MessageQueue(db.Model):
 
     @classmethod
     def process_incoming_queue(cls, user, max_items=None):
-        from pyaspora.diaspora.actions import process_incoming_message
-
         queue_items = db.session.query(MessageQueue).filter(
             cls.Queries.pending_items_for_user(user)
         ).order_by(cls.created_at)
-        dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
         processed = 0
         for qi in queue_items:
             if qi.error:
                 break
 
-            ret, c_from = dmp.decode(
-                qi.body.decode('ascii'),
-                user._unlocked_key
-            )
             try:
-                process_incoming_message(ret, c_from, user)
+                qi.process_incoming(user)
                 processed += 1
                 if max_items and processed > max_items:
                     break
@@ -223,11 +220,21 @@ class MessageQueue(db.Model):
                 db.session.delete(qi)
         db.session.commit()
 
+    def process_incoming(self, user=None):
+        from pyaspora.diaspora.actions import process_incoming_message
+
+        dmp = DiasporaMessageParser(DiasporaContact.get_by_username)
+        ret, c_from = dmp.decode(
+            self.body.decode('ascii'),
+            user._unlocked_key if user else None
+        )
+        process_incoming_message(ret, c_from, user)
+
 
 class DiasporaPost(db.Model):
     __tablename__ = 'diaspora_posts'
     post_id = Column(Integer, ForeignKey('posts.id'), primary_key=True)
-    guid = Column(String, nullable=False)
+    guid = Column(String, nullable=False, unique=True)
     type = Column(String, nullable=True)
 
     post = relationship('Post', single_parent=True,

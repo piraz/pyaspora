@@ -21,4 +21,13 @@ List the friends of the logged-in User
 {% endfor %}
 </ul>
 
+<h2>Find someone</h2>
+
+<form method="get" action="{{actions.search}}">
+	<p>
+		Search for: <input name="searchterm" />
+		<input type="submit" value="Search" />
+	</p>
+</form>
+
 {% endblock %}

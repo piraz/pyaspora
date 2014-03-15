@@ -38,7 +38,10 @@ def view(_user):
     subs = db.session.query(Subscription). \
         filter(Subscription.from_contact == _user.contact)
     data = {
-        'subscriptions': [json_contact_with_groups(s, _user) for s in subs]
+        'subscriptions': [json_contact_with_groups(s, _user) for s in subs],
+        'actions': {
+            'search': url_for('contacts.search', _external=True)
+        }
     }
 
     add_logged_in_user_to_data(data, _user)
