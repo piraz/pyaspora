@@ -372,7 +372,7 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
                 type='text/x-markdown' if tag == 'text' else 'text/plain',
                 body=(data.get(tag, None) or msg[tag]).encode('utf-8'),
             ), order=order, inline=True)
-        p.tags = cls.find_tags(data['text'])
+        p.tags = cls.find_tags(msg['text'])
         p.share_with([c_from, u_to.contact])
         p.thread_modified()
         p.diasp = DiasporaPost(guid=data['guid'], type='private')
@@ -467,7 +467,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         db.session.add(p)
         db.session.commit()
 
-        if (p.parent.author_id == u_to.contact.id) or not u_to:
+        if not(u_to) or (p.parent.author_id == u_to.contact.id):
             cls.forward(u_to, p, node)
 
     @classmethod
@@ -537,16 +537,14 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
             ))
 
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
-        p = Post(author=c_from, created_at=created)
+        p = Post(author=author, created_at=created)
         p.parent = parent
         p.add_part(MimePart(
             type='text/x-markdown',
             body=data['text'].encode('utf-8'),
         ), order=0, inline=True)
-        p.tags = cls.find_tags(data['raw_message'])
-        p.share_with([p.author, u_to.contact])
-        if p.author_id != c_from.id:
-            p.share_with([c_from])
+        p.tags = cls.find_tags(data['text'])
+        p.share_with([s.contact for s in p.root().shares])
         p.thread_modified()
         p.diasp = DiasporaPost(guid=data['guid'])
         db.session.add(p)
