@@ -458,7 +458,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
             p.share_with([p.author, u_to.contact])
         else:
             p.share_with([p.author], show_on_wall=True)
-        if p.author_id != c_from.id:
+        if p.author.id != c_from.id:
             p.share_with([c_from])
 
         p.thread_modified()
@@ -484,7 +484,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         ])
         etree.SubElement(req, "author_signature").text = \
             cls.generate_signature(u_from, req)
-        if p_diasp.post.author_id == u_from.id:
+        if p_diasp.post.author.id == u_from.id:
             etree.SubElement(req, "parent_author_signature").text = \
                 cls.generate_signature(u_from, req)
         return req
@@ -499,15 +499,16 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
 
         def _builder(u_from, c_to, n):
             return n
-        targets = [s.to_contact for s in post.parent.shares
-                   if s.to_contact_id != post.author_id]
-        post.share_with([targets])
+        already_shared = set([s.contact_id for s in post.shares])
+        targets = [s.contact for s in post.parent.shares
+                   if s.contact_id not in already_shared]
+        post.share_with(targets)
         is_public = (post.root().is_public())
         if is_public:
             targets.append(list(post.author.followers()))
         targets = [c for c in targets if not c.user]
         for target in targets:
-            if is_public:  # FIXME dedupe servers
+            if is_public:
                 cls.send_public(None, target, n=node, fn=_builder)
             else:
                 cls.send(u_from, target, n=node, fn=_builder)
@@ -550,6 +551,9 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         db.session.add(p)
         db.session.commit()
 
+        if not(u_to) or (p.parent.author_id == u_to.contact.id):
+            cls.forward(u_to, p, node)
+
     @classmethod
     def generate(cls, u_from, c_to, post, text):
         req = etree.Element('message')
@@ -566,10 +570,28 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         ])
         etree.SubElement(req, "author_signature").text = \
             cls.generate_signature(u_from, req)
-        if p_diasp.post.author_id == u_from.id:
+        if p_diasp.post.author.id == u_from.id:
             etree.SubElement(req, "parent_author_signature").text = \
                 cls.generate_signature(u_from, req)
         return req
+
+    @classmethod
+    def forward(cls, u_from, post, node):
+        parent_sig = [n for n in node if n.tag == 'parent_author_signature']
+        assert(not parent_sig)
+        if u_from:
+            etree.SubElement(node, "parent_author_signature").text = \
+                cls.generate_signature(u_from, node)
+
+        def _builder(u_from, c_to, n):
+            return n
+        already_shared = set([s.contact_id for s in post.shares])
+        targets = [s.contact for s in post.parent.shares
+                   if s.contact_id not in already_shared]
+        post.share_with(targets)
+        targets = [c for c in targets if not c.user]
+        for target in targets:
+            cls.send(u_from, target, n=node, fn=_builder)
 
 
 @diaspora_message_handler('/XML/post/like')

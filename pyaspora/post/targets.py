@@ -215,7 +215,7 @@ class AllFriends(Target):
                 c,
                 post.parent
             )
-            and s.contact_id != post.author_id
+            and c.id != post.author_id
         ]
         post.share_with(contacts)
 
