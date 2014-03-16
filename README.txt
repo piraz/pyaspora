@@ -29,21 +29,15 @@ Aim
 ---
 
 To create a second implemention of the "Diaspora" social network, to create an
-ecosystem around the protocol. I would like to license it under a more liberal
-license than the main implementation in the hope that it increases adoption.
+ecosystem around the protocol.
 
 Status
 ------
 
-THIS SOFTWARE IS NOT COMPLETE AND IS NOT YET FUNCTIONAL.
-
-I started by doing the webfinger protocol work to interact with existing
-Diaspora "pods" (nodes), but realised it would be more useful if I created a
-stand-alone "social network" and then integrated it with the Diaspora protocol.
-
-Thus, there is a Flask web site that offers basic social networking (you
-can create users, befriend local users and post messages onto your wall that
-your friends can view).
+Offers basic functionality to find users, message them and manage user lists,
+including send and receive with the D* network. The user interface is basic
+and there are known security issues (in particular, there is no CSRF
+protection)
 
 Quick start
 -----------
@@ -55,7 +49,6 @@ Browse to:
 http://localhost:5000/setup
 http://localhost:5000/user/create
 http://localhost:5000/user/login
-http://localhost:5000/contact/1/profile
 
 Dependencies
 ------------
@@ -63,12 +56,17 @@ Dependencies
 (I'm trying to track licenses to ensure I eventually release it under
 a suitable license).
 
-dateutil (BSD)
-Flask (BSD) GPL=yes BSD=yes
-Flask-SQLAlchemy (BSD) GPL=yes BSD=yes
-Python (PSF LICENSE AGREEMENT) GPL=yes BSD=?
-PyCrypto (PSF)
-Jinja2 (BSD) GPL=yes BSD=yes
-Markdown (BSD)
-LXML (BSD,MIT) GPL=yes BSD=yes
+Python 2.6 or greater
+dateutil
+Flask
+Flask-SQLAlchemy
+PyCrypto 2.6 or above
+Jinja2 2.6 or above
+Markdown
+LXML
 SQLAlchemy
+
+More information
+----------------
+
+http://www.pyaspora.info/
