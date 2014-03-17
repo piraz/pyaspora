@@ -343,7 +343,10 @@ class DiasporaMessageParser:
         """
         Remove the padding bytes that were added at point of encryption.
         """
-        return data[0:-data[-1]]
+        if isinstance(data, str)
+            return data[0:-ord(data[-1])]
+        else:
+            return data[0:-data[-1]]
 
 
 class WebfingerRequest(object):
