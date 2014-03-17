@@ -10,6 +10,7 @@ from flask import current_app
 from json import dumps, loads
 from lxml import etree
 from re import match as re_match, sub as re_sub
+from sys import version as python_version
 try:
     from urllib.parse import quote as url_quote, quote_plus, unquote_plus, \
         urlencode, urlparse
@@ -213,9 +214,15 @@ class DiasporaMessageBuilder:
         """
         val = block_size - len(inp) % block_size
         if val == 0:
-            return inp + (bytes([block_size]) * block_size)
+            return inp + (self.array_to_bytes([block_size]) * block_size)
         else:
-            return inp + (bytes([val]) * val)
+            return inp + (self.array_to_bytes([val]) * val)
+
+    def array_to_bytes(self, vals):
+        if python_version < '3':
+            return bytes([chr(v) for v in vals])
+        else:
+            return bytes(vals)
 
     def post(self, url, recipient_public_key):
         """
