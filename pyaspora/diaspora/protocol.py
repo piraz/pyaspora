@@ -350,7 +350,7 @@ class DiasporaMessageParser:
         """
         Remove the padding bytes that were added at point of encryption.
         """
-        if isinstance(data, str)
+        if isinstance(data, str):
             return data[0:-ord(data[-1])]
         else:
             return data[0:-data[-1]]
