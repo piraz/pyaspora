@@ -41,11 +41,12 @@ class DiasporaContact(db.Model):
         if contact.diasp:
             return contact.diasp
         assert(contact.user)
+        hostname = urlsplit(request.url)[1]
         server = urlunsplit(list(urlsplit(request.url)[0:2]) + ['/', '', ''])
         diasp = cls(
             server=server,
             guid=str(uuid4()),
-            username="{0}@{1}".format(contact.user.id, server),
+            username="{0}@{1}".format(contact.user.id, hostname),
             contact=contact
         )
         db.session.add(diasp)
