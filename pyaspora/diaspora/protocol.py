@@ -220,7 +220,7 @@ class DiasporaMessageBuilder:
 
     def array_to_bytes(self, vals):
         if python_version < '3':
-            return bytes([chr(v) for v in vals])
+            return ''.join([chr(v) for v in vals])
         else:
             return bytes(vals)
 
