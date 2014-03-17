@@ -261,13 +261,13 @@ class Profile(TagMixin, MessageHandlerBase):
         <c_to> know.
         """
         req = etree.Element("profile")
-        name_parts = u_from.contact.realname.split(maxsplit=2)
+        name_parts = u_from.contact.realname.split()
         if len(name_parts) == 1:
             name_parts.append('')
         cls.struct_to_xml(req, [
             {'diaspora_handle': u_from.contact.diasp.username},
             {'first_name': name_parts[0]},
-            {'last_name': name_parts[1]},
+            {'last_name': ' '.join(name_parts[1:])},
             {'image_url': url_for(
                 'contacts.avatar', contact_id=u_from.contact.id, _external=True
             )},
