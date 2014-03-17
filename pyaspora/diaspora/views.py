@@ -58,7 +58,7 @@ def webfinger(contact_addr):
     """
     contact_id, _ = contact_addr.split('@')
     c = Contact.get(int(contact_id))
-    if not c or not c.user or not c.activated:
+    if not c or not c.user or not c.user.activated:
         abort(404, 'No such contact')
     diasp = DiasporaContact.get_for_contact(c)
 
