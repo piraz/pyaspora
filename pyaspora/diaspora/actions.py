@@ -244,7 +244,7 @@ class Profile(TagMixin, MessageHandlerBase):
                 c_from.diasp.server,
                 data['image_url']
             ))
-            mp.text_preview = '(picture for {})'.format(c_from.realname)
+            mp.text_preview = '(picture for {0})'.format(c_from.realname)
             c_from.avatar = mp
         else:
             c_from.avatar = None
