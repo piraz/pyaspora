@@ -2,11 +2,10 @@ from __future__ import absolute_import
 
 from flask import current_app, get_template_attribute, render_template
 from smtplib import SMTP, SMTP_SSL, LMTP
+from email.mime.text import MIMEText
 try:
-    from email.mime.text import MIMEText
     from urllib.parse import unquote_plus, urlparse
 except:
-    from email import MIMEText
     from urllib import unquote_plus
     from urlparse import urlparse
 
