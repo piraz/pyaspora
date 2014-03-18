@@ -24,14 +24,17 @@ class Subscription(db.Model):
     """
 
     __tablename__ = "subscriptions"
-    from_id = Column(Integer, ForeignKey('contacts.id'),
-                     primary_key=True)
+    id = Column(Integer, primary_key=True)
+    from_id = Column(Integer, ForeignKey('contacts.id'), nullable=False)
     from_contact = relationship("Contact", backref="subscriptions",
                                 foreign_keys=[from_id])
-    to_id = Column(Integer, ForeignKey('contacts.id'),
-                   primary_key=True, index=True)
+    to_id = Column(Integer, ForeignKey('contacts.id'), nullable=False,
+                   index=True)
     to_contact = relationship("Contact", backref="subscribers",
                               foreign_keys=[to_id])
+    __table_args__ = (
+        UniqueConstraint(from_id, to_id),
+    )
 
 
 class SubscriptionTag(db.Model):
@@ -46,7 +49,7 @@ class SubscriptionTag(db.Model):
     __tablename__ = "subscription_tags"
     group_id = Column(Integer, ForeignKey('subscription_groups.id'),
                       primary_key=True)
-    subscription_id = Column(Integer, ForeignKey('subscriptions.from_id'),
+    subscription_id = Column(Integer, ForeignKey('subscriptions.id'),
                              primary_key=True, index=True)
 
 
