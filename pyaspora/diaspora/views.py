@@ -8,12 +8,17 @@ from __future__ import absolute_import
 
 from base64 import b64encode
 from datetime import datetime, timedelta
-from flask import abort, Blueprint, current_app, make_response, request, \
-    url_for
+from dateutil.relativedelta import relativedelta
+from flask import abort, Blueprint, current_app, jsonify, make_response, \
+    request, url_for
 from json import dumps
 from lxml import etree
 from sqlalchemy.sql import desc
 from traceback import format_exc
+try:
+    from urllib.parse import urlsplit
+except:
+    from urlparse import urlsplit
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
@@ -22,6 +27,7 @@ from pyaspora.diaspora.models import DiasporaContact, DiasporaPost, \
     MessageQueue
 from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.post.models import Post, Share
+from pyaspora.user.models import User
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.utils.rendering import add_logged_in_user_to_data, \
     redirect, render_response, send_xml
@@ -273,7 +279,7 @@ def json_feed(guid):
         }
         ret.append(rep)
 
-    return dumps(ret)
+    return jsonify(response)
 
 
 @blueprint.route('/diaspora/run_queue', methods=['GET'])
@@ -325,3 +331,20 @@ def run_public_queue(_user):
             db.session.delete(qi)
     db.session.commit()
     return redirect(url_for('feed.view'))
+
+
+@blueprint.route('/statistics.json', methods=['GET'])
+def stats():
+    return jsonify({
+        'name': '{0} Pyaspora'.format(urlsplit(request.url)[1]),
+        'version': '0.x',
+        'registrations_open': current_app.config.get('ALLOW_CREATION', False),
+        'total_users': db.session.query(User).count(),
+        'active_users_halfyear': db.session.query(User).join(Contact).join(Post).filter(
+            Post.created_at > datetime.now() - relativedelta(months=6)
+        ).group_by(User.id).count(),
+        'active_users_monthly': db.session.query(User).join(Contact).join(Post).filter(
+            Post.created_at > datetime.now() - relativedelta(months=1)
+        ).group_by(User.id).count(),
+        'local_posts': db.session.query(User).join(Contact).join(Post).count()
+    })
