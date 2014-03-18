@@ -47,11 +47,11 @@ Standard widgets
                 {%- else -%}
                     {%- for s in post.shares|sort(attribute='contact.name') if s.public and not s.hidden -%}
                         {%- if loop.first %}shared publicly by {% else %}, {% endif -%}
-                            {{s.contact.name}}
+                            {{s.contact.name.strip() or '(anonymous)'}}
                     {%- else -%}
                         {%- for s in post.shares|sort(attribute='contact.name') if s.contact.id != post.author.id -%}
                             {%- if loop.first %}shared with {% else %}, {% endif -%}
-                                {{s.contact.name}}
+                                {{s.contact.name.strip() or '(anonymous)'}}
                         {%- else -%}
                             shown only to you
                         {%- endfor -%}

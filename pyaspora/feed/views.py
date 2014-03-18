@@ -44,7 +44,7 @@ def view(_user):
         limit(limit)
 
     data = {
-        'feed': json_posts([(s.post, s) for s in feed], _user)
+        'feed': json_posts([(s.post, s) for s in feed], _user, True)
     }
 
     add_logged_in_user_to_data(data, _user)

@@ -34,7 +34,7 @@ def _base_cache():
     }
 
 
-def json_posts(posts_and_shares, viewing_as=None):
+def json_posts(posts_and_shares, viewing_as=None, show_shares=False):
     """
     Run a list of (post, share) pairs through json_post, giving a list
     of for-serialisation views of Posts. This call is more efficient than
@@ -45,7 +45,7 @@ def json_posts(posts_and_shares, viewing_as=None):
         json_post(p, viewing_as, s, cache=cache)
         for p, s in posts_and_shares
     ]
-    _fill_cache(cache)
+    _fill_cache(cache, show_shares)
     return res
 
 
