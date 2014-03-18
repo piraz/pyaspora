@@ -225,7 +225,7 @@ def _get_share_for_post(post_id, _user):
     if not share:
         abort(403, 'Not available')
 
-    return share
+    return share, _user
 
 
 @blueprint.route('/<int:post_id>/hide', methods=['POST'])
@@ -233,7 +233,7 @@ def hide(post_id):
     """
     Hide an existing Post from the user's wall and profile.
     """
-    share = _get_share_for_post(post_id)
+    share, user = _get_share_for_post(post_id)
 
     share.hidden = True
     db.session.add(share)
@@ -248,10 +248,11 @@ def set_public(post_id, toggle):
     Make the Post appear-on/disappear-from the User's public wall. If toggle
     is True then the post will appear.
     """
-    share = _get_share_for_post(post_id)
+    share, user = _get_share_for_post(post_id)
+    post = share.post
     toggle = bool(toggle)
 
-    if not share.post.can_change_privacy(toggle):
+    if not post.can_change_privacy(toggle):
         abort(403, 'Not available')
 
     if share.public != toggle:
@@ -259,8 +260,15 @@ def set_public(post_id, toggle):
         db.session.add(share)
         if toggle:
             # If it's going public, it'll be visible to more people
-            share.post.thread_modified()
-            db.session.add(share.post)
+            post.thread_modified()
+            db.session.add(post)
+            db.session.commit() # Write out the updated share
+            if post.author_id == user.contact_id:
+                post.author.user = user # So we have the key
+                post.implicit_share([
+                    c for c in post.author.followers()
+                    if not post.shared_with(c)
+                ])
         db.session.commit()
 
     return redirect(url_for('feed.view', _external=True))
