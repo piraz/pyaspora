@@ -24,7 +24,7 @@ blueprint = Blueprint('users', __name__, template_folder='templates')
 
 
 def _hash_for_pk(user):
-    return SHA256(user.private_key.encode('ascii')).hexdigest()
+    return SHA256.new(user.private_key.encode('ascii')).hexdigest()
 
 
 @blueprint.route('/login', methods=['GET'])
