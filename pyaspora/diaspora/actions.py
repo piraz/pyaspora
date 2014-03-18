@@ -463,7 +463,10 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
 
         p.thread_modified()
 
-        p.diasp = DiasporaPost(guid=data['guid'])
+        p.diasp = DiasporaPost(
+            guid=data['guid'],
+            type='limited' if u_to else 'public'
+        )
         db.session.add(p)
         db.session.commit()
 
@@ -547,7 +550,7 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         p.tags = cls.find_tags(data['text'])
         p.share_with([s.contact for s in p.root().shares])
         p.thread_modified()
-        p.diasp = DiasporaPost(guid=data['guid'])
+        p.diasp = DiasporaPost(guid=data['guid'], type='private')
         db.session.add(p)
         db.session.commit()
 
