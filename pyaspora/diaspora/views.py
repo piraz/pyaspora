@@ -340,10 +340,12 @@ def stats():
         'version': '0.x',
         'registrations_open': current_app.config.get('ALLOW_CREATION', False),
         'total_users': db.session.query(User).count(),
-        'active_users_halfyear': db.session.query(User).join(Contact).join(Post).filter(
+        'active_users_halfyear':
+        db.session.query(User).join(Contact).join(Post).filter(
             Post.created_at > datetime.now() - relativedelta(months=6)
         ).group_by(User.id).count(),
-        'active_users_monthly': db.session.query(User).join(Contact).join(Post).filter(
+        'active_users_monthly':
+        db.session.query(User).join(Contact).join(Post).filter(
             Post.created_at > datetime.now() - relativedelta(months=1)
         ).group_by(User.id).count(),
         'local_posts': db.session.query(User).join(Contact).join(Post).count()
