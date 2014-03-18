@@ -505,7 +505,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         post.share_with(targets)
         is_public = (post.root().is_public())
         if is_public:
-            targets.append(list(post.author.followers()))
+            targets += list(post.author.followers())
         targets = [c for c in targets if not c.user]
         for target in targets:
             if is_public:
