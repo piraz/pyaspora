@@ -337,8 +337,7 @@ class DiasporaPost(db.Model):
     def can_reply_with(self, target):
         if target.name == 'self':
             return True
-        parent_diasp = self.post.parent.diasp
-        if parent_diasp and parent_diasp.type and parent_diasp.type == 'public':
+        if self.type and self.type == 'public':
             return target.name == 'public'
         else:
             return target.name == 'existing'
