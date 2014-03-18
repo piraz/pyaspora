@@ -337,7 +337,7 @@ class DiasporaPost(db.Model):
     def can_reply_with(self, target):
         if target.name == 'self':
             return True
-        if self.type and self.type == 'p':
+        if self.type and self.type == 'public':
             return target.name == 'public'
         else:
             return target.name == 'existing'
