@@ -338,6 +338,6 @@ class DiasporaPost(db.Model):
         if target.name == 'self':
             return True
         if self.type and self.type == 'public':
-            return target.name == 'public'
+            return target.name == 'wall'
         else:
             return target.name == 'existing'
