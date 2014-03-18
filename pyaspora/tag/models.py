@@ -45,6 +45,8 @@ class PostTag(db.Model):
 
     @classmethod
     def get_tags_for_posts(cls, post_ids):
+        if not post_ids:
+            return []
         return db.session.query(cls). \
             options(joinedload(cls.tag)). \
             filter(cls.post_id.in_(post_ids))

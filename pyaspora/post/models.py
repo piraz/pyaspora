@@ -74,6 +74,8 @@ class PostPart(db.Model):
         Fetch all the PostParts, with MimeParts pre-loaded, for the all the
         Posts with IDs <post_ids>.
         """
+        if not post_ids:
+            return []
         return db.session.query(cls). \
             join(MimePart). \
             filter(cls.post_id.in_(post_ids)). \
