@@ -257,11 +257,9 @@ def search(_user):
     from pyaspora.diaspora.models import DiasporaContact
     term = request.args.get('searchterm', None) or \
         abort(400, 'No search term provided')
-    print(term)
     if re_match('[A-Za-z0-9._]+@[A-Za-z0-9.]+$', term):
         try:
-            print("fetch")
-            print(DiasporaContact.get_by_username(term))
+            DiasporaContact.get_by_username(term)
         except:
             import traceback
             traceback.print_exc()
