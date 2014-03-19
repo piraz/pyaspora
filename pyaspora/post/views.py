@@ -117,7 +117,8 @@ def _fill_cache(c, show_shares=False):
     for post_tag in PostTag.get_tags_for_posts(post_ids):
         c['post'][post_tag.post_id]['tags'].append(json_tag(post_tag.tag))
     post_parts = PostPart.get_parts_for_posts(post_ids). \
-        order_by(PostPart.order)
+    if post_parts:
+        post_parts = post_parts.order_by(PostPart.order)
     for post_part in post_parts:
         c['post'][post_part.post_id]['parts'].append(json_part(post_part))
     if show_shares:
