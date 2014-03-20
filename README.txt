@@ -53,9 +53,6 @@ http://localhost:5000/user/login
 Dependencies
 ------------
 
-(I'm trying to track licenses to ensure I eventually release it under
-a suitable license).
-
 Python 2.6 or greater
 dateutil
 Flask
