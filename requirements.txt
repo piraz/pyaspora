@@ -1,4 +1,4 @@
-dateutil
+python-dateutil
 flask
 flask-sqlalchemy
 jinja2>=2.6
