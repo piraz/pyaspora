@@ -305,6 +305,9 @@ class Unsubscribe(SignableMixin, MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/status_message')
 class PostMessage(TagMixin, MessageHandlerBase):
+    """
+    A top-level post.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -348,6 +351,11 @@ class PostMessage(TagMixin, MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/conversation')
 class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
+    """
+    The start of a private conversation. This doesn't see much use in
+    Pyaspora because there is nothing to stop a top-level Post being
+    private.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -414,6 +422,11 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/participation/target_type[text()="Post"]')
 class PostParticipation(MessageHandlerBase):
+    """
+    Somewhat like a Share in Pyaspora, it indicates that someone is
+    participating in a conversation on a post (not a PM). However this can be
+    easily inferred by virtue of receiving a post by the new author!
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         # Not sure what these do, but they don't seem to be necessary, so do
@@ -423,6 +436,10 @@ class PostParticipation(MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/comment')
 class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
+    """
+    A comment on a top-level post. In Pyaspora these are posts in their own
+    right, but the federation protocol treats these differently.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -471,7 +488,10 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         db.session.commit()
 
         if not(u_to) or (p.parent.author_id == u_to.contact.id):
-            cls.forward(u_to, p, node)
+            # If the parent has signed this then it must have already been
+            # via the hub.
+            if 'parent_author_signature' not in data:
+                cls.forward(u_to, p, node)
 
     @classmethod
     def generate(cls, u_from, c_to, post, text):
@@ -519,6 +539,9 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/message')
 class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
+    """
+    A response to a private message thread.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -555,7 +578,10 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         db.session.commit()
 
         if not(u_to) or (p.parent.author_id == u_to.contact.id):
-            cls.forward(u_to, p, node)
+            # If the parent has signed this then it must have already been
+            # via the hub.
+            if 'parent_author_signature' not in data:
+                cls.forward(u_to, p, node)
 
     @classmethod
     def generate(cls, u_from, c_to, post, text):
@@ -599,6 +625,9 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/like')
 class Like(MessageHandlerBase):
+    """
+    A post being "liked". Pyaspora doesn't do likes, this is ignored.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         # Pyaspora does not support likes
@@ -608,6 +637,10 @@ class Like(MessageHandlerBase):
 @diaspora_message_handler('/XML/post/relayable_retraction')
 @diaspora_message_handler('/XML/post/signed_retraction')
 class Retraction(MessageHandlerBase):
+    """
+    An attempt to delete a previously-sent post, comment or PM. Pyaspora
+    doesn't currently support this.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         # Pyaspora does not support deleting posts/PMs
@@ -616,6 +649,10 @@ class Retraction(MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/photo')
 class Photo(MessageHandlerBase):
+    """
+    An image attached to a top-level post. This message usually comes through
+    just after the notification of the post.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
@@ -641,11 +678,20 @@ class Photo(MessageHandlerBase):
 
 @diaspora_message_handler('/XML/post/reshare')
 class Reshare(MessageHandlerBase):
+    """
+    An existing post is being reshared.
+    """
     @classmethod
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
         shared = DiasporaPost.get_by_guid(data['root_guid'])
-        assert(shared)
+        if not shared:
+            current_app.logger.warning(
+                "Could not find post being reshared (with GUID {0})".format(
+                    data['root_guid']
+                )
+            )
+            return
         shared = shared.post
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         post = Post(author=c_from, created_at=created)
