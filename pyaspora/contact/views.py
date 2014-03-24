@@ -6,9 +6,11 @@ cached information.
 
 from __future__ import absolute_import
 
-from flask import Blueprint, request, url_for, abort as flask_abort
+from flask import Blueprint, current_app, request, url_for, \
+    abort as flask_abort
 from lxml import etree
 from re import match as re_match
+from traceback import format_exc
 from sqlalchemy.orm import contains_eager
 from sqlalchemy.sql import desc, or_
 
@@ -65,8 +67,15 @@ def _profile_base(contact_id, public=False):
     data = json_contact(contact, viewing_as)
     limit = int(request.args.get('limit', 99))
 
+    if viewing_as and request.args.get('refresh', False) and contact.diasp:
+        try:
+            contact.diasp.import_public_posts()
+            db.session.commit()
+        except:
+            current_app.logger.debug(format_exc())
+
     # If not local, we don't have a proper feed
-    if contact.user:
+    if viewing_as or contact.user:
         # user put it on their public wall
         feed_query = Post.Queries.public_wall_for_contact(contact)
         if viewing_as:
@@ -261,8 +270,7 @@ def search(_user):
         try:
             DiasporaContact.get_by_username(term)
         except:
-            import traceback
-            traceback.print_exc()
+            current_app.logger.debug(format_exc())
 
     matches = db.session.query(Contact).outerjoin(DiasporaContact).filter(or_(
         DiasporaContact.username.contains(term),

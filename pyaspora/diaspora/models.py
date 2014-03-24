@@ -1,7 +1,9 @@
 from __future__ import absolute_import
 
 from base64 import b64decode
+from datetime import datetime
 from flask import current_app, request, url_for
+from json import load as json_load
 from lxml import html
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, \
     String
@@ -13,16 +15,17 @@ from uuid import uuid4
 try:
     from urllib.error import URLError
     from urllib.parse import urljoin, urlsplit, urlunsplit
-    from urllib.request import urlopen
+    from urllib.request import Request, urlopen
 except:
-    from urllib import urlopen
-    from urllib2 import URLError
+    from urllib2 import Request, URLError, urlopen
     from urlparse import urljoin, urlsplit, urlunsplit
 
 from pyaspora import db
 from pyaspora.contact.models import Contact
+from pyaspora.content.models import MimePart
 from pyaspora.diaspora import import_url_as_mimepart
 from pyaspora.diaspora.protocol import DiasporaMessageParser, WebfingerRequest
+from pyaspora.post.models import Post
 from pyaspora.post.views import json_post
 
 
@@ -129,6 +132,11 @@ class DiasporaContact(db.Model):
         db.session.add(d)
         db.session.add(c)
 
+        try:
+            d.import_public_posts()
+        except:
+            current_app.logger.debug(format_exc())
+
         return d
 
     def photo_url(self):
@@ -149,6 +157,58 @@ class DiasporaContact(db.Model):
                 filename='nophoto.png',
                 _external=True
             )
+
+    def import_public_posts(self):
+        """
+        Load the JSON of public posts for this user and create local posts
+        from them.
+        """
+        url = self.server + 'people/{0}'.format(self.guid)
+        req = Request(url)
+        req.add_header('Accept', 'application/json')
+        entries = json_load(urlopen(req))
+        for entry in entries:
+            user_guid = entry['author']['guid']
+            username = entry['author']['diaspora_id']
+            user = self if self.username == username \
+                else DiasporaContact.get_by_username(username, commit=False)
+            if not user or user.guid != user_guid:
+                continue
+            post_guid = entry['guid']
+            existing_post = DiasporaPost.get_by_guid(post_guid)
+            if existing_post or not entry['public']:
+                continue  # Already imported
+
+            post = Post(author=user.contact)
+
+            if entry.get('root'):
+                root_guid = entry['root']['guid']
+                root_post = DiasporaPost.get_by_guid(root_guid)
+                if root_post:
+                    post.parent = root_post.post
+                else:
+                    continue  # Cannot find parent
+
+            post.created_at = datetime.strptime(
+                entry['created_at'],
+                '%Y-%m-%dT%H:%M:%SZ'
+            )
+            post.thread_modified_at = datetime.strptime(
+                entry['interacted_at'],
+                '%Y-%m-%dT%H:%M:%SZ'
+            )
+            post.add_part(
+                MimePart(
+                    type='text/x-markdown',
+                    body=entry['text'].encode('utf-8'),
+                    text_preview=entry['text']
+                ),
+                inline=True,
+                order=0
+            )
+            post.share_with([user.contact], show_on_wall=True)
+            post.diasp = DiasporaPost(guid=post_guid, type='public')
+            db.session.add(post)
 
 
 class MessageQueue(db.Model):

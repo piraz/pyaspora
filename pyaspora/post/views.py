@@ -263,9 +263,9 @@ def set_public(post_id, toggle):
             # If it's going public, it'll be visible to more people
             post.thread_modified()
             db.session.add(post)
-            db.session.commit() # Write out the updated share
+            db.session.commit()  # Write out the updated share
             if post.author_id == user.contact_id:
-                post.author.user = user # So we have the key
+                post.author.user = user  # So we have the key
                 post.implicit_share([
                     c for c in post.author.followers()
                     if not post.shared_with(c)

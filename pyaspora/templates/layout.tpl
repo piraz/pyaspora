@@ -10,8 +10,8 @@ Standard page layout.
     <title>Pyaspora</title>
     {% endblock %}
 </head>
-<body onload="fixtimes()">
-    <h1>Pyaspora</h1>
+<body>
+    <h1 id="topbar">Pyaspora</h1>
     <div id="header">
         {%block header%}
             {%if logged_in%}
