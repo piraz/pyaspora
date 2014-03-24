@@ -169,11 +169,6 @@ def json_contact(contact, viewing_as=None):
             contact_id=contact.id,
             _external=True
         ),
-        'subscriptions': url_for(
-            'contacts.subscriptions',
-            contact_id=contact.id,
-            _external=True
-        ),
         'name': contact.realname,
         'bio': '',
         'avatar': None,
@@ -187,6 +182,15 @@ def json_contact(contact, viewing_as=None):
         'feed': None,
         'tags': [json_tag(t) for t in contact.interests]
     }
+
+    # No point in showing subs for remote users as they're incomplete
+    if contact.user:
+        resp['subscriptions'] = url_for(
+            'contacts.subscriptions',
+            contact_id=contact.id,
+            _external=True
+        )
+
     if contact.avatar:
         resp['avatar'] = url_for(
             'contacts.avatar',
@@ -195,17 +199,18 @@ def json_contact(contact, viewing_as=None):
         )
 
     if contact.bio:
+        # Need something that feels like a PostPart for the rendering engine.
         fake_part = FakePart()
         fake_part.inline = True
         fake_part.mime_part = contact.bio
         resp['bio'] = json_part(fake_part)
 
     if viewing_as:
-        if viewing_as.id == contact.id:
+        if viewing_as.id == contact.id:  # Viewing own profile
             resp['actions'].update({
                 'edit': url_for('users.info', _external=True)
             })
-        elif viewing_as.contact.subscribed_to(contact):
+        elif viewing_as.contact.subscribed_to(contact):  # Friend
             resp['actions'].update({
                 'remove': url_for(
                     'roster.unsubscribe',
@@ -224,7 +229,7 @@ def json_contact(contact, viewing_as=None):
                     _external=True
                 )
             })
-        else:
+        else:  # Potential friend? :-)
             resp['actions'].update({
                 'add': url_for(
                     'roster.subscribe',
