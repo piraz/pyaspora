@@ -1,8 +1,8 @@
-python-dateutil
 flask
 flask-sqlalchemy
 jinja2>=2.6
 lxml
 markdown
 pycrypto>=2.6
+python-dateutil
 sqlalchemy
