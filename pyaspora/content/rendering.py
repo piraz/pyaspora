@@ -9,6 +9,23 @@ from pyaspora.utils.rendering import ACCEPTABLE_BROWSER_IMAGE_FORMATS
 renderers = {}
 
 
+def _markdown_to_html(md):
+    try:
+        return markdown(
+            md,
+            output_format='xhtml',
+            safe_mode='replace',
+            html_replacement_text='(could not show this)',
+            lazy_ol=False
+        )
+    except TypeError:
+        return markdown(
+            md,
+            output_format='xhtml',
+            safe_mode='replace',
+        )
+
+
 def renderer(formats):
     """
     Decorator which remembers the functions and the MIME types that they
@@ -63,20 +80,7 @@ def text_markdown(part, fmt, url):
     if part.inline:
         md = part.mime_part.body.decode('utf-8')
         if fmt == 'text/html':
-            try:
-                return markdown(
-                    md,
-                    output_format='xhtml',
-                    safe_mode='replace',
-                    html_replacement_text='(could not show this)',
-                    lazy_ol=False
-                )
-            except TypeError:
-                return markdown(
-                    md,
-                    output_format='xhtml',
-                    safe_mode='replace',
-                )
+            return _markdown_to_html(md)
         if fmt == 'text/plain':
             return md
     return None
@@ -186,11 +190,12 @@ def diaspora_profile(part, fmt, url):
     rather more feature-rich profiles than Pyaspora.
     """
     payload = loads(part.mime_part.body.decode('utf-8'))
+    payload['parsed_bio'] = _markdown_to_html(payload.get('bio', None) or '')
     if fmt != 'text/html' or not part.inline:
         return None
 
     templ = """
-    <p>{{bio or '(no info)'}}</p>
+    <p>{{parsed_bio or '(no info)' |safe}}</p>
     <table>
         {%- if gender %}
         <tr>
