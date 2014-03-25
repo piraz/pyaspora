@@ -371,7 +371,7 @@ def create(_user):
                     'name': shared.author.realname,
                 }
             }).encode('utf-8'),
-            text_preview="shared {0}'s post".format(shared.author.realname)
+            text_preview=u"shared {0}'s post".format(shared.author.realname)
         )
         post.add_part(share_part, order=0, inline=True)
         post.add_part(body_part, order=1, inline=True)

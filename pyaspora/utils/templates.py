@@ -61,7 +61,7 @@ def since(dt, base=None, chunks=1):
         else:
             val = getattr(delta, section, None)
         if val:
-            result.append('{0} {1}'.format(
+            result.append(u'{0} {1}'.format(
                 val,
                 section if val != 1 else section[:-1]
             ))

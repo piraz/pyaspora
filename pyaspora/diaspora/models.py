@@ -106,7 +106,7 @@ class DiasporaContact(db.Model):
         photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')[0]
         if photo_url:
             mp = import_url_as_mimepart(urljoin(pod_loc, photo_url))
-            mp.text_preview = '(picture for {0})'.format(
+            mp.text_preview = u'(picture for {0})'.format(
                 c.realname or '(anonymous)'
             )
             c.avatar = mp

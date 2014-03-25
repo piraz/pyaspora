@@ -129,7 +129,7 @@ def feed(contact_id):
 
     ns = 'http://www.w3.org/2005/Atom'
     doc = etree.Element("{%s}feed" % ns, nsmap={None: ns})
-    etree.SubElement(doc, "title").text = 'Pyaspora feed for {0}'.format(
+    etree.SubElement(doc, "title").text = u'Pyaspora feed for {0}'.format(
         data['name']
     )
     etree.SubElement(doc, "link").text = data['link']

@@ -46,7 +46,7 @@ def process_incoming_message(payload, c_from, u_to):
     """
     xml = payload.lstrip()
     current_app.logger.debug(
-        "Message received from {0} for {1}\n{2}".format(
+        u'Message received from {0} for {1}\n{2}'.format(
             c_from.id, u_to.id if u_to else '(none)', xml
         )
     )
@@ -79,9 +79,9 @@ class MessageHandlerBase:
         Send a message from <u_from> to <c_to>.
         """
         m = cls._build(u_from, c_to, **kwargs)
-        url = "{0}receive/users/{1}".format(
+        url = '{0}receive/users/{1}'.format(
             c_to.diasp.server, c_to.diasp.guid)
-        current_app.logger.debug("posting {0} to {1}".format(
+        current_app.logger.debug(u'posting {0} to {1}'.format(
             etree.tostring(m.message),
             url
         ))
@@ -95,8 +95,8 @@ class MessageHandlerBase:
         as a public message.
         """
         m = cls._build(u_from, None, **kwargs)
-        url = "{0}receive/public".format(c_to.diasp.server)
-        current_app.logger.debug("posting {0} to {1}".format(
+        url = '{0}receive/public'.format(c_to.diasp.server)
+        current_app.logger.debug(u'posting {0} to {1}'.format(
             etree.tostring(m.message),
             url
         ))
@@ -244,7 +244,7 @@ class Profile(TagMixin, MessageHandlerBase):
                 c_from.diasp.server,
                 data['image_url']
             ))
-            mp.text_preview = '(picture for {0})'.format(c_from.realname)
+            mp.text_preview = u'(picture for {0})'.format(c_from.realname)
             c_from.avatar = mp
         else:
             c_from.avatar = None
@@ -687,7 +687,7 @@ class Reshare(MessageHandlerBase):
         shared = DiasporaPost.get_by_guid(data['root_guid'])
         if not shared:
             current_app.logger.warning(
-                "Could not find post being reshared (with GUID {0})".format(
+                'Could not find post being reshared (with GUID {0})'.format(
                     data['root_guid']
                 )
             )
@@ -704,7 +704,7 @@ class Reshare(MessageHandlerBase):
                     'name': shared.author.realname,
                 }
             }).encode('utf-8'),
-            text_preview="shared {0}'s post".format(shared.author.realname)
+            text_preview=u"shared {0}'s post".format(shared.author.realname)
         )
         post.add_part(share_part, order=0, inline=True)
         order = 0
