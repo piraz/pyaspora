@@ -1,5 +1,4 @@
-"Pyaspora" Diaspora-interoperable social networking platform
-============================================================
+#"Pyaspora" Diaspora-interoperable social networking platform
 
 This software is licensed under what the FSF terms the "Expat license", a
 BSD-style license:
@@ -25,33 +24,29 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Aim
----
+##Aim
 
 To create a second implemention of the "Diaspora" social network, to create an
 ecosystem around the protocol.
 
-Status
-------
+##Status
 
 Offers basic functionality to find users, message them and manage user lists,
 including send and receive with the D* network. The user interface is basic
 and there are known security issues (in particular, there is no CSRF
 protection)
 
-Quick start
------------
-
+##Quick Start
+```shell
 ./quickstart.py
-
+```
 Browse to:
-
+```shell
 http://localhost:5000/setup
 http://localhost:5000/user/create
 http://localhost:5000/user/login
-
-Dependencies
-------------
+```
+##Dependencies
 
 Python 2.6 or greater
 dateutil
@@ -63,7 +58,6 @@ Markdown
 LXML
 SQLAlchemy
 
-More information
-----------------
+##More information
 
 http://www.pyaspora.info/
