@@ -1,9 +1,11 @@
-#"Pyaspora" Diaspora-interoperable social networking platform
+# Pyaspora
+
+**A Diaspora-interoperable social networking platform**
 
 This software is licensed under what the FSF terms the "Expat license", a
 BSD-style license:
 
-Copyright (c) 2012-2014, Luke Ross <lr@lukeross.name>
+Copyright (c) 2012-2014, Luke Ross <lr@lukeross.name> and others
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,40 +26,42 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-##Aim
+## Aim
 
 To create a second implemention of the "Diaspora" social network, to create an
 ecosystem around the protocol.
 
-##Status
+## Status
 
 Offers basic functionality to find users, message them and manage user lists,
 including send and receive with the D* network. The user interface is basic
 and there are known security issues (in particular, there is no CSRF
 protection)
 
-##Quick Start
+## Quick Start
+
 ```shell
 ./quickstart.py
 ```
-Browse to:
-```shell
-http://localhost:5000/setup
-http://localhost:5000/user/create
-http://localhost:5000/user/login
-```
-##Dependencies
 
-Python 2.6 or greater
-dateutil
-Flask
-Flask-SQLAlchemy
-PyCrypto 2.6 or above
-Jinja2 2.6 or above
-Markdown
-LXML
-SQLAlchemy
+Then browse to:
 
-##More information
+- http://localhost:5000/setup
+- http://localhost:5000/user/create
+- http://localhost:5000/user/login
+
+## Dependencies
+
+- Python 2.6 or greater
+- dateutil
+- Flask
+- Flask-SQLAlchemy
+- PyCrypto 2.6 or above
+- Jinja2 2.6 or above
+- LXML
+- Markdown
+- SQLAlchemy
+
+## More information
 
 http://www.pyaspora.info/
