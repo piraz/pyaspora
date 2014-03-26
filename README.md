@@ -46,9 +46,9 @@ protection)
 
 Then browse to:
 
-- http://localhost:5000/setup
-- http://localhost:5000/user/create
-- http://localhost:5000/user/login
+- `http://localhost:5000/setup`
+- `http://localhost:5000/user/create`
+- `http://localhost:5000/user/login`
 
 ## Dependencies
 
