@@ -90,14 +90,14 @@ def add_logged_in_user_to_data(data, user=False):
         if 'actions' not in base:
             base['actions'] = {}
         base['actions'].update({
-            'logout': url_for('users.logout'),
-            'feed': url_for('feed.view'),
-            'new_post': url_for('posts.create'),
+            'logout': url_for('users.logout', _external=True),
+            'feed': url_for('feed.view', _external=True),
+            'new_post': url_for('posts.create', _external=True),
         })
     else:
         base = {
             'actions': {
-                'login': url_for('users.login')
+                'login': url_for('users.login', _external=True)
             }
         }
 

@@ -3,6 +3,8 @@ Sign-up form for creating a new account on the local server.
 #}
 {% extends "layout.tpl" %}
 {% block content %}
+<h2>Create a new account</h2>
+
 <form method="post" action="{{ url_for('.create') }}">
 <table>
     <tr>

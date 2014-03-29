@@ -23,6 +23,10 @@ from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
 blueprint = Blueprint('users', __name__, template_folder='templates')
 
 
+def _can_create_account():
+    return current_app.config.get('ALLOW_CREATION', False)
+
+
 def _hash_for_pk(user):
     return SHA256.new(user.private_key.encode('ascii')).hexdigest()
 
@@ -40,6 +44,12 @@ def login():
 
     data = {}
     add_logged_in_user_to_data(data, None)
+
+    if _can_create_account():
+        data['logged_in']['actions']['sign_up'] = url_for(
+            'users.create',
+            _external=True
+        )
 
     return render_response('users_login_form.tpl', data)
 
@@ -63,7 +73,7 @@ def create_form():
     """
     Display the form to create a new user account.
     """
-    if not current_app.config.get('ALLOW_CREATION', False):
+    if not _can_create_account():
         abort(403, 'Disabled by site administrator')
     return render_response('users_create_form.tpl')
 
@@ -73,7 +83,7 @@ def create():
     """
     Create a new User (sign-up).
     """
-    if not current_app.config.get('ALLOW_CREATION', False):
+    if not _can_create_account():
         abort(403, 'Disabled by site administrator')
 
     user = logged_in_user()
