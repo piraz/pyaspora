@@ -40,6 +40,9 @@ protection)
 
 ## Quick Start
 
+Edit the file `quickstart.py` to specify a secret session key and a suitable
+mail server. Then you can start the server with:
+
 ```shell
 ./quickstart.py
 ```
