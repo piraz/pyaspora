@@ -326,10 +326,11 @@ def run_public_queue(_user):
             qi.error = err.encode('utf-8')
             current_app.logger.error(err)
             db.session.add(qi)
+            db.session.commit()
             break
         else:
             db.session.delete(qi)
-    db.session.commit()
+            db.session.commit()
     return redirect(url_for('feed.view'))
 
 
