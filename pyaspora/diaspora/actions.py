@@ -450,8 +450,14 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         )
         assert(author)
         author = author.contact
-        parent = DiasporaPost.get_by_guid(data['parent_guid']).post
-        assert(parent)
+        parent = DiasporaPost.get_by_guid(data['parent_guid'])
+
+        # Which post is this in reply to?
+        if parent:
+            parent = parent.post
+        else:
+            return
+
         if u_to:
             assert(parent.shared_with(c_from))
             assert(parent.shared_with(u_to))

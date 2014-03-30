@@ -5,7 +5,7 @@ Display a contact's "wall", which varies according to who is viewing it.
 {% from 'widgets.tpl' import button_form,show_feed %}
 
 {% block content %}
-<h2>{{name}}</h2>
+<h2 {% if username %}title="{{username}}"{% endif %}>{{name}}</h2>
 
 {% if avatar %}
 <p>

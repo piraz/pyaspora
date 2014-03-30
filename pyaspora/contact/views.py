@@ -183,6 +183,9 @@ def json_contact(contact, viewing_as=None):
         'tags': [json_tag(t) for t in contact.interests]
     }
 
+    if contact.diasp:
+        resp['username'] = contact.diasp.username
+
     # No point in showing subs for remote users as they're incomplete
     if contact.user:
         resp['subscriptions'] = url_for(
