@@ -179,15 +179,18 @@ class DiasporaContact(db.Model):
             if existing_post or not entry['public']:
                 continue  # Already imported
 
-            post = Post(author=user.contact)
-
             if entry.get('root'):
                 root_guid = entry['root']['guid']
                 root_post = DiasporaPost.get_by_guid(root_guid)
                 if root_post:
-                    post.parent = root_post.post
+                    parent = root_post.post
                 else:
                     continue  # Cannot find parent
+            else:
+                parent = None
+
+            post = Post(author=user.contact, parent=parent)
+            db.session.add(post)
 
             post.created_at = datetime.strptime(
                 entry['created_at'],
@@ -208,7 +211,6 @@ class DiasporaContact(db.Model):
             )
             post.share_with([user.contact], show_on_wall=True)
             post.diasp = DiasporaPost(guid=post_guid, type='public')
-            db.session.add(post)
 
 
 class MessageQueue(db.Model):

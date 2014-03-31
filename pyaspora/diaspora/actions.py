@@ -478,8 +478,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
                 )
             )
 
-        p = Post(author=author)
-        p.parent = parent
+        p = Post(author=author, parent=parent)
         p.add_part(MimePart(
             type='text/x-markdown',
             body=data['text'].encode('utf-8'),
@@ -580,8 +579,7 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
             ))
 
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
-        p = Post(author=author, created_at=created)
-        p.parent = parent
+        p = Post(author=author, created_at=created, parent=parent)
         p.add_part(MimePart(
             type='text/x-markdown',
             body=data['text'].encode('utf-8'),
