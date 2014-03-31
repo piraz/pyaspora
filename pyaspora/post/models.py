@@ -137,20 +137,14 @@ class Post(db.Model):
 
         @classmethod
         def shared_with_contact(cls, contact):
-            return and_(
-                Share.contact_id == contact.id,
-                not_(Share.hidden),
-                Post.parent_id == None
-            )
+            return Share.contact_id == contact.id
 
         @classmethod
         def authored_by_contacts_and_public(cls, contact_ids):
             return and_(
                 Share.contact_id.in_(contact_ids),
-                Share.contact_id == Post.author_id,
-                Share.public,
                 not_(Share.hidden),
-                Post.parent_id == None
+                Share.public
             )
 
     @classmethod
@@ -271,6 +265,25 @@ class Post(db.Model):
             Share.contact == contact,
             Share.post == self
         )).first()
+
+    def hide(self, user):
+        """
+        Stop this post appearing in the feed of the user.
+        """
+        share = self.shared_with(user.contact)
+        if share:
+            share.hidden = False
+            db.session.add(share)
+            return
+
+        # Can only make our own share for public posts
+        assert(self.is_public())
+        db.session.add(Share(
+            contact=user.contact,
+            post=self,
+            public=True,
+            hidden=True
+        ))
 
     def root(self):
         """
