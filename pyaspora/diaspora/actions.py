@@ -487,9 +487,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['text'])
         if u_to:
-            p.share_with([p.author])
-            if u_to.contact.subscribed_to(p.author):
-                p.share_with([u_to.contact])
+            p.share_with([p.author, u_to.contact])
         else:
             p.share_with([p.author], show_on_wall=True)
         if p.author.id != c_from.id:
