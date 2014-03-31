@@ -469,7 +469,6 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
 
         if u_to:
             assert(parent.shared_with(c_from))
-            assert(parent.shared_with(u_to))
         node = xml[0][0]
         assert(cls.valid_signature(author, data['author_signature'], node))
         if 'parent_author_signature' in data:
@@ -487,7 +486,9 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['text'])
         if u_to:
-            p.share_with([p.author, u_to.contact])
+            p.share_with([p.author])
+            if parent.shared_with(u_to.contact):
+                p.share_with([u_to.contact])
         else:
             p.share_with([p.author], show_on_wall=True)
         if p.author.id != c_from.id:
