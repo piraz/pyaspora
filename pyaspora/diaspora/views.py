@@ -288,7 +288,8 @@ def run_queue(_user):
     start = datetime.now()
     retry = True
     processed = int(request.args.get('processed', 0))
-    while datetime.now() < start + timedelta(seconds=3):
+    delta = 10 if processed else 3  # Small first batch
+    while datetime.now() < start + timedelta(seconds=delta):
         if not MessageQueue.has_pending_items(_user):
             retry = False
             break
