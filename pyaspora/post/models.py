@@ -294,12 +294,16 @@ class Post(db.Model):
             post = post.parent
         return post
 
-    def thread_modified(self):
+    def thread_modified(self, when=None):
         """
         Mark this thread as having been modified. This makes it "bubble up" in
         contact feeds. Requires the caller commit the session.
         """
         post = self.root()
-        post.thread_modified_at = func.now()
+        if when:
+            if not(post.thread_modified_at) or post.thread_modified_at < when:
+                post.thread_modified_at = when
+        else:
+            post.thread_modified_at = func.now()
         if post.id != self.id:
             db.session.add(post)

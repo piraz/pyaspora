@@ -196,10 +196,10 @@ class DiasporaContact(db.Model):
                 entry['created_at'],
                 '%Y-%m-%dT%H:%M:%SZ'
             )
-            post.thread_modified_at = datetime.strptime(
+            post.thread_modified(when=datetime.strptime(
                 entry['interacted_at'],
                 '%Y-%m-%dT%H:%M:%SZ'
-            )
+            ))
             post.add_part(
                 MimePart(
                     type='text/x-markdown',
