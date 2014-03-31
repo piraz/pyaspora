@@ -318,15 +318,22 @@ class PostMessage(TagMixin, MessageHandlerBase):
         assert(data['diaspora_handle'] == c_from.diasp.username)
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         p = Post(author=c_from, created_at=created)
+        msg = data.get('raw_message', None)
+        if msg is None:
+            msg = data.get('photo', None)
+        if msg is None:
+            msg = ''
         p.add_part(MimePart(
             type='text/x-markdown',
-            body=data['raw_message'].encode('utf-8'),
+            body=msg.encode('utf-8'),
         ), order=0, inline=True)
-        p.tags = cls.find_tags(data['raw_message'])
+        p.tags = cls.find_tags(msg)
         if public:
             p.share_with([c_from], show_on_wall=True)
         else:
-            p.share_with([c_from, u_to.contact])
+            p.share_with([c_from])
+            if u_to.contact.subscribed_to(c_from):
+                p.share_with([u_to.contact])
         p.thread_modified()
 
         p.diasp = DiasporaPost(
@@ -381,7 +388,9 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
                 body=(data.get(tag, None) or msg[tag]).encode('utf-8'),
             ), order=order, inline=True)
         p.tags = cls.find_tags(msg['text'])
-        p.share_with([c_from, u_to.contact])
+        p.share_with([c_from])
+        if u_to.contact.subscribed_to(c_from):
+            p.share_with([u_to.contact])
         p.thread_modified()
         p.diasp = DiasporaPost(guid=data['guid'], type='private')
         db.session.add(p)
@@ -478,7 +487,9 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         ), order=0, inline=True)
         p.tags = cls.find_tags(data['text'])
         if u_to:
-            p.share_with([p.author, u_to.contact])
+            p.share_with([p.author])
+            if u_to.contact.subscribed_to(p.author):
+                p.share_with([u_to.contact])
         else:
             p.share_with([p.author], show_on_wall=True)
         if p.author.id != c_from.id:
@@ -727,7 +738,9 @@ class Reshare(MessageHandlerBase):
         if not post.tags:
             post.tags = shared.tags
         if u_to:
-            post.share_with([c_from, u_to.contact])
+            post.share_with([c_from])
+            if u_to.contact.subscribed_to(c_from):
+                p.share_with([u_to.contact])
         else:
             post.share_with([c_from], show_on_wall=True)
         post.thread_modified()
