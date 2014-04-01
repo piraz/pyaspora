@@ -137,20 +137,14 @@ class Post(db.Model):
 
         @classmethod
         def shared_with_contact(cls, contact):
-            return and_(
-                Share.contact_id == contact.id,
-                not_(Share.hidden),
-                Post.parent_id == None
-            )
+            return Share.contact_id == contact.id
 
         @classmethod
         def authored_by_contacts_and_public(cls, contact_ids):
             return and_(
                 Share.contact_id.in_(contact_ids),
-                Share.contact_id == Post.author_id,
-                Share.public,
                 not_(Share.hidden),
-                Post.parent_id == None
+                Share.public
             )
 
     @classmethod
@@ -272,6 +266,25 @@ class Post(db.Model):
             Share.post == self
         )).first()
 
+    def hide(self, user):
+        """
+        Stop this post appearing in the feed of the user.
+        """
+        share = self.shared_with(user.contact)
+        if share:
+            share.hidden = False
+            db.session.add(share)
+            return
+
+        # Can only make our own share for public posts
+        assert(self.is_public())
+        db.session.add(Share(
+            contact=user.contact,
+            post=self,
+            public=True,
+            hidden=True
+        ))
+
     def root(self):
         """
         The top-level post that started this thread.
@@ -281,12 +294,16 @@ class Post(db.Model):
             post = post.parent
         return post
 
-    def thread_modified(self):
+    def thread_modified(self, when=None):
         """
         Mark this thread as having been modified. This makes it "bubble up" in
         contact feeds. Requires the caller commit the session.
         """
         post = self.root()
-        post.thread_modified_at = func.now()
+        if when:
+            if not(post.thread_modified_at) or post.thread_modified_at < when:
+                post.thread_modified_at = when
+        else:
+            post.thread_modified_at = func.now()
         if post.id != self.id:
             db.session.add(post)

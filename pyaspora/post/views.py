@@ -77,6 +77,7 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
         'tags': [],
         'shares': None
     })
+
     if children:
         data['children'] = [
             json_post(
@@ -86,12 +87,18 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
                 cache=c
             ) for p in sorted_children
         ]
+
     if viewing_as:
         data['actions']['comment'] = url_for('posts.comment',
                                              post_id=post.id, _external=True)
         if viewing_as.id != post.author_id:
             data['actions']['share'] = \
                 url_for('posts.share', post_id=post.id, _external=True)
+
+        if share and viewing_as and \
+                (share.public or share.contact_id == viewing_as.id):
+            data['actions']['hide'] = url_for('posts.hide',
+                                              post_id=post.id, _external=True)
 
         if share and viewing_as and share.contact_id == viewing_as.id:
             data['actions']['hide'] = url_for('posts.hide',
@@ -230,14 +237,16 @@ def _get_share_for_post(post_id, _user):
 
 
 @blueprint.route('/<int:post_id>/hide', methods=['POST'])
-def hide(post_id):
+@require_logged_in_user
+def hide(post_id, _user):
     """
     Hide an existing Post from the user's wall and profile.
     """
-    share, user = _get_share_for_post(post_id)
+    post = Post.get(post_id)
+    if not post:
+        abort(404, 'No such post', force_status=True)
 
-    share.hidden = True
-    db.session.add(share)
+    post.hide(_user)
     db.session.commit()
 
     return redirect(url_for('feed.view', _external=True))

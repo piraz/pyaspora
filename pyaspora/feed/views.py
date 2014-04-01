@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 
 from flask import Blueprint, request, url_for
-from sqlalchemy.sql import desc, or_
-from sqlalchemy.orm import contains_eager
+from sqlalchemy.sql import and_, desc, not_, or_
+from sqlalchemy.orm import aliased, contains_eager
 
 from pyaspora.database import db
 from pyaspora.post.models import Post, Share
@@ -35,9 +35,19 @@ def view(_user):
     if tag_ids:
         clauses.append(Tag.Queries.public_posts_for_tags(tag_ids))
     feed_query = or_(*clauses)
+    my_share = aliased(Share)
     feed = db.session.query(Share).join(Post). \
+        outerjoin(  # Stuff user hasn't hidden
+            my_share,
+            and_(
+                Post.id == my_share.post_id,
+                my_share.contact == _user.contact
+            )
+        ). \
         outerjoin(PostTag).outerjoin(Tag). \
         filter(feed_query). \
+        filter(or_(my_share.hidden == None, not_(my_share.hidden))). \
+        filter(Post.parent == None). \
         order_by(desc(Post.thread_modified_at)). \
         group_by(Post.id). \
         options(contains_eager(Share.post)). \
