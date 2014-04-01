@@ -3,26 +3,51 @@ from __future__ import absolute_import
 from flask import render_template_string, url_for
 from json import loads
 from markdown import markdown
+from markdown.extensions import Extension
+from markdown.preprocessors import Preprocessor
+from re import MULTILINE, compile as re_compile
 
 from pyaspora.utils.rendering import ACCEPTABLE_BROWSER_IMAGE_FORMATS
 
 renderers = {}
 
 
+class SkipTagsExtension(Extension):
+    class SkipTagPattern(Preprocessor):
+        """
+        Look for lines of tags and stop them becoming headings. It does this by
+        putting a space before the line.
+        """
+        def __init__(self):
+            super(SkipTagsExtension.SkipTagPattern, self).__init__()
+            self.pattern = re_compile(r'^(#([A-Za-z0-9_]+(\s+#)?)+)$')
+
+        def run(self, lines):
+            return [
+                self.pattern.sub(r' \1', l) for l in lines
+            ]
+
+    def extendMarkdown(self, md, md_globals):
+        md.preprocessors.add('skiptags', self.SkipTagPattern(), '_end')
+
+
 def _markdown_to_html(md):
+    common_opts = dict(
+        output_format='xhtml',
+        safe_mode='replace',
+        extensions=['headerid(forceid=False, level=3)', SkipTagsExtension()]
+    )
     try:
         return markdown(
             md,
-            output_format='xhtml',
-            safe_mode='replace',
             html_replacement_text='(could not show this)',
-            lazy_ol=False
+            lazy_ol=False,
+            **common_opts
         )
     except TypeError:
         return markdown(
             md,
-            output_format='xhtml',
-            safe_mode='replace',
+            **common_opts
         )
 
 
