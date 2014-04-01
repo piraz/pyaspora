@@ -29,9 +29,17 @@ class TagParseMixin:
     @classmethod
     def parse_line(cls, line, create=True, **kwargs):
         tags = []
+        seen = set()
         for possible_tag in re_split('[,\s]+', line):
+            possible_tag = possible_tag.lower()
+
+            if possible_tag in seen:
+                continue
+            else:
+                seen.add(possible_tag)
+
             tag = cls.get_by_name(
-                possible_tag.lower(),
+                possible_tag,
                 create=create,
                 **kwargs
             )
