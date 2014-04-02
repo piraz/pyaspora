@@ -5,7 +5,7 @@ from json import loads
 from markdown import markdown
 from markdown.extensions import Extension
 from markdown.preprocessors import Preprocessor
-from re import MULTILINE, compile as re_compile
+from re import compile as re_compile
 
 from pyaspora.utils.rendering import ACCEPTABLE_BROWSER_IMAGE_FORMATS
 
@@ -133,20 +133,18 @@ def pyaspora_subscribe(part, fmt, url):
     """
     Standard message for when a contact subscribes to you.
     """
-    from pyaspora.contact.models import Contact
     if fmt != 'text/html' or not part.inline:
         return None
 
     payload = loads(part.mime_part.body.decode('utf-8'))
-    to_contact = Contact.get(payload['to'])
     return render_template_string(
         'subscribed to <a href="{{profile}}">{{name}}</a>',
         profile=url_for(
             'contacts.profile',
-            contact_id=to_contact.id,
+            contact_id=payload['to'],
             _external=True
         ),
-        name=to_contact.realname
+        name=payload.get('to_name', '(unknown)')
     )
 
 

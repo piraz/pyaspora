@@ -42,6 +42,15 @@ class Contact(db.Model):
                        primaryjoin='Contact.bio_id==MimePart.id')
 
     @classmethod
+    def _get_base(cls):
+        return db.session.query(cls).options(
+            joinedload(cls.avatar),
+            joinedload(cls.bio),
+            joinedload(cls.interests),
+            joinedload(cls.user)
+        )
+
+    @classmethod
     def get(cls, contact_id, prefetch=True):
         """
         Get a contact by primary key ID. None is returned if the Contact
@@ -49,11 +58,8 @@ class Contact(db.Model):
         contact's bio and avatar parts will be pre-fetched, along with any
         interests.
         """
-        if prefetch:
-            res = cls.get_many([contact_id])
-            return res[0] if res else None
-        else:
-            return db.session.query(cls).get(contact_id)
+        base = cls._get_base() if prefetch else db.session.query(cls)
+        return base.get(contact_id)
 
     @classmethod
     def get_many(cls, contact_ids):
@@ -62,13 +68,7 @@ class Contact(db.Model):
         items as Contact.get(). The contacts are returned in an unsorted
         order.
         """
-        return db.session.query(cls). \
-            options(
-                joinedload(cls.avatar),
-                joinedload(cls.bio),
-                joinedload(cls.interests)
-            ). \
-            filter(cls.id.in_(contact_ids))
+        return cls._get_base(). filter(cls.id.in_(contact_ids))
 
     def subscribe(self, contact):
         """
@@ -120,6 +120,7 @@ class Contact(db.Model):
                 body=dumps({
                     'from': self.id,
                     'to': contact.id,
+                    'to_name': contact.realname
                 }).encode('utf-8'),
                 type='application/x-pyaspora-subscribe',
                 text_preview=u'subscribed to {0}'.format(contact.realname)

@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from flask import Blueprint, request, url_for
 from sqlalchemy.sql import and_, desc, not_, or_
-from sqlalchemy.orm import aliased, contains_eager
+from sqlalchemy.orm import aliased, contains_eager, joinedload
 
 from pyaspora.database import db
 from pyaspora.post.models import Post, Share
@@ -51,6 +51,7 @@ def view(_user):
         order_by(desc(Post.thread_modified_at)). \
         group_by(Post.id). \
         options(contains_eager(Share.post)). \
+        options(joinedload(Share.post, Post.diasp)). \
         limit(limit)
 
     data = {

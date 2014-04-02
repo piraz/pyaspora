@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from flask import Blueprint, request, url_for
 from json import dumps
+from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import and_, not_
 
 from pyaspora.content.models import MimePart
@@ -42,11 +43,48 @@ def json_posts(posts_and_shares, viewing_as=None, show_shares=False):
     """
     cache = _base_cache()
     res = [
-        json_post(p, viewing_as, s, cache=cache)
+        json_post(p, viewing_as, s, cache=cache, children=False)
         for p, s in posts_and_shares
     ]
+    _fill_children(cache, viewing_as)
     _fill_cache(cache, show_shares)
     return res
+
+
+def _fill_children(c, viewing_as):
+    if 'post' not in c:
+        return
+
+    while True:
+        fetch_ids = [k for k, v in c['post'].items() if v['children'] is None]
+        if not fetch_ids:
+            break
+        child_posts = db.session.query(Post).outerjoin(Share). \
+            filter(Post.Queries.children_for_posts(fetch_ids)). \
+            options(joinedload(Post.diasp)). \
+            order_by(Post.created_at). \
+            add_entity(Share)
+        if viewing_as:
+            child_posts = child_posts.filter(Share.contact == viewing_as)
+        else:
+            child_posts = child_posts.filter(Share.public)
+        for i in fetch_ids:
+            c['post'][i]['children'] = []
+        for post, share in child_posts:
+            can_view = post.has_permission_to_view(
+                viewing_as,
+                share=share
+            )
+            if can_view:
+                c['post'][post.parent_id]['children'].append(
+                    json_post(
+                        post,
+                        viewing_as,
+                        share,
+                        children=False,
+                        cache=c
+                    )
+                )
 
 
 def json_post(post, viewing_as=None, share=None, children=True, cache=None):
@@ -58,8 +96,6 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
     """
     c = cache or _base_cache()
 
-    sorted_children = sorted(post.viewable_children(viewing_as),
-                             key=lambda p: p.created_at)
     data = _get_cached(c, 'post', post.id)
     data.update({
         'id': post.id,
@@ -71,14 +107,14 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
             'share': None,
             'comment': None,
             'hide': None,
-            'make_public': None,
-            'unmake_public': None,
         },
         'tags': [],
         'shares': None
     })
 
     if children:
+        sorted_children = sorted(post.viewable_children(viewing_as),
+                                 key=lambda p: p.created_at)
         data['children'] = [
             json_post(
                 p,
@@ -91,26 +127,13 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
     if viewing_as:
         data['actions']['comment'] = url_for('posts.comment',
                                              post_id=post.id, _external=True)
-        if viewing_as.id != post.author_id:
-            data['actions']['share'] = \
-                url_for('posts.share', post_id=post.id, _external=True)
+        data['actions']['share'] = \
+            url_for('posts.share', post_id=post.id, _external=True)
 
         if share and viewing_as and \
                 (share.public or share.contact_id == viewing_as.id):
             data['actions']['hide'] = url_for('posts.hide',
                                               post_id=post.id, _external=True)
-
-        if share and viewing_as and share.contact_id == viewing_as.id:
-            data['actions']['hide'] = url_for('posts.hide',
-                                              post_id=post.id, _external=True)
-            if share.public and post.can_change_privacy(False):
-                data['actions']['unmake_public'] = \
-                    url_for('posts.set_public',
-                            post_id=post.id, toggle='0', _external=True)
-            elif post.can_change_privacy(True):
-                data['actions']['make_public'] = \
-                    url_for('posts.set_public',
-                            post_id=post.id, toggle='1', _external=True)
 
     if not cache:
         _fill_cache(c, bool(share))
@@ -137,7 +160,9 @@ def _fill_cache(c, show_shares=False):
                     json_share(post_share, cache=c)
                 )
     if c['contact']:
-        for contact in Contact.get_many(c['contact'].keys()):
+        query = Contact.get_many(c['contact'].keys()). \
+            options(joinedload(Contact.diasp))
+        for contact in query:
             c['contact'][contact.id].update(json_contact(contact))
 
 
@@ -248,38 +273,6 @@ def hide(post_id, _user):
 
     post.hide(_user)
     db.session.commit()
-
-    return redirect(url_for('feed.view', _external=True))
-
-
-@blueprint.route('/<int:post_id>/set_public/<int:toggle>', methods=['POST'])
-def set_public(post_id, toggle):
-    """
-    Make the Post appear-on/disappear-from the User's public wall. If toggle
-    is True then the post will appear.
-    """
-    share, user = _get_share_for_post(post_id)
-    post = share.post
-    toggle = bool(toggle)
-
-    if not post.can_change_privacy(toggle):
-        abort(403, 'Not available')
-
-    if share.public != toggle:
-        share.public = toggle
-        db.session.add(share)
-        if toggle:
-            # If it's going public, it'll be visible to more people
-            post.thread_modified()
-            db.session.add(post)
-            db.session.commit()  # Write out the updated share
-            if post.author_id == user.contact_id:
-                post.author.user = user  # So we have the key
-                post.implicit_share([
-                    c for c in post.author.followers()
-                    if not post.shared_with(c)
-                ])
-        db.session.commit()
 
     return redirect(url_for('feed.view', _external=True))
 

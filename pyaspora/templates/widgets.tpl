@@ -100,12 +100,6 @@ Standard widgets
     {% if post.actions.hide %}
         {{button_form(post.actions.hide,'Hide')}}
     {% endif %}
-    {% if post.actions.make_public %}
-        {{button_form(post.actions.make_public,'Show on public wall')}}
-    {% endif %}
-    {% if post.actions.unmake_public %}
-        {{button_form(post.actions.unmake_public,'Shown on public wall', True)}}
-    {% endif %}
 
     {% if post.children %}
         {{ loop(post.children) }}

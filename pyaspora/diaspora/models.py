@@ -395,9 +395,6 @@ class DiasporaPost(db.Model):
             for target in targets:
                 sender.send(post.author.user, target, post=post, text=text)
 
-    def can_change_privacy(self):
-        return False  # Generally, no
-
     def can_reply_with(self, target):
         if target.name == 'self':
             return True

@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import backref, contains_eager, relationship
 from sqlalchemy.sql import and_, not_
@@ -147,6 +146,10 @@ class Post(db.Model):
                 Share.public
             )
 
+        @classmethod
+        def children_for_posts(cls, post_ids):
+            return Post.parent_id.in_(post_ids)
+
     @classmethod
     def get(cls, postid):
         """
@@ -154,13 +157,15 @@ class Post(db.Model):
         """
         return db.session.query(cls).get(postid)
 
-    def has_permission_to_view(self, contact=None):
+    def has_permission_to_view(self, contact=None, share=False):
         """
         Whether the Contact <contact> is permitted to view this post.
         """
         if contact:
             # Check for shares to the contact
-            share = self.shared_with(contact)
+            if share is False:  # we don't use None as there may be no Share
+                share = self.shared_with(contact)
+
             if share:
                 # Hidden status trumps everything else
                 return not share.hidden
@@ -206,19 +211,6 @@ class Post(db.Model):
             Share.public,
             Share.post == self
         )).first()
-
-    def can_change_privacy(self, new_state):
-        if new_state:
-            if self.parent_id and not self.parent.is_public():
-                return False
-        else:
-            if any(c.is_public() for c in self.children):
-                return False
-
-        if self.diasp:
-            return self.diasp.can_change_privacy()
-        else:
-            return True
 
     def _send_to_remotes(self, contacts):
         """
