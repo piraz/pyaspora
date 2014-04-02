@@ -59,10 +59,10 @@ def _fill_children(c, viewing_as):
         fetch_ids = [k for k, v in c['post'].items() if v['children'] is None]
         if not fetch_ids:
             break
-        child_posts = db.session.query(Post, Share). \
+        child_posts = db.session.query(Post).join(Share). \
             filter(Post.Queries.children_for_posts(fetch_ids)). \
             options(joinedload(Post.diasp)). \
-            order_by(Post.created_at)
+            order_by(Post.created_at).add_entity(Share)
         if viewing_as:
             child_posts = child_posts.filter(
                 or_(Share.public, Share.contact == viewing_as)
