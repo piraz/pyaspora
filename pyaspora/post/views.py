@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from flask import Blueprint, request, url_for
 from json import dumps
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql import and_, not_
+from sqlalchemy.sql import and_, not_, or_
 
 from pyaspora.content.models import MimePart
 from pyaspora.content.rendering import render, renderer_exists
@@ -59,13 +59,14 @@ def _fill_children(c, viewing_as):
         fetch_ids = [k for k, v in c['post'].items() if v['children'] is None]
         if not fetch_ids:
             break
-        child_posts = db.session.query(Post).outerjoin(Share). \
+        child_posts = db.session.query(Post, Share). \
             filter(Post.Queries.children_for_posts(fetch_ids)). \
             options(joinedload(Post.diasp)). \
-            order_by(Post.created_at). \
-            add_entity(Share)
+            order_by(Post.created_at)
         if viewing_as:
-            child_posts = child_posts.filter(Share.contact == viewing_as)
+            child_posts = child_posts.filter(
+                or_(Share.public, Share.contact == viewing_as)
+            )
         else:
             child_posts = child_posts.filter(Share.public)
         for i in fetch_ids:
