@@ -174,6 +174,9 @@ class Post(db.Model):
             if contact.id == self.author_id:
                 return True
 
+        if share and share.public:
+            return True
+
         return bool(self.is_public())
 
     def viewable_children(self, contact=None):
@@ -264,7 +267,7 @@ class Post(db.Model):
         """
         share = self.shared_with(user.contact)
         if share:
-            share.hidden = False
+            share.hidden = True
             db.session.add(share)
             return
 
