@@ -2,8 +2,11 @@ from __future__ import absolute_import
 
 from flask import render_template_string, url_for
 from json import loads
-from markdown import markdown
-from markdown.extensions import Extension
+from markdown import Markdown
+try:
+    from markdown.extensions import Extension
+except:
+    from markdown import Extension
 from markdown.preprocessors import Preprocessor
 from re import compile as re_compile
 
@@ -19,7 +22,6 @@ class SkipTagsExtension(Extension):
         putting a space before the line.
         """
         def __init__(self):
-            super(SkipTagsExtension.SkipTagPattern, self).__init__()
             self.pattern = re_compile(r'^(#([A-Za-z0-9_]+(\s+#)?)+)$')
 
         def run(self, lines):
@@ -31,24 +33,23 @@ class SkipTagsExtension(Extension):
         md.preprocessors.add('skiptags', self.SkipTagPattern(), '_end')
 
 
-def _markdown_to_html(md):
+def _markdown_to_html(md_text):
     common_opts = dict(
         output_format='xhtml',
         safe_mode='replace',
         extensions=['headerid(forceid=False, level=3)', SkipTagsExtension()]
     )
     try:
-        return markdown(
-            md,
+        md = Markdown(
             html_replacement_text='(could not show this)',
             lazy_ol=False,
             **common_opts
         )
     except TypeError:
-        return markdown(
-            md,
+        md = Markdown(
             **common_opts
         )
+    return md.convert(md_text)
 
 
 def renderer(formats):
