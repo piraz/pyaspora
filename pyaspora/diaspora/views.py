@@ -352,5 +352,5 @@ def stats():
         ).group_by(User.id).count(),
         'local_posts': db.session.query(User).join(Contact).join(Post).filter(
             Post.parent_id == None
-        )count()
+        ).count()
     })
