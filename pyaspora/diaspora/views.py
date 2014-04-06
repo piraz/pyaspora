@@ -338,7 +338,7 @@ def run_public_queue(_user):
 @blueprint.route('/statistics.json', methods=['GET'])
 def stats():
     return jsonify({
-        'name': '{0} Pyaspora'.format(urlsplit(request.url)[1]),
+        'name': '{0} Pyaspora'.format(urlsplit(request.url).netloc),
         'version': '0.x',
         'registrations_open': current_app.config.get('ALLOW_CREATION', False),
         'total_users': db.session.query(User).count(),
@@ -350,5 +350,7 @@ def stats():
         db.session.query(User).join(Contact).join(Post).filter(
             Post.created_at > datetime.now() - relativedelta(months=1)
         ).group_by(User.id).count(),
-        'local_posts': db.session.query(User).join(Contact).join(Post).count()
+        'local_posts': db.session.query(User).join(Contact).join(Post).filter(
+            Post.parent_id == None
+        )count()
     })
