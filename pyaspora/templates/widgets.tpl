@@ -8,7 +8,7 @@ Standard widgets
     #}
     <div class="smallContact">
         {% if contact.avatar %}
-            <img src="{{contact.avatar}}" alt="Avatar" class="avatar" height="24" width="24" />
+            <img src="{{contact.avatar}}" alt="Avatar" class="avatar" height="5%" width="5%" />
         {% endif %}
         <a href="{{contact.link}}">
        		{%- if contact.name.strip() == "" %}
