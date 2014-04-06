@@ -18,13 +18,17 @@ try:
         urlopen
 except:
     from urllib import quote as url_quote, quote_plus, unquote_plus, \
-        urlencode, urlopen
-    from urllib2 import build_opener, HTTPRedirectHandler, Request
+        urlencode
+    from urllib2 import build_opener, HTTPRedirectHandler, Request, urlopen
     from urlparse import urlparse
 
 
 # The namespace for the Diaspora envelope
 PROTOCOL_NS = "https://joindiaspora.com/protocol"
+
+
+# Our user agent
+USER_AGENT = 'Pyaspora/0.x'
 
 
 class DiasporaMessageBuilder:
@@ -233,7 +237,9 @@ class DiasporaMessageBuilder:
         data = urlencode({
             'xml': xml
         })
-        return urlopen(url, data.encode("ascii"))
+        req = Request(url)
+        req.add_header('User-Agent', USER_AGENT)
+        return urlopen(req, data.encode("ascii"))
 
 
 class DiasporaMessageParser:
@@ -382,7 +388,9 @@ class WebfingerRequest(object):
             ),
             template_url
         )
-        return etree.parse(urlopen(target_url))
+        req = Request(target_url)
+        req.add_header('User-Agent', USER_AGENT)
+        return etree.parse(urlopen(req))
 
     def _get_template(self):
         """
@@ -433,6 +441,7 @@ class HostMeta(object):
         """
         request = Request(url)
         opener = build_opener(RedirectTrackingHandler())
+        opener.addheaders = [('User-agent', USER_AGENT)]
         return opener.open(request, timeout=5)
 
     def _get_connection(self):

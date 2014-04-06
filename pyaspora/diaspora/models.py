@@ -24,7 +24,8 @@ from pyaspora import db
 from pyaspora.contact.models import Contact
 from pyaspora.content.models import MimePart
 from pyaspora.diaspora import import_url_as_mimepart
-from pyaspora.diaspora.protocol import DiasporaMessageParser, WebfingerRequest
+from pyaspora.diaspora.protocol import DiasporaMessageParser, USER_AGENT, \
+    WebfingerRequest
 from pyaspora.post.models import Post
 from pyaspora.post.views import json_post
 
@@ -82,7 +83,8 @@ class DiasporaContact(db.Model):
         """
         try:
             wf = WebfingerRequest(addr).fetch()
-        except URLError:
+        except URLError as e:
+            current_app.logger.warning(e)
             return None
         if not wf:
             return None
@@ -99,7 +101,9 @@ class DiasporaContact(db.Model):
             '//XRD:Link[@rel="http://microformats.org/profile/hcard"]/@href',
             namespaces=NS
         )[0]
-        hcard = html.parse(urlopen(hcard_url))
+        req = Request(hcard_url)
+        req.add_header('User-Agent', USER_AGENT)
+        hcard = html.parse(urlopen(req))
         c.realname = hcard.xpath('//*[@class="fn"]')[0].text
 
         pod_loc = hcard.xpath('//*[@id="pod_location"]')[0].text
@@ -165,6 +169,7 @@ class DiasporaContact(db.Model):
         """
         url = self.server + 'people/{0}'.format(self.guid)
         req = Request(url)
+        req.add_header('User-Agent', USER_AGENT)
         req.add_header('Accept', 'application/json')
         entries = json_load(urlopen(req))
         for entry in entries:
