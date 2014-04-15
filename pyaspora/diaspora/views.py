@@ -279,7 +279,7 @@ def json_feed(guid):
         }
         ret.append(rep)
 
-    return jsonify(response)
+    return jsonify(ret)
 
 
 @blueprint.route('/diaspora/run_queue', methods=['GET'])
