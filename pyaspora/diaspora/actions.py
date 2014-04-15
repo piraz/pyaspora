@@ -671,7 +671,8 @@ class Photo(MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
         assert(data['diaspora_handle'] == c_from.diasp.username)
-        parent = DiasporaPost.get_by_guid(data['guid'])
+        target_guid = data.get('status_message_guid', data['guid'])
+        parent = DiasporaPost.get_by_guid(target_guid)
 
         if parent:
             parent = parent.post
@@ -680,7 +681,8 @@ class Photo(MessageHandlerBase):
 
         assert(parent)
         assert(parent.shared_with(c_from))
-        assert(parent.shared_with(u_to))
+        if u_to:
+            assert(parent.shared_with(u_to))
         photo_url = urljoin(
             data['remote_photo_path'], data['remote_photo_name']
         )
