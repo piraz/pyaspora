@@ -6,6 +6,7 @@ cached information.
 
 from __future__ import absolute_import
 
+from datetime import timedelta
 from flask import Blueprint, current_app, request, url_for, \
     abort as flask_abort
 from lxml import etree
