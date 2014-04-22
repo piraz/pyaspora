@@ -47,7 +47,7 @@ def avatar(contact_id):
     if not part:
         abort(404, 'Contact has no avatar', force_status=True)
 
-    return raw_response(part.body, part.type)
+    return raw_response(part.body, part.type, expiry_delta=timedelta(hours=12))
 
 
 def _profile_base(contact_id, public=False):

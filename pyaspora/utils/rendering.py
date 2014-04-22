@@ -1,9 +1,12 @@
 from __future__ import absolute_import
 
+from datetime import datetime
 from dateutil.tz import tzlocal, tzutc
 from flask import jsonify, make_response, render_template, request, url_for, \
     abort as flask_abort, redirect as flask_redirect
 from lxml import etree
+from time import mktime
+from wsgiref.handlers import format_date_time
 
 
 ACCEPTABLE_BROWSER_IMAGE_FORMATS = ('image/jpeg', 'image/gif', 'image/png')
@@ -13,9 +16,17 @@ def _desired_format(default='html'):
     return request.args.get('alt', 'html')
 
 
-def raw_response(body, mime_type):
+def raw_response(body, mime_type, expiry_delta=None):
     response = make_response(body)
     response.headers['Content-Type'] = mime_type
+
+    if expiry_delta:
+        response.headers['Expires'] = format_date_time(
+            mktime(
+                (datetime.now() + expiry_delta).timetuple()
+            )
+        )
+
     return response
 
 

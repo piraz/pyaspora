@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from datetime import timedelta
 from flask import Blueprint
 
 from pyaspora.content.models import MimePart
@@ -23,6 +24,10 @@ def raw(part_id):
     # it.
     for link in part.posts:
         if link.post.has_permission_to_view(logged_in):
-            return raw_response(part.body, part.type)
+            return raw_response(
+                part.body,
+                part.type,
+                expiry_delta=timedelta(days=365)
+            )
 
     abort(403, 'Forbidden')
