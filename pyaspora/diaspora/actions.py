@@ -681,8 +681,6 @@ class Photo(MessageHandlerBase):
 
         assert(parent)
         assert(parent.shared_with(c_from))
-        if u_to:
-            assert(parent.shared_with(u_to))
         photo_url = urljoin(
             data['remote_photo_path'], data['remote_photo_name']
         )
