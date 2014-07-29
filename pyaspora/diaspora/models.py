@@ -407,3 +407,12 @@ class DiasporaPost(db.Model):
             return target.name == 'wall'
         else:
             return target.name == 'existing'
+
+
+class DiasporaPart(db.Model):
+    __tablename__ = 'diaspora_parts'
+    part_id = Column(Integer, ForeignKey('mime_parts.id'), primary_key=True)
+    guid = Column(String, nullable=False, unique=True)
+
+    part = relationship('MimePart', single_parent=True,
+                        backref=backref('diasp', uselist=False))

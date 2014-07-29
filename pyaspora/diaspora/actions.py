@@ -20,7 +20,8 @@ except:
 from pyaspora import db
 from pyaspora.content.models import MimePart
 from pyaspora.diaspora import import_url_as_mimepart
-from pyaspora.diaspora.models import DiasporaContact, DiasporaPost
+from pyaspora.diaspora.models import DiasporaContact, DiasporaPart, \
+    DiasporaPost
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder
 from pyaspora.post.models import Post
 from pyaspora.tag.models import Tag
@@ -681,18 +682,31 @@ class Photo(MessageHandlerBase):
 
         assert(parent)
         assert(parent.shared_with(c_from))
+
+        # Check if already received here
+        for part in parent.parts:
+            dp = part.mime_part.diasp
+            if dp and dp.guid == data['guid']:
+                return
+
         photo_url = urljoin(
             data['remote_photo_path'], data['remote_photo_name']
         )
         resp = urlopen(photo_url)
         mime = resp.info().get('Content-Type')
-        parent.add_part(MimePart(
+        part MimePart(
             type=resp.info().get('Content-Type'),
             body=resp.read(),
             text_preview='(picture)'
-        ), order=0, inline=bool(mime.startswith('image/')))
+        )
+        parent.add_part(
+            part,
+            order=0,
+            inline=bool(mime.startswith('image/'))
+        )
         parent.thread_modified()
         db.session.add(parent)
+        db.session.add(DiasporaPart(part=part, guid=data['guid']))
         db.session.commit()
 
 
