@@ -694,8 +694,8 @@ class Photo(MessageHandlerBase):
         )
         resp = urlopen(photo_url)
         mime = resp.info().get('Content-Type')
-        part MimePart(
-            type=resp.info().get('Content-Type'),
+        part = MimePart(
+            type=mime,
             body=resp.read(),
             text_preview='(picture)'
         )
