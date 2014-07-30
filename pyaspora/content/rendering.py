@@ -170,6 +170,68 @@ def pyaspora_share(part, fmt, url):
     )
 
 
+@renderer(['application/x-diaspora-poll-question'])
+def poll_question(part, fmt, url):
+    """
+    A question sent as part of a poll from a Diaspora node.
+    """
+    if not part.inline:
+        return
+
+    if fmt == 'text/plain':
+        return 'Question: {}'.format(part.mime_part.body.decode('utf-8'))
+
+    if fmt == 'text/html':
+        return render_template_string(
+            "Question: <strong>{{question}}</strong>",
+            question=part.mime_part.body.decode('utf-8')
+        )
+
+    return None
+
+
+@renderer(['application/x-diaspora-poll-answer'])
+def poll_answer(part, fmt, url):
+    """
+    A question sent as part of a poll from a Diaspora node.
+    """
+    if not part.inline:
+        return
+
+    if fmt == 'text/plain':
+        return '- {}'.format(part.mime_part.body.decode('utf-8'))
+
+    if fmt == 'text/html':
+        return render_template_string(
+            "<ul style='margin: 0em'><li>{{question}}</li></ul>",
+            question=part.mime_part.body.decode('utf-8')
+        )
+
+    return None
+
+
+@renderer(['application/x-diaspora-poll-participation'])
+def poll_participation(part, fmt, url):
+    """
+    A question sent as part of a poll from a Diaspora node.
+    """
+    if not part.inline:
+        return
+
+    payload = loads(part.mime_part.body.decode('utf-8'))
+
+    if fmt == 'text/plain':
+        return 'answered the poll with {}'.format(payload['answer_text'])
+
+    if fmt == 'text/html':
+        return render_template_string(
+            "answered with <strong>{{answer}}</strong>",
+            answer=payload['answer_text']
+        )
+
+    return None
+
+
 def render(part, fmt, url=None):
     """
     Attempt to render the PostPart <part> into MIME format <fmt>, which is

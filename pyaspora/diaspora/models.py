@@ -416,3 +416,7 @@ class DiasporaPart(db.Model):
 
     part = relationship('MimePart', single_parent=True,
                         backref=backref('diasp', uselist=False))
+
+    @classmethod
+    def get_by_guid(cls, guid):
+        return db.session.query(cls).filter(cls.guid == guid).first()

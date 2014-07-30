@@ -329,6 +329,23 @@ class PostMessage(TagMixin, MessageHandlerBase):
             body=msg.encode('utf-8'),
         ), order=0, inline=True)
         p.tags = cls.find_tags(msg)
+
+        if 'poll' in data:
+            pd = xml.xpath('//poll')[0]
+            part = MimePart(
+                type='application/x-diaspora-poll-question',
+                body=pd.xpath('./question')[0].text.encode('utf-8')
+            )
+            part.diasp = DiasporaPart(guid=pd.xpath('./guid')[0].text)
+            p.add_part(part, order=1, inline=True)
+            for pos, answer in enumerate(pd.xpath('./poll_answer')):
+                part = MimePart(
+                    type='application/x-diaspora-poll-answer',
+                    body=answer.xpath('./answer')[0].text.encode('utf-8')
+                )
+                part.diasp = DiasporaPart(guid=answer.xpath('./guid')[0].text)
+                p.add_part(part, order=2+pos, inline=True)
+
         if public:
             p.share_with([c_from], show_on_wall=True)
         else:
@@ -762,3 +779,77 @@ class Reshare(MessageHandlerBase):
         )
         db.session.add(post)
         db.session.commit()
+
+
+@diaspora_message_handler('/XML/post/poll_participation')
+class PollParticipation(MessageHandlerBase, SignableMixin):
+    """
+    A vote in a poll
+    """
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        data = cls.as_dict(xml)
+        if DiasporaPost.get_by_guid(data['guid']):
+            return
+        author = DiasporaContact.get_by_username(
+            data['diaspora_handle'], True, False
+        )
+        assert(author)
+        author = author.contact
+        poll_part = DiasporaPart.get_by_guid(data['parent_guid'])
+        if not poll_part:
+            return
+        posts = {p.post.id: p.post for p in poll_part.part.posts}
+        if not posts:
+            return
+
+        answer_part = DiasporaPart.get_by_guid(data['poll_answer_guid'])
+        assert answer_part, 'Poll participation must have stored answer'
+
+        new_part = MimePart(
+            type='application/x-diaspora-poll-participation',
+            body=dumps({
+                'poll_guid': data['parent_guid'],
+                'answer_guid': data['poll_answer_guid'],
+                'answer_text': answer_part.part.body.decode('utf-8')
+            })
+        )
+
+        node = xml[0][0]
+        assert(cls.valid_signature(author, data['author_signature'], node))
+
+        saved = []
+        for parent in posts.values():
+            # FIXME: we should validate parent_author_signature against, err
+            # the right post.
+            if u_to and not parent.shared_with(c_from):
+                continue
+            p = Post(author=author, parent=parent)
+            saved.append(p)
+            p.add_part(new_part, order=0, inline=True)
+
+            if u_to:
+                p.share_with([p.author])
+                if parent.shared_with(u_to.contact):
+                    p.share_with([u_to.contact])
+            else:
+                p.share_with([p.author], show_on_wall=True)
+            if p.author.id != c_from.id:
+                p.share_with([c_from])
+
+            p.thread_modified()
+
+            p.diasp = DiasporaPost(
+                guid=data['guid'],
+                type='limited' if u_to else 'public'
+            )
+            db.session.add(p)
+
+        db.session.commit()
+
+        for p in saved:
+            if not(u_to) or (p.parent.author_id == u_to.contact.id):
+                # If the parent has signed this then it must have already been
+                # via the hub.
+                if 'parent_author_signature' not in data:
+                    cls.forward(u_to, p, node)
