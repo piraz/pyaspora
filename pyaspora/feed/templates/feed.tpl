@@ -12,6 +12,9 @@ Display the user's "feed".
 
 {% if feed %}
     {{show_feed(feed, logged_in)}}
+    {% if next %}
+        {{button_form(next, 'View older items', method='get')}}
+    {% endif %}
 {% else %}
     <p>Your feed is empty. You can change your profile tags to show posts
     on topics that interest you.</p>

@@ -25,7 +25,7 @@ def view(_user):
     if MessageQueue.has_pending_items(_user):
         return redirect(url_for('diaspora.run_queue', _external=True))
 
-    limit = int(request.args.get('limit', 99))
+    limit = int(request.args.get('limit', 10))
     friend_ids = [f.id for f in _user.contact.friends()]
     clauses = [Post.Queries.shared_with_contact(_user.contact)]
     if friend_ids:
@@ -55,7 +55,9 @@ def view(_user):
         limit(limit)
 
     data = {
-        'feed': json_posts([(s.post, s) for s in feed], _user, True)
+        'feed': json_posts([(s.post, s) for s in feed], _user, True),
+        'limit': limit,
+        'next': url_for('feed.view', limit=limit + 10, _external=True)
     }
 
     add_logged_in_user_to_data(data, _user)
