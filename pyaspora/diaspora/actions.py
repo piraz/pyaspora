@@ -799,7 +799,7 @@ class PollParticipation(MessageHandlerBase, SignableMixin):
         poll_part = DiasporaPart.get_by_guid(data['parent_guid'])
         if not poll_part:
             return
-        posts = {p.post.id: p.post for p in poll_part.part.posts}
+        posts = dict((p.post.id, p.post) for p in poll_part.part.posts)
         if not posts:
             return
 
