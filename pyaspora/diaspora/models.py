@@ -400,6 +400,25 @@ class DiasporaPost(db.Model):
             for target in targets:
                 sender.send(post.author.user, target, post=post, text=text)
 
+    def reshare(self, targets, reshared_post):
+        """
+        DiasporaPost <self> is a reshare of Post <reshared_post>, and we need
+        to notify Contact <targets> that this has been reshared.
+
+        Unfortunately the protocol doesn't permit us to send the accompanying
+        message.
+        """
+        from pyaspora.diaspora.actions import Reshare
+        # De-dupe by server
+        targets = dict((c.diasp.server, c) for c in targets)
+        for target in targets.values():
+            Reshare.send_public(
+                self.post.author.user,
+                target,
+                post=self.post,
+                reshare=reshared_post
+            )
+
     def can_reply_with(self, target):
         if target.name == 'self':
             return True

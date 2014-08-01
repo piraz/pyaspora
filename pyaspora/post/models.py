@@ -215,25 +215,31 @@ class Post(db.Model):
             Share.post == self
         )).first()
 
-    def _send_to_remotes(self, contacts):
+    def _send_to_remotes(self, contacts, reshare_of):
         """
         Arrange to send this post to contacts on the remote node.
         """
         from pyaspora.diaspora.models import DiasporaPost
+        db.session.commit()  # write out shares
         contacts = [c for c in contacts if not c.user]
         if contacts:
-            DiasporaPost.get_for_post(self).send_to(contacts)
+            # Only public posts can be reshared by Diaspora
+            if reshare_of and self.author_made_public() and \
+                    reshare_of.author_made_public():
+                DiasporaPost.get_for_post(self).reshare(contacts, reshare_of)
+            else:
+                DiasporaPost.get_for_post(self).send_to(contacts)
 
-    def implicit_share(self, contacts):
+    def implicit_share(self, contacts, reshare_of=None):
         """
         Contacts can see the content because it is public, but it is not
         directly shared with them.
         """
         if self.author.user:
             # Only announce locally-generated content
-            self._send_to_remotes(contacts)
+            self._send_to_remotes(contacts, reshare_of)
 
-    def share_with(self, contacts, show_on_wall=False):
+    def share_with(self, contacts, show_on_wall=False, reshare_of=None):
         """
         Share this Post with all the contacts in list <contacts>. This method
         doesn't share the post if the Contact already has this Post shared
@@ -249,7 +255,7 @@ class Post(db.Model):
                     contact.user.notify_event(commit=False)
         if self.author.user:
             # Only announce locally-generated content
-            self._send_to_remotes(new_shares)
+            self._send_to_remotes(new_shares, reshare_of)
 
     def shared_with(self, contact):
         """

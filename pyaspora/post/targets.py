@@ -63,7 +63,7 @@ class Self(Target):
         return True
 
     @classmethod
-    def make_shares(cls, post, target):
+    def make_shares(cls, post, target, reshare_of=None):
         cls._make_self_share(post)
 
 
@@ -91,7 +91,7 @@ class Contact(Target):
         return bool(cls._user_bothway_contacts_for_post(user, parent_post))
 
     @classmethod
-    def make_shares(cls, post, target):
+    def make_shares(cls, post, target, reshare_of=None):
         cls._make_self_share(post)
         contact = [
             c for c in post.author.friends() if c.id == int(target)
@@ -105,7 +105,7 @@ class Contact(Target):
             contact,
             post.parent
         ):
-            post.share_with([contact])
+            post.share_with([contact], reshare_of=reshare_of)
 
 
 class Group(Target):
@@ -163,7 +163,7 @@ class Group(Target):
         return False
 
     @classmethod
-    def make_shares(cls, post, target):
+    def make_shares(cls, post, target, reshare_of=None):
         cls._make_self_share(post)
         group = [
             g for g in post.author.groups if g.id == int(target)
@@ -180,7 +180,7 @@ class Group(Target):
                 post.parent
             )
         ]
-        post.share_with(contacts)
+        post.share_with(contacts, reshare_of=reshare_of)
 
 
 class AllFriends(Target):
@@ -206,7 +206,7 @@ class AllFriends(Target):
         ))
 
     @classmethod
-    def make_shares(cls, post, target):
+    def make_shares(cls, post, target, reshare_of=None):
         cls._make_self_share(post)
         contacts = [
             c for c in post.author.friends()
@@ -217,7 +217,7 @@ class AllFriends(Target):
             )
             and c.id != post.author_id
         ]
-        post.share_with(contacts)
+        post.share_with(contacts, reshare_of=reshare_of)
 
 
 class ExistingViewers(Target):
@@ -241,7 +241,7 @@ class ExistingViewers(Target):
         return True
 
     @classmethod
-    def make_shares(cls, post, target):
+    def make_shares(cls, post, target, reshare_of=None):
         cls._make_self_share(post)
         contacts = [
             s.contact for s in post.parent.shares
@@ -252,7 +252,7 @@ class ExistingViewers(Target):
             )
             and s.contact_id != post.author_id
         ]
-        post.share_with(contacts)
+        post.share_with(contacts, reshare_of=reshare_of)
 
 
 class Public(Target):
@@ -275,10 +275,10 @@ class Public(Target):
         return parent_post.is_public()
 
     @classmethod
-    def make_shares(cls, post, target):
+    def make_shares(cls, post, target, reshare_of=None):
         cls._make_self_share(post, True)
 
-        post.implicit_share(post.author.followers())
+        post.implicit_share(post.author.followers(), reshare_of=reshare_of)
 
 
 target_list = (Self, Contact, Group, AllFriends, ExistingViewers, Public)

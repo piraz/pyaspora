@@ -352,6 +352,7 @@ def create(_user):
             abort(403, 'Forbidden')
         relationship['post'] = post
 
+    shared = None
     post = Post(author=_user.contact)
     body_part = MimePart(type='text/x-markdown', body=body.encode('utf-8'),
                          text_preview=None)
@@ -404,7 +405,11 @@ def create(_user):
     db.session.add(post)
     db.session.commit()
 
-    targets_by_name[target['type']].make_shares(post, target['id'])
+    targets_by_name[target['type']].make_shares(
+        post,
+        target['id'],
+        reshare_of=shared
+    )
     db.session.commit()
 
     data = json_post(post)

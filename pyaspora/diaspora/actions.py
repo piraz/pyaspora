@@ -780,6 +780,22 @@ class Reshare(MessageHandlerBase):
         db.session.add(post)
         db.session.commit()
 
+    @classmethod
+    def generate(cls, u_from, c_to, post, reshare):
+        req = etree.Element('reshare')
+        diasp = DiasporaPost.get_for_post(post)
+        r_diasp = DiasporaPost.get_for_post(reshare)
+
+        cls.struct_to_xml(req, [
+            {'root_diaspora_id': reshare.author.diasp.username},
+            {'root_guid': r_diasp.guid},
+            {'guid': diasp.guid},
+            {'diaspora_handle': post.author.diasp.username},
+            {'public': 'true'},
+            {'created_at': cls.format_dt(reshare.created_at)}
+        ])
+        return req
+
 
 @diaspora_message_handler('/XML/post/poll_participation')
 class PollParticipation(MessageHandlerBase, SignableMixin):
