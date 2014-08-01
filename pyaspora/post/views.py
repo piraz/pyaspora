@@ -315,7 +315,7 @@ def create_form(_user):
     if request.args.get('target_type') and request.args.get('target_id'):
         data['default_target'] = {
             'type': request.args['target_type'],
-            'id': request.args['target_id'],
+            'id': int(request.args['target_id']),
         }
     return render_response('posts_create_form.tpl', data)
 

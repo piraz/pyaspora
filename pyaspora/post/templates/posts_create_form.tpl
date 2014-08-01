@@ -40,7 +40,7 @@ Allow a User to enter the contents of a new Post.
                 <th>
                     <label>
                         <input name="target_type" value="{{target_type.name}}" type="radio"
-                            {% if default_target and target_type.name==default_target.type %}
+                            {% if default_target and target_type.name == default_target.type %}
                                 checked='checked'
                             {% endif %}
                         />
@@ -52,7 +52,7 @@ Allow a User to enter the contents of a new Post.
                         <select name="target_{{target_type.name}}_id">
                             {%for target in target_type.targets%}
                                 <option value="{{target.id}}"
-                                    {% if default_target and target.id==default_target.id %}
+                                    {% if default_target and target_type.name == default_target.type and target.id == default_target.id %}
                                         selected='selected'
                                     {% endif %}
                                 />
