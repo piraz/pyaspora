@@ -59,7 +59,9 @@ def view(_user):
         'limit': limit,
     }
     if len(data['feed']) >= limit:
-        data['next'] = url_for('feed.view', limit=limit + 10, _external=True)
+        data['actions'] = {
+            'more': url_for('feed.view', limit=limit + 10, _external=True)
+        }
 
     add_logged_in_user_to_data(data, _user)
 
