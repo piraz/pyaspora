@@ -13,7 +13,7 @@ from pyaspora.database import db
 from pyaspora.post.models import Post, PostPart, Share
 from pyaspora.post.targets import target_list, targets_by_name
 from pyaspora.utils.rendering import abort, add_logged_in_user_to_data, \
-    redirect, render_response
+    redirect, render_datetime, render_response
 from pyaspora.utils.validation import check_attachment_is_safe, post_param
 from pyaspora.user.session import require_logged_in_user
 from pyaspora.tag.models import PostTag, Tag
@@ -103,7 +103,7 @@ def json_post(post, viewing_as=None, share=None, children=True, cache=None):
         'author': _get_cached(c, 'contact', post.author_id),
         'parts': [],
         'children': None,
-        'created_at': post.created_at.isoformat(),
+        'created_at': render_datetime(post.created_at),
         'actions': {
             'share': None,
             'comment': None,

@@ -2,8 +2,8 @@ from __future__ import absolute_import
 
 from re import compile as re_compile
 from datetime import datetime
+from dateutil.parser import parse as parse_datetime
 from dateutil.relativedelta import relativedelta
-from dateutil.tz import tzutc
 from jinja2 import evalcontextfilter, Markup, escape
 try:
     from urllib.parse import parse_qsl, urlsplit, urlunsplit  # py3
@@ -30,7 +30,10 @@ def since(dt, base=None, chunks=1):
         base = datetime.now()
 
     if isinstance(dt, str):
-        dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M:%S')
+        dt = parse_datetime(dt)
+
+    base = ensure_timezone(base)
+    dt = ensure_timezone(dt)
 
     if dt == base:
         return "now"

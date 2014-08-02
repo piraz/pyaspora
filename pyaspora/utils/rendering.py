@@ -126,8 +126,20 @@ def send_xml(doc, content_type='text/xml'):
     return response
 
 
-def ensure_timezone(dt):
+def ensure_timezone(dt, tz=None):
+    """
+    Make sure the datetime <dt> has a timezone set, using timezone <tz> if it
+    doesn't. <tz> defaults to the local timezone.
+    """
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=tzlocal())
+        return dt.replace(tzinfo=tz or tzlocal())
     else:
         return dt
+
+
+def render_datetime(dt):
+    """
+    Create an ISO date string with timezone from a datetime object.
+    """
+    dt = ensure_timezone(dt, tz=tzutc())  # Sigh, SQLAlchemy
+    return dt.isoformat()
