@@ -34,13 +34,21 @@ Allow a User to enter the contents of a new Post.
         Choose who can see your new post:
     </p>
 
+    {% if default_target -%}
+        {%- set default_target_type = default_target.type -%}
+    {%- elif targets[-1].name == 'wall' and targets[-2] and targets[-2].name != 'self' -%}
+        {%- set default_target_type = targets[-2].name -%}
+    {%- else -%}
+        {%- set default_target_type = targets[-1].name -%}
+    {%- endif -%}
+
     <table>
          {%for target_type in targets%}
             <tr>
                 <th>
                     <label>
                         <input name="target_type" value="{{target_type.name}}" type="radio"
-                            {% if default_target and target_type.name == default_target.type %}
+                            {% if target_type.name == default_target_type %}
                                 checked='checked'
                             {% endif %}
                         />
