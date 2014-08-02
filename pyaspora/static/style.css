@@ -74,6 +74,15 @@ th {
     font-size: small;
 }
 
+#profileAvatar .avatar {
+	max-width: 90%;
+}
+
+.smallContact .avatar {
+	max-height: 3ex;
+	max-width: 3em;
+}
+
 @media screen {
     html,body {
         margin: 0em;

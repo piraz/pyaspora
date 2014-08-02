@@ -8,7 +8,7 @@ Display a contact's "wall", which varies according to who is viewing it.
 <h2 {% if username %}title="{{username}}"{% endif %}>{{name}}</h2>
 
 {% if avatar %}
-<p>
+<p id="profileAvatar">
     <img src="{{avatar}}" alt="Avatar" class="avatar" />
 </p>
 {% endif %}

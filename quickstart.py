@@ -23,6 +23,11 @@ app.config['ALLOW_CREATION'] = False
 # Whether to permit user download from HTTP (not HTTPS)
 app.config['ALLOW_INSECURE_HOSTMETA'] = False
 
+# On/off featurs
+app.config['FEATURES'] = {
+    'gravatar': False  # Use Gravatars for users with no profile picture
+}
+
 assert app.secret_key, \
     'You need to edit quickstart.py to configure the application'
 

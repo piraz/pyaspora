@@ -9,6 +9,7 @@ from __future__ import absolute_import
 from datetime import timedelta
 from flask import Blueprint, current_app, request, url_for, \
     abort as flask_abort
+from hashlib import md5
 from lxml import etree
 from re import match as re_match
 from traceback import format_exc
@@ -200,6 +201,11 @@ def json_contact(contact, viewing_as=None):
             'contacts.avatar',
             contact_id=contact.id,
             _external=True
+        )
+    elif contact.user and \
+            current_app.config.get('FEATURES', {}).get('gravatar', False):
+        resp['avatar'] = 'http://www.gravatar.com/avatar/{}?d=mm'.format(
+            md5(contact.user.email.strip().lower()).hexdigest()
         )
 
     if contact.bio:
