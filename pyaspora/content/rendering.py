@@ -179,7 +179,7 @@ def poll_question(part, fmt, url):
         return
 
     if fmt == 'text/plain':
-        return 'Question: {}'.format(part.mime_part.body.decode('utf-8'))
+        return 'Question: {0}'.format(part.mime_part.body.decode('utf-8'))
 
     if fmt == 'text/html':
         return render_template_string(
@@ -199,7 +199,7 @@ def poll_answer(part, fmt, url):
         return
 
     if fmt == 'text/plain':
-        return '- {}'.format(part.mime_part.body.decode('utf-8'))
+        return '- {0}'.format(part.mime_part.body.decode('utf-8'))
 
     if fmt == 'text/html':
         return render_template_string(
@@ -221,7 +221,7 @@ def poll_participation(part, fmt, url):
     payload = loads(part.mime_part.body.decode('utf-8'))
 
     if fmt == 'text/plain':
-        return 'answered the poll with {}'.format(payload['answer_text'])
+        return 'answered the poll with {0}'.format(payload['answer_text'])
 
     if fmt == 'text/html':
         return render_template_string(

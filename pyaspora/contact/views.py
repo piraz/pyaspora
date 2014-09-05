@@ -204,7 +204,7 @@ def json_contact(contact, viewing_as=None):
         )
     elif contact.user and \
             current_app.config.get('FEATURES', {}).get('gravatar', False):
-        resp['avatar'] = 'http://www.gravatar.com/avatar/{}?d=mm'.format(
+        resp['avatar'] = 'http://www.gravatar.com/avatar/{0}?d=mm'.format(
             md5(contact.user.email.strip().lower()).hexdigest()
         )
 
