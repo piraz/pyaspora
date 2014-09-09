@@ -239,7 +239,7 @@ class Post(db.Model):
             # Only announce locally-generated content
             self._send_to_remotes(contacts, reshare_of)
 
-    def share_with(self, contacts, show_on_wall=False, reshare_of=None):
+    def share_with(self, contacts, show_on_wall=False, reshare_of=None, remote=True):
         """
         Share this Post with all the contacts in list <contacts>. This method
         doesn't share the post if the Contact already has this Post shared
@@ -253,7 +253,7 @@ class Post(db.Model):
                                      public=show_on_wall))
                 if contact.user and contact.id != self.author_id:
                     contact.user.notify_event(commit=False)
-        if self.author.user:
+        if remote and self.author.user:
             # Only announce locally-generated content
             self._send_to_remotes(new_shares, reshare_of)
 

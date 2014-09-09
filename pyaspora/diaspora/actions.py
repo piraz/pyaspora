@@ -458,7 +458,29 @@ class PostParticipation(MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         # Not sure what these do, but they don't seem to be necessary, so do
         # nothing - like Shares?
-        pass
+        data = cls.as_dict(xml)
+        post = DiasporaPost.get_by_guid(data['parent_guid'])
+        if not post:
+            return
+        if post.is_public():
+            return
+
+        participant = DiasporaContact.get_by_username(
+            data['diaspora_handle'], True, False
+        )
+        assert(participant)
+        assert(
+            cls.valid_signature(participant, data['author_signature'], node)
+        )
+        if 'parent_author_signature' in data:
+            assert(
+                cls.valid_signature(
+                    post.author, data['parent_author_signature'], node
+                )
+            )
+
+        if not post.shared_with(participant):
+            post.share_with([participant], remote=False)
 
 
 @diaspora_message_handler('/XML/post/comment')
