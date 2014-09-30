@@ -8,7 +8,7 @@ try:
 except:
     from markdown import Extension
 from markdown.preprocessors import Preprocessor
-from re import compile as re_compile
+from re import UNICODE, compile as re_compile
 
 from pyaspora.utils.rendering import ACCEPTABLE_BROWSER_IMAGE_FORMATS
 
@@ -22,7 +22,7 @@ class SkipTagsExtension(Extension):
         putting a space before the line.
         """
         def __init__(self):
-            self.pattern = re_compile(r'^(#([A-Za-z0-9_]+(\s+#)?)+)$')
+            self.pattern = re_compile(r'^(((#\w+)(\s+|\s*$))+)$', UNICODE)
 
         def run(self, lines):
             return [
