@@ -471,6 +471,7 @@ class PostParticipation(SignableMixin, MessageHandlerBase):
             data['diaspora_handle'], True, False
         )
         assert(participant)
+        node = xml[0][0]
         if 'parent_author_signature' in data:
             assert(
                 cls.valid_signature(
