@@ -491,8 +491,8 @@ class PostParticipation(SignableMixin, MessageHandlerBase):
                 )
             )
 
-        if not post.shared_with(participant):
-            post.share_with([participant], remote=False)
+        if not post.shared_with(participant.contact):
+            post.share_with([participant.contact], remote=False)
 
 
 @diaspora_message_handler('/XML/post/comment')
