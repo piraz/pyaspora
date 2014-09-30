@@ -449,7 +449,7 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
 
 
 @diaspora_message_handler('/XML/post/participation/target_type[text()="Post"]')
-class PostParticipation(MessageHandlerBase):
+class PostParticipation(SignableMixin, MessageHandlerBase):
     """
     Somewhat like a Share in Pyaspora, it indicates that someone is
     participating in a conversation on a post (not a PM). However this can be
