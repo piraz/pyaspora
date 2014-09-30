@@ -481,7 +481,7 @@ class HostMeta(object):
         If any part of fetching the HostMeta occurs insecurely (eg. over HTTP)
         then attempt to fetch and validate the signature of the HostMeta).
         """
-        assert current_app.config.get('ALLOW_INSECURE_HOSTMETA', False), \
+        assert current_app.config.get('ALLOW_INSECURE_COMPAT', False), \
             "Configuration doesn't permit HTTP lookup"
 
 

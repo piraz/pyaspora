@@ -390,7 +390,8 @@ class PrivateMessage(SignableMixin, TagMixin, MessageHandlerBase):
         msg = dict((e.tag, e.text) for e in node)
         assert(data['diaspora_handle'] == c_from.diasp.username)
         assert(msg['diaspora_handle'] == c_from.diasp.username)
-        assert(cls.valid_signature(c_from, msg['author_signature'], node))
+        if not current_app.config.get('ALLOW_INSECURE_COMPAT', False):
+            assert(cls.valid_signature(c_from, msg['author_signature'], node))
         assert(cls.valid_signature(
             c_from, msg['parent_author_signature'], node
         ))
@@ -469,13 +470,22 @@ class PostParticipation(MessageHandlerBase):
             data['diaspora_handle'], True, False
         )
         assert(participant)
-        assert(
-            cls.valid_signature(participant, data['author_signature'], node)
-        )
         if 'parent_author_signature' in data:
             assert(
                 cls.valid_signature(
                     post.author, data['parent_author_signature'], node
+                )
+            )
+            if not current_app.config.get('ALLOW_INSECURE_COMPAT', False):
+                assert(
+                    cls.valid_signature(
+                        participant, data['author_signature'], node
+                    )
+                )
+        else:
+            assert(
+                cls.valid_signature(
+                    participant, data['author_signature'], node
                 )
             )
 
@@ -510,13 +520,18 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         if u_to:
             assert(parent.shared_with(c_from))
         node = xml[0][0]
-        assert(cls.valid_signature(author, data['author_signature'], node))
         if 'parent_author_signature' in data:
             assert(
                 cls.valid_signature(
                     parent.root().author, data['parent_author_signature'], node
                 )
             )
+            if not current_app.config.get('ALLOW_INSECURE_COMPAT', False):
+                assert(
+                    cls.valid_signature(author, data['author_signature'], node)
+                )
+        else:
+            assert(cls.valid_signature(author, data['author_signature'], node))
 
         p = Post(author=author, parent=parent)
         p.add_part(MimePart(
@@ -612,11 +627,16 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         assert(parent.shared_with(c_from))
         assert(parent.shared_with(u_to))
         node = xml[0][0]
-        assert(cls.valid_signature(author, data['author_signature'], node))
         if 'parent_author_signature' in data:
             assert(cls.valid_signature(
                 parent.author, data['parent_author_signature'], node
             ))
+            if not current_app.config.get('ALLOW_INSECURE_COMPAT', False):
+                assert(
+                    cls.valid_signature(author, data['author_signature'], node)
+                )
+        else:
+            assert(cls.valid_signature(author, data['author_signature'], node))
 
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         p = Post(author=author, created_at=created, parent=parent)

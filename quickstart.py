@@ -20,8 +20,9 @@ app.config['UPLOAD_FOLDER'] = '/tmp'
 # Whether to allow new-user signup
 app.config['ALLOW_CREATION'] = False
 
-# Whether to permit user download from HTTP (not HTTPS)
-app.config['ALLOW_INSECURE_HOSTMETA'] = False
+# Whether to make more Diaspora-compatible at the expense of security
+# (permit user download from HTTP (not HTTPS), skip some signature processing)
+app.config['ALLOW_INSECURE_COMPAT'] = False
 
 # On/off featurs
 app.config['FEATURES'] = {
