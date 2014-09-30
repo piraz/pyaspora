@@ -463,6 +463,7 @@ class PostParticipation(MessageHandlerBase):
         post = DiasporaPost.get_by_guid(data['parent_guid'])
         if not post:
             return
+        post = post.post  # Underlying Post object
         if post.is_public():
             return
 
