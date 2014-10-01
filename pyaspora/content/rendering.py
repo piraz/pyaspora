@@ -22,7 +22,7 @@ class SkipTagsExtension(Extension):
         putting a space before the line.
         """
         def __init__(self):
-            self.pattern = re_compile(r'^(((#\w+)(\s+|\s*$))+)$', UNICODE)
+            self.pattern = re_compile(r'^(#\w+)', UNICODE)
 
         def run(self, lines):
             return [
