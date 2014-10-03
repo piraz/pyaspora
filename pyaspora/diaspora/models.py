@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import current_app, request, url_for
 from json import load as json_load
 from lxml import html
@@ -28,6 +28,14 @@ from pyaspora.diaspora.protocol import DiasporaMessageParser, USER_AGENT, \
     WebfingerRequest
 from pyaspora.post.models import Post
 from pyaspora.post.views import json_post
+
+
+class TryLater(Exception):
+    """
+    This message should be retried later because it depends on another message
+    that hasn't arrived yet.
+    """
+    pass
 
 
 class DiasporaContact(db.Model):
@@ -242,6 +250,8 @@ class MessageQueue(db.Model):
     body = Column(LargeBinary, nullable=False)
     created_at = Column(DateTime(timezone=True),
                         nullable=False, default=func.now())
+    last_attempted_at = Column(DateTime(timezone=True),
+                               nullable=True)
     error = Column(LargeBinary, nullable=True)
 
     local_user = relationship('User', backref='message_queue')
@@ -280,15 +290,24 @@ class MessageQueue(db.Model):
                 processed += 1
                 if max_items and processed > max_items:
                     break
-            except Exception:
-                err = format_exc()
-                qi.error = err.encode('utf-8')
-                current_app.logger.error(err)
-                db.session.add(qi)
-                break
+            except Exception as e:
+                if isinstance(e, TryLater):
+                    if qi.too_old_for_retry:
+                        db.session.delete(qi)
+                    else:
+                        qi.last_attempted_at = datetime.now()
+                        db.session.add(qi)
+                else:
+                    err = format_exc()
+                    qi.last_attempted_at = datetime.now()
+                    qi.error = err.encode('utf-8')
+                    current_app.logger.error(err)
+                    db.session.add(qi)
+                    break
             else:
                 db.session.delete(qi)
-        db.session.commit()
+            finally:
+                db.session.commit()
 
     def process_incoming(self, user=None):
         from pyaspora.diaspora.actions import process_incoming_message
@@ -299,6 +318,12 @@ class MessageQueue(db.Model):
             user._unlocked_key if user else None
         )
         process_incoming_message(ret, c_from, user)
+
+    @property
+    def too_old_for_retry(self):
+        if not self.last_attempted_at:
+            return False
+        return self.last_attempted_at < datetime.now() - timedelta(minutes=60)
 
 
 class DiasporaPost(db.Model):

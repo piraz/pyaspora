@@ -21,7 +21,7 @@ from pyaspora import db
 from pyaspora.content.models import MimePart
 from pyaspora.diaspora import import_url_as_mimepart
 from pyaspora.diaspora.models import DiasporaContact, DiasporaPart, \
-    DiasporaPost
+    DiasporaPost, TryLater
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder
 from pyaspora.post.models import Post
 from pyaspora.tag.models import Tag
@@ -462,7 +462,7 @@ class PostParticipation(SignableMixin, MessageHandlerBase):
         data = cls.as_dict(xml)
         post = DiasporaPost.get_by_guid(data['parent_guid'])
         if not post:
-            return
+            raise TryLater()
         post = post.post  # Underlying Post object
         if post.is_public():
             return
@@ -505,7 +505,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
         if DiasporaPost.get_by_guid(data['guid']):
-            return
+            raise TryLater()
         author = DiasporaContact.get_by_username(
             data['diaspora_handle'], True, False
         )
@@ -625,7 +625,8 @@ class SubPM(SignableMixin, TagMixin, MessageHandlerBase):
         assert(author)
         author = author.contact
         parent = DiasporaPost.get_by_guid(data['parent_guid']).post
-        assert(parent)
+        if not parent:
+            raise TryLater()
         assert(parent.shared_with(c_from))
         assert(parent.shared_with(u_to))
         node = xml[0][0]
@@ -739,9 +740,8 @@ class Photo(MessageHandlerBase):
         if parent:
             parent = parent.post
         else:
-            return
+            raise TryLater()
 
-        assert(parent)
         assert(parent.shared_with(c_from))
 
         # Check if already received here
@@ -858,10 +858,10 @@ class PollParticipation(MessageHandlerBase, SignableMixin):
         author = author.contact
         poll_part = DiasporaPart.get_by_guid(data['parent_guid'])
         if not poll_part:
-            return
+            raise TryLater()
         posts = dict((p.post.id, p.post) for p in poll_part.part.posts)
         if not posts:
-            return
+            raise TryLater()
 
         answer_part = DiasporaPart.get_by_guid(data['poll_answer_guid'])
         assert answer_part, 'Poll participation must have stored answer'

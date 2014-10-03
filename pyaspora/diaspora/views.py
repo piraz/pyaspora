@@ -24,7 +24,7 @@ from pyaspora import db
 from pyaspora.contact.models import Contact
 from pyaspora.diaspora.actions import process_incoming_message
 from pyaspora.diaspora.models import DiasporaContact, DiasporaPost, \
-    MessageQueue
+    MessageQueue, TryLater
 from pyaspora.diaspora.protocol import DiasporaMessageParser
 from pyaspora.post.models import Post, Share
 from pyaspora.user.models import User
@@ -229,7 +229,7 @@ def receive_public():
     try:
         process_incoming_message(ret, c_from, None)
         return 'OK'
-    except Exception:
+    except Exception as e:
         err = format_exc()
         current_app.logger.error(err)
         db.session.expunge_all()
@@ -238,9 +238,14 @@ def receive_public():
         queue_item.remote = None
         queue_item.format = MessageQueue.PUBLIC_INCOMING
         queue_item.body = request.form['xml'].encode('ascii')
-        queue_item.error = err.encode('utf-8')
+        queue_item.last_attempted_at = datetime.now()
+        if not isinstance(e, TryLater):
+            queue_item.error = err.encode('utf-8')
         db.session.add(queue_item)
-        return 'Error', 400
+        if isinstance(e, TryLater):
+            return 'OK'
+        else:
+            return 'Error', 400
     finally:
         db.session.commit()
 
@@ -322,15 +327,23 @@ def run_public_queue(_user):
 
         try:
             qi.process_incoming()
-        except Exception:
-            err = format_exc()
-            qi.error = err.encode('utf-8')
-            current_app.logger.error(err)
-            db.session.add(qi)
-            db.session.commit()
-            break
+        except Exception as e:
+            if isinstance(e, TryLater):
+                if qi.too_old_for_retry:
+                    db.session.delete(qi)
+                else:
+                    qi.last_attempted_at = datetime.now()
+                    db.session.add(qi)
+            else:
+                err = format_exc()
+                qi.error = err.encode('utf-8')
+                qi.last_attempted_at = datetime.now()
+                current_app.logger.error(err)
+                db.session.add(qi)
+                break
         else:
             db.session.delete(qi)
+        finally:
             db.session.commit()
     return redirect(url_for('feed.view'))
 
