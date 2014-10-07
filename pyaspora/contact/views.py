@@ -67,7 +67,7 @@ def _profile_base(contact_id, public=False):
     viewing_as = None if public else logged_in_user()
 
     data = json_contact(contact, viewing_as)
-    limit = int(request.args.get('limit', 99))
+    limit = int(request.args.get('limit', 25))
 
     if viewing_as and request.args.get('refresh', False) and contact.diasp:
         try:

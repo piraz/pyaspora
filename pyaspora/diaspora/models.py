@@ -8,7 +8,7 @@ from lxml import html
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, \
     String
 from sqlalchemy.orm import backref, relationship
-from sqlalchemy.sql import and_
+from sqlalchemy.sql import and_, or_
 from sqlalchemy.sql.expression import func
 from traceback import format_exc
 from uuid import uuid4
@@ -261,18 +261,37 @@ class MessageQueue(db.Model):
         def pending_items_for_user(cls, user):
             return and_(
                 MessageQueue.format == MessageQueue.INCOMING,
-                MessageQueue.local_user == user
+                MessageQueue.local_user == user,
+                or_(
+                    MessageQueue.last_attempted_at == None,
+                    MessageQueue.last_attempted_at <=
+                    datetime.now() - timedelta(minutes=5)
+                )
             )
 
         @classmethod
         def pending_public_items(cls):
-            return MessageQueue.format == MessageQueue.PUBLIC_INCOMING
+            return and_(
+                MessageQueue.format == MessageQueue.PUBLIC_INCOMING,
+                or_(
+                    MessageQueue.last_attempted_at == None,
+                    MessageQueue.last_attempted_at <=
+                    datetime.now() - timedelta(minutes=5)
+                )
+            )
 
     @classmethod
     def has_pending_items(cls, user):
         first = db.session.query(cls).filter(
             cls.Queries.pending_items_for_user(user)
         ).order_by(cls.created_at).first()
+
+        # Just tried
+        if first and first.last_attempted_at and \
+                first.last_attempted_at > \
+                datetime.now() - timedelta(minutes=5):
+            return False
+
         return bool(first and not first.error)
 
     @classmethod
@@ -322,8 +341,9 @@ class MessageQueue(db.Model):
     @property
     def too_old_for_retry(self):
         if not self.last_attempted_at:
+            # We'll always have two tries to ensure later items get looked at
             return False
-        return self.last_attempted_at < datetime.now() - timedelta(minutes=60)
+        return self.last_attempted_at > self.created_at + timedelta(hours=24)
 
 
 class DiasporaPost(db.Model):

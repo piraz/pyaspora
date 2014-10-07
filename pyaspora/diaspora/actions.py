@@ -24,6 +24,7 @@ from pyaspora.diaspora.models import DiasporaContact, DiasporaPart, \
     DiasporaPost, TryLater
 from pyaspora.diaspora.protocol import DiasporaMessageBuilder
 from pyaspora.post.models import Post
+from pyaspora.roster.models import Subscription
 from pyaspora.tag.models import Tag
 from pyaspora.utils.rendering import ensure_timezone
 
@@ -505,7 +506,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
     def receive(cls, xml, c_from, u_to):
         data = cls.as_dict(xml)
         if DiasporaPost.get_by_guid(data['guid']):
-            raise TryLater()
+            return
         author = DiasporaContact.get_by_username(
             data['diaspora_handle'], True, False
         )
@@ -517,7 +518,7 @@ class SubPost(SignableMixin, TagMixin, MessageHandlerBase):
         if parent:
             parent = parent.post
         else:
-            return
+            raise TryLater()
 
         if u_to:
             assert(parent.shared_with(c_from))
@@ -913,3 +914,30 @@ class PollParticipation(MessageHandlerBase, SignableMixin):
                 # via the hub.
                 if 'parent_author_signature' not in data:
                     cls.forward(u_to, p, node)
+
+
+@diaspora_message_handler('/XML/post/account_deletion')
+class AccountDeletion(MessageHandlerBase):
+    """
+    An account is being deleted
+    """
+    @classmethod
+    def receive(cls, xml, c_from, u_to):
+        data = cls.as_dict(xml)
+
+        participant = DiasporaContact.get_by_username(
+            data['diaspora_handle'], False
+        )
+        if not participant:
+            return
+
+        participant.contact.bio = MimePart(
+            text_preview="This account has been deleted.",
+            body="This account has been deleted.",
+            type="text/plain"
+        )
+        db.session.add(participant)
+        db.session.query(Subscription).filter(
+            Subscription.to_contact == participant.contact
+        ).delete()
+        db.session.commit()
