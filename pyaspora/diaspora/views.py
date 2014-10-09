@@ -258,7 +258,7 @@ def json_feed(guid):
     """
     contact = DiasporaContact.get_by_guid(guid)
     if not(contact and contact.contact.user):
-        abort(404, 'No such contact', force_status=True)
+        abort(404, 'No such contact')
 
     feed_query = Post.Queries.public_wall_for_contact(contact.contact)
     feed = db.session.query(Post).join(Share).filter(feed_query). \
