@@ -243,11 +243,22 @@ def receive_public():
             queue_item.error = err.encode('utf-8')
         db.session.add(queue_item)
         if isinstance(e, TryLater):
-            return 'OK'
+            pass
         else:
             return 'Error', 400
     finally:
         db.session.commit()
+
+    # Sneakily attempt to process one item off the backlog
+    try:
+        queue_items = db.session.query(MessageQueue).filter(
+            MessageQueue.Queries.pending_public_items()
+        ).order_by(MessageQueue.created_at)
+        MessageQueue.process_queue(queue_items, None, max_items=1)
+    except:
+        pass
+
+    return 'OK'
 
 
 @blueprint.route('/people/<string:guid>', methods=['GET'])
@@ -321,30 +332,7 @@ def run_public_queue(_user):
     queue_items = db.session.query(MessageQueue).filter(
         MessageQueue.Queries.pending_public_items()
     ).order_by(MessageQueue.created_at)
-    for qi in queue_items:
-        if qi.error:
-            break
-
-        try:
-            qi.process_incoming()
-        except Exception as e:
-            if isinstance(e, TryLater):
-                if qi.too_old_for_retry:
-                    db.session.delete(qi)
-                else:
-                    qi.last_attempted_at = datetime.now()
-                    db.session.add(qi)
-            else:
-                err = format_exc()
-                qi.error = err.encode('utf-8')
-                qi.last_attempted_at = datetime.now()
-                current_app.logger.error(err)
-                db.session.add(qi)
-                break
-        else:
-            db.session.delete(qi)
-        finally:
-            db.session.commit()
+    MessageQueue.process_queue(queue_items, None)
     return redirect(url_for('feed.view'))
 
 

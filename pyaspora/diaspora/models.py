@@ -295,12 +295,9 @@ class MessageQueue(db.Model):
         return bool(first and not first.error)
 
     @classmethod
-    def process_incoming_queue(cls, user, max_items=None):
-        queue_items = db.session.query(MessageQueue).filter(
-            cls.Queries.pending_items_for_user(user)
-        ).order_by(cls.created_at)
+    def process_queue(cls, query, user, max_items=None):
         processed = 0
-        for qi in queue_items:
+        for qi in query:
             if qi.error:
                 break
 
@@ -308,7 +305,7 @@ class MessageQueue(db.Model):
                 qi.process_incoming(user)
                 processed += 1
                 if max_items and processed > max_items:
-                    break
+                    return
             except Exception as e:
                 if isinstance(e, TryLater):
                     if qi.too_old_for_retry:
@@ -322,11 +319,18 @@ class MessageQueue(db.Model):
                     qi.error = err.encode('utf-8')
                     current_app.logger.error(err)
                     db.session.add(qi)
-                    break
+                    return
             else:
                 db.session.delete(qi)
             finally:
                 db.session.commit()
+
+    @classmethod
+    def process_incoming_queue(cls, user, max_items=None):
+        queue_items = db.session.query(MessageQueue).filter(
+            cls.Queries.pending_items_for_user(user)
+        ).order_by(cls.created_at)
+        cls.process_queue(queue_items, user, max_items)
 
     def process_incoming(self, user=None):
         from pyaspora.diaspora.actions import process_incoming_message
