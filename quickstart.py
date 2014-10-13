@@ -24,7 +24,7 @@ app.config['ALLOW_CREATION'] = False
 # (permit user download from HTTP (not HTTPS), skip some signature processing)
 app.config['ALLOW_INSECURE_COMPAT'] = False
 
-# On/off featurs
+# On/off features
 app.config['FEATURES'] = {
     'gravatar': False  # Use Gravatars for users with no profile picture
 }
