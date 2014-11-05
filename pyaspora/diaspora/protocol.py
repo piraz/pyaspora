@@ -239,7 +239,7 @@ class DiasporaMessageBuilder:
         })
         req = Request(url)
         req.add_header('User-Agent', USER_AGENT)
-        return urlopen(req, data.encode("ascii"))
+        return urlopen(req, data.encode("ascii"), timeout=60)
 
 
 class DiasporaMessageParser:
@@ -441,7 +441,7 @@ class HostMeta(object):
         """
         request = Request(url)
         opener = build_opener(RedirectTrackingHandler())
-        opener.addheaders = [('User-agent', USER_AGENT)]
+        opener.addheaders = [('User-Agent', USER_AGENT)]
         return opener.open(request, timeout=5)
 
     def _get_connection(self):

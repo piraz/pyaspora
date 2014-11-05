@@ -14,7 +14,7 @@ try:
     from urllib.parse import urljoin
     from urllib.request import urlopen
 except:
-    from urllib import urlopen
+    from urllib2 import urlopen
     from urlparse import urljoin
 
 from pyaspora import db
@@ -754,7 +754,7 @@ class Photo(MessageHandlerBase):
         photo_url = urljoin(
             data['remote_photo_path'], data['remote_photo_name']
         )
-        resp = urlopen(photo_url)
+        resp = urlopen(photo_url, timeout=10)
         mime = resp.info().get('Content-Type')
         part = MimePart(
             type=mime,

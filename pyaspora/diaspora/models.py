@@ -93,6 +93,7 @@ class DiasporaContact(db.Model):
             wf = WebfingerRequest(addr).fetch()
         except URLError as e:
             current_app.logger.warning(e)
+            current_app.logger.warning(e.readlines())
             return None
         if not wf:
             return None
@@ -111,17 +112,21 @@ class DiasporaContact(db.Model):
         )[0]
         req = Request(hcard_url)
         req.add_header('User-Agent', USER_AGENT)
-        hcard = html.parse(urlopen(req))
+        hcard = html.parse(urlopen(req, timeout=10))
         c.realname = hcard.xpath('//*[@class="fn"]')[0].text
 
         pod_loc = hcard.xpath('//*[@id="pod_location"]')[0].text
         photo_url = hcard.xpath('//*[@class="entity_photo"]//img/@src')[0]
         if photo_url:
-            mp = import_url_as_mimepart(urljoin(pod_loc, photo_url))
-            mp.text_preview = u'(picture for {0})'.format(
-                c.realname or '(anonymous)'
-            )
-            c.avatar = mp
+            try:
+                mp = import_url_as_mimepart(urljoin(pod_loc, photo_url))
+            except:
+                current_app.logger.debug(format_exc())
+            else:
+                mp.text_preview = u'(picture for {0})'.format(
+                    c.realname or '(anonymous)'
+                )
+                c.avatar = mp
 
         username = wf.xpath(
             '//XRD:Subject/text()',
@@ -179,7 +184,7 @@ class DiasporaContact(db.Model):
         req = Request(url)
         req.add_header('User-Agent', USER_AGENT)
         req.add_header('Accept', 'application/json')
-        entries = json_load(urlopen(req))
+        entries = json_load(urlopen(req, timeout=10))
         for entry in entries:
             user_guid = entry['author']['guid']
             username = entry['author']['diaspora_id']

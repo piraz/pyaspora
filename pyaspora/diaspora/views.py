@@ -341,6 +341,7 @@ def stats():
     return jsonify({
         'name': '{0} Pyaspora'.format(urlsplit(request.url).netloc),
         'version': '0.x',
+        'network': 'Pyaspora',
         'registrations_open': current_app.config.get('ALLOW_CREATION', False),
         'total_users': db.session.query(User).count(),
         'active_users_halfyear':
