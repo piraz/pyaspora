@@ -307,10 +307,9 @@ class MessageQueue(db.Model):
                 break
 
             try:
-                qi.process_incoming(user)
-                processed += 1
                 if max_items and processed > max_items:
                     return
+                qi.process_incoming(user)
             except Exception as e:
                 if isinstance(e, TryLater):
                     if qi.too_old_for_retry:
@@ -328,6 +327,7 @@ class MessageQueue(db.Model):
             else:
                 db.session.delete(qi)
             finally:
+                processed += 1
                 db.session.commit()
 
     @classmethod
