@@ -782,12 +782,21 @@ class Reshare(MessageHandlerBase):
         data = cls.as_dict(xml)
         shared = DiasporaPost.get_by_guid(data['root_guid'])
         if not shared:
+            author = DiasporaContact.get_by_username(
+                data['root_diaspora_id'], True, True
+            )
+            if not author:
+                raise TryLater()
+            author.import_public_posts()
+            shared = DiasporaPost.get_by_guid(data['root_guid'])
+
+        if not shared:
             current_app.logger.warning(
                 'Could not find post being reshared (with GUID {0})'.format(
                     data['root_guid']
                 )
             )
-            return
+            raise TryLater()
         shared = shared.post
         created = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S %Z')
         post = Post(author=c_from, created_at=created)
