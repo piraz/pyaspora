@@ -185,6 +185,8 @@ class DiasporaContact(db.Model):
         req.add_header('User-Agent', USER_AGENT)
         req.add_header('Accept', 'application/json')
         entries = json_load(urlopen(req, timeout=10))
+        if isinstance(entries, dict):
+            return  # Faulty node?
         for entry in entries:
             user_guid = entry['author']['guid']
             username = entry['author']['diaspora_id']

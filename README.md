@@ -5,7 +5,7 @@
 This software is licensed under what the FSF terms the "Expat license", a
 BSD-style license:
 
-Copyright (c) 2012-2014, Luke Ross <lr@lukeross.name> and others
+Copyright (c) 2012-2015, Luke Ross <lr@lukeross.name> and others
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the

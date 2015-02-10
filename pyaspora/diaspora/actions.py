@@ -782,6 +782,7 @@ class Reshare(MessageHandlerBase):
         data = cls.as_dict(xml)
         shared = DiasporaPost.get_by_guid(data['root_guid'])
         if not shared:
+            # Try to pull it from the Atom feed
             author = DiasporaContact.get_by_username(
                 data['root_diaspora_id'], True, True
             )
@@ -791,6 +792,18 @@ class Reshare(MessageHandlerBase):
             shared = DiasporaPost.get_by_guid(data['root_guid'])
 
         if not shared:
+            # Fall back to poking the origin server
+            post_url = urljoin(author.server, "/p/{0}.xml".format(
+                data['root_guid']
+            ))
+            resp = urlopen(post_url, timeout=10)
+            current_app.logger.debug(
+                'Injecting downloaded message into processing loop'
+            )
+            process_incoming_message(resp.read(), author.contact, None)
+
+        if not shared:
+            # Failed
             current_app.logger.warning(
                 'Could not find post being reshared (with GUID {0})'.format(
                     data['root_guid']
