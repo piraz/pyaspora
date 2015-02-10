@@ -801,6 +801,7 @@ class Reshare(MessageHandlerBase):
                 'Injecting downloaded message into processing loop'
             )
             process_incoming_message(resp.read(), author.contact, None)
+            shared = DiasporaPost.get_by_guid(data['root_guid'])
 
         if not shared:
             # Failed
