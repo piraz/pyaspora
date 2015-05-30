@@ -50,8 +50,8 @@ mail server. Then you can start the server with:
 Then browse to:
 
 - `http://localhost:5000/setup`
-- `http://localhost:5000/user/create`
-- `http://localhost:5000/user/login`
+- `http://localhost:5000/users/create`
+- `http://localhost:5000/users/login`
 
 ## Dependencies
 
