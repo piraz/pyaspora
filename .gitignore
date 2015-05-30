@@ -37,5 +37,8 @@ nosetests.xml
 .project
 .pydevproject
 
+# PyCharm
+.idea/
+
 # Pyaspora specific
 quickstart.py
