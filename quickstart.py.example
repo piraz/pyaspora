@@ -20,6 +20,10 @@ app.config['UPLOAD_FOLDER'] = '/tmp'
 # Whether to allow new-user signup
 app.config['ALLOW_CREATION'] = True
 
+# Whether login requires account activation
+# NOTE! Strongly encouraged to change this to True in a production server
+app.config["USER_REQUIRE_ACTIVATION"] = False
+
 # Whether to make more Diaspora-compatible at the expense of security
 # (permit user download from HTTP (not HTTPS), skip some signature processing)
 app.config['ALLOW_INSECURE_COMPAT'] = False

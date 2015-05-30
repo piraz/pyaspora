@@ -66,7 +66,7 @@ def log_in_user(email, password):
     if not user:
         return None
 
-    if not user.activated:
+    if current_app.config.get('USER_REQUIRE_ACTIVATION', True) and not user.activated:
         return None
 
     key = user.unlock_key_with_password(password)
