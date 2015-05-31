@@ -57,11 +57,11 @@ def view(_user):
     data = {
         'feed': json_posts([(s.post, s) for s in feed], _user, True),
         'limit': limit,
+        'actions': {},
     }
+
     if len(data['feed']) >= limit:
-        data['actions'] = {
-            'more': url_for('feed.view', limit=limit + 10, _external=True)
-        }
+        data['actions']['more'] = url_for('feed.view', limit=limit + 10, _external=True)
 
     add_logged_in_user_to_data(data, _user)
 

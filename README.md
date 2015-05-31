@@ -40,7 +40,7 @@ protection)
 
 ## Quick Start
 
-Edit the file `quickstart.py` to specify a secret session key and a suitable
+Copy the example `quickstart.py.example` as `quickstart.py`, edit it and specify a secret session key and a suitable
 mail server. Then you can start the server with:
 
 ```shell
@@ -50,8 +50,8 @@ mail server. Then you can start the server with:
 Then browse to:
 
 - `http://localhost:5000/setup`
-- `http://localhost:5000/user/create`
-- `http://localhost:5000/user/login`
+- `http://localhost:5000/users/create`
+- `http://localhost:5000/users/login`
 
 ## Dependencies
 
